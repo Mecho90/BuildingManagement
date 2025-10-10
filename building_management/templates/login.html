@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Вписване</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 2rem; }
+    .card { max-width: 360px; margin: 10vh auto; padding: 1.5rem; border: 1px solid #ddd; border-radius: 12px; }
+    .title { margin: 0 0 1rem; }
+    .field { display: grid; gap: 0.25rem; margin-bottom: 0.75rem; }
+    input { padding: 0.6rem 0.7rem; border-radius: 8px; border: 1px solid #bbb; width: 100%; }
+    button { padding: 0.7rem 0.9rem; border-radius: 8px; border: 1px solid #333; background: #fff; cursor: pointer; width: 100%; }
+    .error { color: #b00020; margin: 0.5rem 0 0.25rem; min-height: 1.25rem; }
+    .hint { color: #666; font-size: 0.9rem; margin-top: 0.75rem; }
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 class="title">Вписване</h1>
+    {% if error %}<div class="error">{{ error }}</div>{% else %}<div class="error"></div>{% endif %}
+    <form method="post" action="/login" novalidate>
+      <div class="field">
+        <label for="username">Потребителско Име</label>
+        <input id="username" name="username" type="username" autocomplete="username" required />
+      </div>
+      <div class="field">
+        <label for="password">Парола</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit">Вход</button>
+    </form>
+
+    <form method="post" action="/signup" style="margin-top:1rem">
+      <div class="hint">No account? Quick-create one for demo:</div>
+      <div class="field">
+        <input name="username" type="username" placeholder="test123" required />
+      </div>
+      <div class="field">
+        <input name="password" type="password" placeholder="password" required />
+      </div>
+      <button type="submit">Create account</button>
+    </form>
+  </div>
+</body>
+</html>
