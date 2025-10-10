@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <title>Категории</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 2rem; }
+    .wrap { max-width: 760px; margin: 6vh auto; display: grid; gap: 1.25rem; }
+    .card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 1rem; }
+    .row { display: flex; gap: .5rem; align-items: center; }
+    input, button { padding: .6rem .7rem; border-radius: 8px; border: 1px solid #bbb; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { display: flex; justify-content: space-between; padding: .5rem 0; border-bottom: 1px dashed #eee; }
+    .chip { display: inline-block; padding: .25rem .5rem; border: 1px solid #ddd; border-radius: 999px; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="row" style="justify-content: space-between;">
+      <h1>Категории</h1>
+      <div>Потребител: <strong>{{ username }}</strong> | <a href="/logout">Отписване</a></div>
+    </header>
+
+    <section class="card">
+      <h2 style="margin:0 0 .75rem">Нова категория</h2>
+      <form method="post" action="/categories" class="row" autocomplete="off">
+        <input name="name" type="text" placeholder="Име на категорията" required style="flex:1" />
+        <button type="submit">Създай</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2 style="margin:0 0 .75rem">Моите категории</h2>
+      {% if categories and categories|length > 0 %}
+      <ul>
+        {% for c in categories %}
+        <li>
+          <a href="/categories/{{ c.id }}">{{ c.name }}</a>
+          <span>
+            <span class="chip">Активни: {{ c.active_count }}</span>
+            <span class="chip">Архив: {{ c.archived_count }}</span>
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p><em>Няма категории. Създайте първата си категория горе.</em></p>
+      {% endif %}
+    </section>
+  </div>
+</body>
+</html>

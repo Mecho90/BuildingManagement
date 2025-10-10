@@ -1,0 +1,107 @@
+<!-- templates/category_detail.html -->
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ category.name }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 2rem; }
+    .wrap { max-width: 760px; margin: 6vh auto; display: grid; gap: 1.25rem; }
+    .card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 1rem; }
+    .row { display: flex; gap: .5rem; align-items: center; }
+    input, button, select { padding: .6rem .7rem; border-radius: 8px; border: 1px solid #bbb; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { display: flex; align-items: center; justify-content: space-between; padding: .5rem 0; border-bottom: 1px dashed #eee; }
+    .done { text-decoration: line-through; opacity: .6; }
+    .task-left { display: inline-flex; align-items: center; gap: .5rem; }
+    .check { color: #16a34a; font-weight: 700; }   /* Обработено */
+    .warn  { color: #ca8a04; font-weight: 700; }   /* В процел на обработка -> ⚠️ */
+    .alert { color: #dc2626; font-weight: 700; }   /* В процес на изчакване -> 🚨 */
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="row" style="justify-content: space-between;">
+      <h1>{{ category.name }}</h1>
+      <div>Потребител: <strong>{{ username }}</strong> | <a href="/categories">Всички категории</a> | <a href="/logout">Отписване</a></div>
+    </header>
+
+    <section class="card">
+      <h2 style="margin:0 0 .75rem">Добавяне на задача</h2>
+      <form method="post" action="/categories/{{ category.id }}/tasks" class="row" autocomplete="off">
+        <input name="title" type="text" placeholder="Нова задача…" required style="flex:1" />
+        <button type="submit">Добавяне</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2 style="margin:0 0 .75rem">Задачи</h2>
+      {% if tasks and tasks|length > 0 %}
+      <ul>
+        {% for t in tasks %}
+        <li>
+          <span class="task-left">
+            {% if t.status == "Обработено" %}
+              <span class="check" aria-hidden="true">✓</span>
+            {% elif t.status == "В процел на обработка" %}
+              <span class="warn" aria-hidden="true">⚠️</span>
+            {% elif t.status == "В процес на изчакване" %}
+              <span class="alert" aria-hidden="true">🚨</span>
+            {% endif %}
+            <span class="{% if t.status == 'Обработено' %}done{% endif %}">{{ t.title }}</span>
+          </span>
+          <span class="row">
+            <form method="post" action="/tasks/{{ t.id }}/status">
+              <select name="status" onchange="this.form.submit()">
+                {% for s in STATUSES %}
+                  <option value="{{ s }}" {% if t.status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+            </form>
+            {% if t.status == "Обработено" %}
+            <form method="post" action="/tasks/{{ t.id }}/archive" onsubmit="return confirm('Архивиране на задача?');">
+              <button type="submit">Архивиране</button>
+            </form>
+            {% endif %}
+            <form method="post" action="/tasks/{{ t.id }}/delete" onsubmit="return confirm('Да изтривам задачата завинаги?');">
+              <button type="submit">Изтриване</button>
+            </form>
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p><em>Няма задачи в тази категория.</em></p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2 style="margin:0 0 .75rem">Архив</h2>
+      {% if archived and archived|length > 0 %}
+      <ul>
+        {% for t in archived %}
+        <li>
+          <span class="task-left">
+            <span class="check" aria-hidden="true">✓</span>
+            <span class="done">{{ t.title }}</span>
+          </span>
+          <span class="row">
+            <form method="post" action="/tasks/{{ t.id }}/unarchive">
+              <button type="submit">Възстановяване</button>
+            </form>
+            <form method="post" action="/tasks/{{ t.id }}/delete" onsubmit="return confirm('Да изтривам задачата завинаги?');">
+              <button type="submit">Изтриване</button>
+            </form>
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p><em>Няма архивирани задачи.</em></p>
+      {% endif %}
+    </section>
+  </div>
+</body>
+</html>
