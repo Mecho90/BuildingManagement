@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Delete User · Building Management{% endblock %}
+{% block content %}
+<h2>Delete User</h2>
+<p>Are you sure you want to delete user <strong>{{ object.username }}</strong>?</p>
+<form method="post">
+  {% csrf_token %}
+  <button class="btn" type="submit">Yes, delete</button>
+  <a class="btn" href="{% url 'users_list' %}">Cancel</a>
+</form>
+{% endblock %}

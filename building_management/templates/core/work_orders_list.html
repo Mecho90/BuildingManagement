@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Work Orders · Building Management{% endblock %}
+{% block content %}
+<h2>Work Orders</h2>
+<p><a class="btn" href="{% url 'work_order_create' %}">New Work Order</a></p>
+<table>
+  <thead><tr><th>Title</th><th>Unit</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+  <tbody>
+  {% for w in work_orders %}
+    <tr>
+      <td>{{ w.title }}</td>
+      <td>{{ w.unit.building.name }} #{{ w.unit.number }}</td>
+      <td>{{ w.get_status_display }}</td>
+      <td>{{ w.created_at }}</td>
+      <td><a class="btn" href="{% url 'work_order_update' w.id %}">Edit</a></td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5">No work orders.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

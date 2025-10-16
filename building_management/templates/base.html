@@ -1,0 +1,48 @@
+<!-- path: templates/base.html -->
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{% block title %}Building Management{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <header class="site-topbar">
+      <div class="container row space-between">
+        <nav class="left row gap" aria-label="Primary">
+          {# REMOVED the brand link so only nav items show #}
+          <a class="navlink{% if request.path == request.build_absolute_uri|slice:':0' %}{% endif %}" href="{% url 'buildings_list' %}">Buildings</a>
+          {% if work_orders_enabled and work_orders_url %}
+            <a class="navlink" href="{{ work_orders_url }}">Work Orders</a>
+          {% endif %}
+          {% if user.is_staff %}
+            <a class="navlink" href="{% url 'admin:index' %}">Admin Panel</a>
+          {% endif %}
+        </nav>
+        <div class="right row gap">
+          {% if user.is_authenticated %}
+            <span class="muted">Welcome, {{ user.get_full_name|default:user.username }}</span>
+            <form class="inline-form" action="{% url 'logout' %}" method="post">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-secondary">Logout</button>
+            </form>
+          {% else %}
+            <a class="btn" href="{% url 'login' %}">Login</a>
+          {% endif %}
+        </div>
+      </div>
+      {% if messages %}
+        <div class="container messages">
+          {% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}
+        </div>
+      {% endif %}
+    </header>
+
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

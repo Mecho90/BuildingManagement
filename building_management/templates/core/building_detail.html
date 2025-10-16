@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% load markdownify %}
+
+{% block title %}{{ building.name }} · Buildings{% endblock %}
+
+{% block content %}
+  {# Top bar with Back only #}
+  <nav class="bm-subnav row gap">
+    <a class="btn" href="{% url 'buildings_list' %}">← Back</a>
+  </nav>
+
+  <section>
+    {# === Name + actions on the same line === #}
+    <div class="row space-between" style="align-items:center; gap:1rem; flex-wrap:wrap;">
+      <h2 class="mb-0">{{ building.name }}</h2>
+      <div class="row gap">
+        <a class="btn" href="{% url 'building_update' building.id %}">Edit</a>
+        <a class="btn btn-danger" href="{% url 'building_delete' building.id %}">Delete</a>
+      </div>
+    </div>
+
+    <p class="mb-1"><strong>Address:</strong> {{ building.address }}</p>
+    <p class="mb-2"><strong>Owner:</strong> {% if building.owner %}{{ building.owner.username }}{% else %}—{% endif %}</p>
+
+    <h3>Description</h3>
+    <div class="bm-description mb-2">
+      {% if building.description %}
+        {{ building.description|markdownify }}
+      {% else %}
+        <em>No description.</em>
+      {% endif %}
+    </div>
+
+    <hr class="section-divider" />
+
+    {# ===== Units header + Add button ===== #}
+    <div class="row space-between" style="gap:1rem; align-items:center; flex-wrap:wrap;">
+      <h3 class="mb-0">Units</h3>
+      {% if can_edit %}
+        <a class="btn" href="{% url 'unit_create' building.id %}">Add Unit</a>
+      {% endif %}
+    </div>
+
+    {# ===== Units filter (input-group) ===== #}
+    <div class="row space-between" style="gap:1rem; flex-wrap:wrap; margin-top:.6rem;">
+      <form method="get" class="row" style="gap:1rem; flex:1;">
+        <div class="input-group" style="flex:1; max-width:640px;">
+          <label for="id_u_q" class="sr-only">Search</label>
+          <input id="id_u_q" class="input-search" type="text" name="u_q" value="{{ u_q }}"
+                 placeholder="Number, floor or description"/>
+          <button class="btn" type="submit">Filter</button>
+        </div>
+
+        <div>
+          <label for="id_u_per">Page size:</label><br/>
+          <select id="id_u_per" name="u_per" onchange="this.form.submit()">
+            <option value="10" {% if u_per == 10 %}selected{% endif %}>10</option>
+            <option value="20" {% if u_per == 20 %}selected{% endif %}>20</option>
+            <option value="50" {% if u_per == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if u_per == 100 %}selected{% endif %}>100</option>
+          </select>
+        </div>
+
+        <input type="hidden" name="u_sort" value="{{ u_sort }}"/>
+
+        {% if u_q or u_per != 10 or u_sort != 'number' %}
+          <a class="btn btn-secondary" href="{% url 'building_detail' building.id %}">Reset</a>
+        {% endif %}
+      </form>
+    </div>
+
+    <div class="table-wrap" style="margin-top:.5rem;">
+      <table class="bm-table">
+        <thead>
+          <tr>
+            <th>
+              {% with field='number' %}
+                {% if u_sort == field %}
+                  {% with next='-'|add:field %}
+                    <a href="?u_sort={{ next }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number ▲</a>
+                  {% endwith %}
+                {% elif u_sort == '-'|add:field %}
+                  <a href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number ▼</a>
+                {% else %}
+                  <a href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number</a>
+                {% endif %}
+              {% endwith %}
+            </th>
+            <th>
+              {% with field='floor' %}
+                {% if u_sort == field %}
+                  {% with next='-'|add:field %}
+                    <a href="?u_sort={{ next }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor ▲</a>
+                  {% endwith %}
+                {% elif u_sort == '-'|add:field %}
+                  <a href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor ▼</a>
+                {% else %}
+                  <a href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor</a>
+                {% endif %}
+              {% endwith %}
+            </th>
+            <th>
+              {% with field='occupied' %}
+                {% if u_sort == field %}
+                  {% with next='-'|add:field %}
+                    <a href="?u_sort={{ next }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Occupied ▲</a>
+                  {% endwith %}
+                {% elif u_sort == '-'|add:field %}
+                  <a href="?u_sort=occupied{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Occupied ▼</a>
+                {% else %}
+                  <a href="?u_sort=occupied{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Occupied</a>
+                {% endif %}
+              {% endwith %}
+            </th>
+            <th>Description</th>
+            {% if can_edit %}<th class="text-right">Actions</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in units_page %}
+            <tr>
+              <td><a href="{% url 'unit_update' u.id %}">{{ u.number }}</a></td>
+              <td>{{ u.floor }}</td>
+              <td>{{ u.occupied|yesno:"Yes,No" }}</td>
+              <td>{% if u.description %}{{ u.description|truncatechars:140 }}{% else %}<span class="muted">—</span>{% endif %}</td>
+              {% if can_edit %}
+                <td class="text-right">
+                  <a class="btn" href="{% url 'unit_update' u.id %}">Edit</a>
+                  <a class="btn btn-danger" href="{% url 'unit_delete' u.id %}">Delete</a>
+                </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="{% if can_edit %}5{% else %}4{% endif %}">No units.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if units_page.has_other_pages %}
+      <div class="row gap mt-2" style="flex-wrap:wrap;">
+        {% if units_page.has_previous %}
+          <a class="btn" href="?u_page={{ units_page.previous_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">‹ Prev</a>
+        {% else %}
+          <span class="btn is-disabled">‹ Prev</span>
+        {% endif %}
+        <span class="muted">Page {{ units_page.number }} of {{ units_page.paginator.num_pages }}</span>
+        {% if units_page.has_next %}
+          <a class="btn" href="?u_page={{ units_page.next_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Next ›</a>
+        {% else %}
+          <span class="btn is-disabled">Next ›</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

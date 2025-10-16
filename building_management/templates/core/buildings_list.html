@@ -1,0 +1,118 @@
+{# path: templates/core/buildings_list.html #}
+{% extends "base.html" %}
+{% block title %}Buildings · Building Management{% endblock %}
+
+{% block content %}
+<h1 class="mb-2">Buildings</h1>
+
+<div class="row space-between" style="gap:1rem; flex-wrap:wrap;">
+  <form method="get" class="row" style="gap:1rem; flex:1;">
+    <div class="input-group" style="flex:1; max-width:640px;">
+      <label class="sr-only" for="id_q">Search</label>
+      <input
+        id="id_q"
+        class="input-search"
+        type="text"
+        name="q"
+        value="{{ q }}"
+        placeholder="Name, address, owner"
+      />
+      <button class="btn" type="submit">Filter</button>
+    </div>
+
+    <div>
+      <label for="id_per">Page size:</label><br/>
+      <select id="id_per" name="per" onchange="this.form.submit()">
+        {% for opt in per_choices %}
+          <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {# preserve current sort while filtering/changing page size #}
+    <input type="hidden" name="sort" value="{{ sort }}"/>
+
+    {% if q or per != 10 or sort != 'name' %}
+      <a class="btn btn-secondary" href="{% url 'buildings_list' %}">Reset</a>
+    {% endif %}
+  </form>
+
+  <div><a class="btn" href="{% url 'building_create' %}">Add new building</a></div>
+</div>
+
+<div class="table-wrap">
+  <table class="bm-table">
+    <thead>
+      <tr>
+        <th>
+          {% if sort == 'name' %}
+            {% with next='-name' %}<a href="?q={{ q|urlencode }}&sort={{ next }}&per={{ per }}">Name ▲</a>{% endwith %}
+          {% elif sort == '-name' %}
+            <a href="?q={{ q|urlencode }}&sort=name&per={{ per }}">Name ▼</a>
+          {% else %}
+            <a href="?q={{ q|urlencode }}&sort=name&per={{ per }}">Name</a>
+          {% endif %}
+        </th>
+        <th>
+          {% if sort == 'address' %}
+            {% with next='-address' %}<a href="?q={{ q|urlencode }}&sort={{ next }}&per={{ per }}">Address ▲</a>{% endwith %}
+          {% elif sort == '-address' %}
+            <a href="?q={{ q|urlencode }}&sort=address&per={{ per }}">Address ▼</a>
+          {% else %}
+            <a href="?q={{ q|urlencode }}&sort=address&per={{ per }}">Address</a>
+          {% endif %}
+        </th>
+        <th style="white-space:nowrap;">
+          {% if sort == 'units_count' %}
+            {% with next='-units_count' %}<a href="?q={{ q|urlencode }}&sort={{ next }}&per={{ per }}">Units ▲</a>{% endwith %}
+          {% elif sort == '-units_count' %}
+            <a href="?q={{ q|urlencode }}&sort=units_count&per={{ per }}">Units ▼</a>
+          {% else %}
+            <a href="?q={{ q|urlencode }}&sort=units_count&per={{ per }}">Units</a>
+          {% endif %}
+        </th>
+        {% if show_owner_col %}<th>Owner</th>{% endif %}
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in buildings %}
+        <tr>
+          <td><a href="{% url 'building_detail' b.id %}">{{ b.name }}</a></td>
+          <td>{{ b.address }}</td>
+          <td>{{ b.units_count }}</td>
+          {% if show_owner_col %}
+            <td>{% if b.owner %}{{ b.owner.username }}{% else %}—{% endif %}</td>
+          {% endif %}
+          <td>
+            {% if user.is_staff or b.owner_id == user.id %}
+              <a class="btn" href="{% url 'building_update' b.id %}">Edit</a>
+              <a class="btn btn-danger" href="{% url 'building_delete' b.id %}">Delete</a>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="{% if show_owner_col %}5{% else %}4{% endif %}">
+            No buildings found.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+  <div class="row" style="margin-top:1rem; gap:.5rem; flex-wrap:wrap;">
+    {% if page_obj.has_previous %}
+      <a class="btn" href="?q={{ q|urlencode }}&sort={{ sort }}&per={{ per }}&page=1">« First</a>
+      <a class="btn" href="?q={{ q|urlencode }}&sort={{ sort }}&per={{ per }}&page={{ page_obj.previous_page_number }}">‹ Prev</a>
+    {% endif %}
+    <span class="muted">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a class="btn" href="?q={{ q|urlencode }}&sort={{ sort }}&per={{ per }}&page={{ page_obj.next_page_number }}">Next ›</a>
+      <a class="btn" href="?q={{ q|urlencode }}&sort={{ sort }}&per={{ per }}&page={{ paginator.num_pages }}">Last »</a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Delete Unit · Building Management{% endblock %}
+
+{% block content %}
+<section>
+  <h2 class="mb-2">Delete Unit</h2>
+
+  <p class="mb-2">
+    Are you sure you want to delete
+    <strong>Unit {{ object.number }}</strong>
+    {% if object.building %}in <strong>{{ object.building.name }}</strong>{% endif %}?
+    This will also delete any related work orders.
+  </p>
+
+  <form method="post" class="mt-2">
+    {% csrf_token %}
+    <button class="btn btn-danger" type="submit">Yes, delete</button>
+    {% if object.building_id %}
+      <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">Cancel</a>
+    {% else %}
+      <a class="btn btn-secondary" href="{% url 'buildings_list' %}">Cancel</a>
+    {% endif %}
+  </form>
+</section>
+{% endblock %}
