@@ -1,11 +1,8 @@
 {% extends "base.html" %}
-{% block title %}{% if form.instance.pk %}Edit{% else %}New{% endif %} Work Order · Building Management{% endblock %}
+{% block title %}{% if form.instance.pk %}Edit Work Order{% else %}New Work Order{% endif %} · Building Management{% endblock %}
+
 {% block content %}
-<h2>{% if form.instance.pk %}Edit{% else %}New{% endif %} Work Order</h2>
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button class="btn" type="submit">Save</button>
-  <a class="btn" href="{% url 'work_orders_list' %}">Cancel</a>
-</form>
+  {% with t=form.instance.pk|yesno:"Edit Work Order,New Work Order" %}
+    {% include "core/_form_layout.html" with form=form title=t subtitle="" cancel_url=cancel_url %}
+  {% endwith %}
 {% endblock %}

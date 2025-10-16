@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Work Order · {{ order.title }}{% endblock %}
+
+{% block content %}
+  <nav class="bm-subnav row gap">
+    <a class="btn" href="{{ cancel_url|default:request.META.HTTP_REFERER|default:'/' }}">← Back</a>
+  </nav>
+
+  <h2 class="mb-1">{{ order.title }}</h2>
+  <p class="mb-1"><strong>Building:</strong> {{ order.unit.building.name }}</p>
+  <p class="mb-1"><strong>Unit:</strong> {% if order.unit_id %}#{{ order.unit.number }}{% else %}—{% endif %}</p>
+  <p class="mb-1"><strong>Status:</strong> {{ order.get_status_display }}</p>
+  <p class="mb-2"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+
+  {% if order.description %}<pre style="white-space:pre-wrap">{{ order.description }}</pre>{% endif %}
+{% endblock %}

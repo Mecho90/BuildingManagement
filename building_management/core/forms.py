@@ -7,14 +7,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from .models import Building, Unit
-
-# Optional import of WorkOrder if present in your app
-try:
-    from .models import WorkOrder  # type: ignore
-    HAS_WORK_ORDERS = False
-except Exception:
-    HAS_WORK_ORDERS = False
+from .models import Building, Unit, WorkOrder
 
 
 # ---------------------------
@@ -159,29 +152,26 @@ class UnitForm(forms.ModelForm):
 
 
 # -------------------
-# Work order form (optional)
+# Work order form
 # -------------------
+class WorkOrderForm(forms.ModelForm):
+    class Meta:
+        model = WorkOrder
+        fields = ["unit", "title", "description", "status"]
+        widgets = {
+            "title": forms.TextInput(attrs={"placeholder": "Short title"}),
+            "description": forms.Textarea(attrs={"placeholder": "Details (optional)"}),
+        }
 
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user", None)
+        building = kwargs.pop("building", None)  # NEW: optionally scope to a building
+        super().__init__(*args, **kwargs)
 
-if HAS_WORK_ORDERS:
+        qs = Unit.objects.select_related("building")
+        if building is not None:
+            qs = qs.filter(building=building)
+        if user and not getattr(user, "is_staff", False):
+            qs = qs.filter(building__owner=user)
 
-    class WorkOrderForm(forms.ModelForm):
-        class Meta:
-            model = WorkOrder  # type: ignore[name-defined]
-            fields = ["building", "title", "description", "status", "assignee"]
-            widgets = {
-                "building": forms.Select(),
-                "title": forms.TextInput(attrs={"placeholder": "Short summary"}),
-                "description": forms.Textarea(attrs={"rows": 6}),
-                "status": forms.Select(),
-                "assignee": forms.Select(),
-            }
-
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-            # Styling
-            for fname, field in self.fields.items():
-                if isinstance(field.widget, (forms.TextInput, forms.Select)):
-                    _add_cls(field.widget, "input-lg")
-                elif isinstance(field.widget, forms.Textarea):
-                    _add_cls(field.widget, "textarea-lg")
+        self.fields["unit"].queryset = qs.order_by("building__name", "floor", "number")

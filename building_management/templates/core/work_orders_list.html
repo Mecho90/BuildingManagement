@@ -1,22 +1,94 @@
+{# path: templates/core/work_orders_list.html #}
 {% extends "base.html" %}
 {% block title %}Work Orders · Building Management{% endblock %}
+
 {% block content %}
-<h2>Work Orders</h2>
-<p><a class="btn" href="{% url 'work_order_create' %}">New Work Order</a></p>
-<table>
-  <thead><tr><th>Title</th><th>Unit</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
-  <tbody>
-  {% for w in work_orders %}
-    <tr>
-      <td>{{ w.title }}</td>
-      <td>{{ w.unit.building.name }} #{{ w.unit.number }}</td>
-      <td>{{ w.get_status_display }}</td>
-      <td>{{ w.created_at }}</td>
-      <td><a class="btn" href="{% url 'work_order_update' w.id %}">Edit</a></td>
-    </tr>
-  {% empty %}
-    <tr><td colspan="5">No work orders.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
+<h1 class="mb-2">Work Orders</h1>
+
+{# Header row with Add button on the right (like building_detail.html) #}
+<div class="row space-between" style="align-items:center;gap:1rem;flex-wrap:wrap;">
+  <div class="flex-1"></div>
+  <div><a class="btn" href="{% url 'work_order_create' %}">Add Work Order</a></div>
+</div>
+
+{# One-line filter bar (search + Filter | Page size | Status) #}
+<form method="get" class="filter-grid" style="margin-top:.6rem;">
+  {# Search + Filter button (expands) #}
+  <div class="input-group" style="width:100%;">
+    <label class="sr-only" for="id_q">Search</label>
+    <input id="id_q" class="input-search" type="text" name="q" value="{{ q }}" placeholder="Title or description">
+    <button class="btn" type="submit">Filter</button>
+  </div>
+
+  {# Page size (first on the right, like the building page) #}
+  <div>
+    <label for="id_per">Page size:</label><br/>
+    <select id="id_per" name="per" onchange="this.form.submit()">
+      {% for opt in per_choices %}
+        <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# Status (to the right of Page size) #}
+  <div>
+    <label for="id_status">Status:</label><br/>
+    <select id="id_status" name="status" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="table-wrap" style="margin-top:.5rem;">
+  <table class="bm-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Unit</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th class="text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for w in orders %}
+        <tr>
+          <td><a href="{% url 'work_order_update' w.id %}">{{ w.title }}</a></td>
+          <td>
+            {% if w.unit_id %}
+              <a href="{% url 'building_detail' w.unit.building_id %}">
+                {{ w.unit.building.name }} — #{{ w.unit.number }}
+              </a>
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ w.get_status_display }}</td>
+          <td>{{ w.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="text-right">
+            <a class="btn" href="{% url 'work_order_update' w.id %}">Edit</a>
+            <a class="btn btn-danger" href="{% url 'work_order_delete' w.id %}">Delete</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">No work orders.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_paginated %}
+  <div class="row" style="margin-top:1rem;flex-wrap:wrap;gap:.5rem;">
+    {% if page_obj.has_previous %}
+      <a class="btn" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page=1">« First</a>
+      <a class="btn" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ page_obj.previous_page_number }}">‹ Prev</a>
+    {% endif %}
+    <span class="muted">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a class="btn" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ page_obj.next_page_number }}">Next ›</a>
+      <a class="btn" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ paginator.num_pages }}">Last »</a>
+    {% endif %}
+  </div>
+{% endif %}
 {% endblock %}

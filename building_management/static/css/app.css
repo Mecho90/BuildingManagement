@@ -93,12 +93,11 @@ input:focus,select:focus,textarea:focus{
 .errors{color:var(--danger);margin-top:.35rem}
 
 /* --- Input group for search + button ---
-   Default: keep full rounded corners so the button matches other .btns.
-   Use '.input-group.joined' if you want the old seamless-pill look. */
+   Default: separate button. Add `.input-group.joined` to attach them. */
 .input-group{display:flex;align-items:center;gap:.5rem}
 .input-search{flex:1;min-width:min(32rem,100%)}
 
-/* Optional joined variant */
+/* Optional joined variant (pill) */
 .input-group.joined > input[type="text"],
 .input-group.joined > select,
 .input-group.joined > textarea{
@@ -142,4 +141,47 @@ input:focus,select:focus,textarea:focus{
   border:0;
   border-top:1px solid var(--border);
   margin:1.25rem 0;
+}
+
+/* Compact filter toolbar (generic grid helper if needed elsewhere) */
+.filter-grid{
+  display:grid;
+  grid-template-columns: 1fr auto auto; /* search | control | control */
+  gap:.75rem;
+  align-items:end;
+}
+@media (max-width: 900px){
+  .filter-grid{
+    grid-template-columns: 1fr;      /* stack controls on small screens */
+  }
+  .filter-grid > *{ width:100%; }
+}
+
+/* ===== Work Orders filter layout (two rows helper) ===== */
+.wo-filter .filters-top{
+  display:flex;
+  gap:.75rem;
+  align-items:center;
+}
+.wo-filter .filters-top .input-group{ flex:1; }
+
+.wo-filter .filters-bottom{
+  display:flex;
+  gap:1rem;
+  justify-content:flex-end;
+  align-items:flex-end;
+  flex-wrap:wrap;
+  margin-top:.5rem;
+}
+.wo-filter select{ min-width:8rem; }
+
+/* ---------- Critical overlap fix ---------- */
+/* Allow the search input to shrink inside grid toolbars */
+.filter-grid .input-group,
+.filter-grid .input-group .input-search{
+  min-width:0;
+}
+/* Keep dropdowns usable */
+.filter-grid select{
+  min-width:8.5rem;
 }

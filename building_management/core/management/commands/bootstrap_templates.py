@@ -16,7 +16,6 @@ BASE = """<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Building Management</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 1.5rem; }
@@ -31,7 +30,6 @@ BASE = """<!doctype html>
   </head>
   <body>
     <header>
-      <h1>Building Management</h1>
       <nav>
         <a href="/buildings/">Buildings</a>
         <a href="/units/">Units</a>
@@ -156,7 +154,7 @@ class Command(BaseCommand):
             base_dir / "core" / "building_detail.html": BUILDING_DETAIL,
             base_dir / "core" / "units_list.html": UNITS_LIST,
             base_dir / "core" / "work_orders_list.html": WORK_ORDERS_LIST,
-            base_dir / "core" / "work_order_form.html": WORK_ORDER_FORM,
+            base_dir / "core" / "l": WORK_ORDER_FORM,
         }
 
         for path, content in files.items():
