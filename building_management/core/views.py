@@ -7,7 +7,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from django.http import Http404, JsonResponse, HttpRequest, HttpResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
 
@@ -183,8 +183,9 @@ class BuildingDetailView(NavContextMixin, LoginRequiredMixin, DetailView):
         w_status = (req.GET.get("w_status") or "").strip()
 
         w_qs = (
-            WorkOrder.objects.filter(unit__building=building)
-            .select_related("unit", "unit__building")
+            WorkOrder.objects
+            .filter(Q(building=building) | Q(unit__building=building))
+            .select_related("unit", "unit__building", "building")
             .order_by("-created_at")
         )
         if w_q:
@@ -422,9 +423,12 @@ class WorkOrderDetailView(NavContextMixin, LoginRequiredMixin, DetailView):
     context_object_name = "order"
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related("unit", "unit__building")
+        qs = super().get_queryset().select_related("unit", "unit__building", "building")
         if not is_admin(self.request.user):
-            qs = qs.filter(unit__building__owner=self.request.user)
+            qs = qs.filter(
+                Q(unit__building__owner=self.request.user) |
+                Q(building__owner=self.request.user)
+            )
         return qs
 
     def get_context_data(self, **kwargs):
@@ -436,21 +440,25 @@ class WorkOrderDetailView(NavContextMixin, LoginRequiredMixin, DetailView):
         else:
             ctx["cancel_url"] = reverse("work_orders_list")
         return ctx
-    
+
+
 class WorkOrderListView(NavContextMixin, LoginRequiredMixin, ListView):
     model = WorkOrder
-    template_name = "core/work_orders_list.html"
+    template_name = "core/work_orders_list.html"  # match your template path
     context_object_name = "orders"
 
     def get_queryset(self):
         qs = (
-            WorkOrder.objects.all()
-            .select_related("unit", "unit__building")
+            WorkOrder.objects
+            .select_related("unit", "unit__building", "building")
             .order_by("-created_at")
         )
-        user = self.request.user
-        if not is_admin(user):
-            qs = qs.filter(unit__building__owner=user)
+        # Owner filter once — include both unit->building owner and direct building owner
+        if not is_admin(self.request.user):
+            qs = qs.filter(
+                Q(unit__building__owner=self.request.user) |
+                Q(building__owner=self.request.user)
+            )
 
         q = (self.request.GET.get("q") or "").strip()
         if q:
@@ -480,35 +488,30 @@ class WorkOrderListView(NavContextMixin, LoginRequiredMixin, ListView):
 class _WorkOrderBase(NavContextMixin, LoginRequiredMixin):
     model = WorkOrder
     form_class = WorkOrderForm
-    success_url = reverse_lazy("work_orders_list")
-    
-    def _building_for_context(self):
-        """Resolve a Building to return to (prefer ?building=, else from object)."""
-        b = self._requested_building()
-        if not b and getattr(self, "object", None) and self.object.unit_id:
-            b = self.object.unit.building
-        return b
+    success_url = reverse_lazy("work_orders_list")  # fallback
 
+    # ----- helpers -----
     def _requested_building(self):
         bid = self.request.GET.get("building")
         if bid and str(bid).isdigit():
             return get_object_or_404(Building, pk=int(bid))
         return None
 
-    def get_success_url(self):
-        """After create/update/delete, return to the building page if we can."""
-        b = self._building_for_context()
-        if b:
-            return reverse("building_detail", args=[b.pk])
-        return super().get_success_url()
+    def _resolved_building(self):
+        """Prefer ?building=, else derive from the order's unit/building."""
+        b = self._requested_building()
+        if not b and getattr(self, "object", None):
+            if self.object.building_id:
+                b = self.object.building
+            elif self.object.unit_id:
+                b = self.object.unit.building
+        return b
 
+    # ----- view overrides -----
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
-        # Prefer explicit ?building=, otherwise derive from selected unit (on update)
-        b = self._requested_building()
-        if b is None and getattr(self, "object", None) and self.object.unit_id:
-            b = self.object.unit.building
+        b = self._resolved_building()
         if b is not None:
             kwargs["building"] = b
         return kwargs
@@ -521,19 +524,27 @@ class _WorkOrderBase(NavContextMixin, LoginRequiredMixin):
         return initial
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related("unit", "unit__building")
+        qs = super().get_queryset().select_related("unit", "unit__building", "building")
         if not is_admin(self.request.user):
-            qs = qs.filter(unit__building__owner=self.request.user)
+            qs = qs.filter(
+                Q(unit__building__owner=self.request.user) |
+                Q(building__owner=self.request.user)
+            )
         return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        # Prefer cancel to building detail if we know the building
-        b = self._requested_building()
-        if not b and getattr(self, "object", None) and self.object.unit_id:
-            b = self.object.unit.building
+        b = self._resolved_building()
         ctx["cancel_url"] = reverse("building_detail", args=[b.pk]) if b else reverse("work_orders_list")
         return ctx
+
+    def get_success_url(self) -> str:
+        """
+        After create/update/delete, return to the building page when known;
+        otherwise fall back to the work orders list.
+        """
+        b = self._resolved_building()
+        return reverse("building_detail", args=[b.pk]) if b else reverse("work_orders_list")
 
 
 class WorkOrderCreateView(_WorkOrderBase, CreateView):
@@ -546,8 +557,3 @@ class WorkOrderUpdateView(_WorkOrderBase, UpdateView):
 
 class WorkOrderDeleteView(_WorkOrderBase, DeleteView):
     template_name = "core/work_order_confirm_delete.html"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["cancel_url"] = reverse("work_orders_list")
-        return ctx

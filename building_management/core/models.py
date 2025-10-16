@@ -107,19 +107,34 @@ class WorkOrder(models.Model):
         IN_PROGRESS = "in_progress", "In Progress"
         CLOSED = "closed", "Closed"
 
-    unit = models.ForeignKey(
-        Unit,
+    # NEW: allow orders to belong to a building even if no specific unit is chosen
+    building = models.ForeignKey(
+        "core.Building",
+        null=True,
+        blank=True,
         on_delete=models.CASCADE,
         related_name="work_orders",
     )
+
+    # CHANGED: unit is optional; if a unit is deleted we keep the order (set to NULL)
+    unit = models.ForeignKey(
+        "core.Unit",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="work_orders",
+    )
+
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.OPEN
+    )
+
+    # NEW: deadline (date only) – renders as a browser calendar with the form widget below
+    deadline = models.DateField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self) -> str:
-        return f"{self.title} ({self.get_status_display()})"
+    def __str__(self):
+        return self.title

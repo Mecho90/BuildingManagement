@@ -157,21 +157,41 @@ class UnitForm(forms.ModelForm):
 class WorkOrderForm(forms.ModelForm):
     class Meta:
         model = WorkOrder
-        fields = ["unit", "title", "description", "status"]
+        fields = ["unit", "title", "description", "status", "deadline"]
         widgets = {
-            "title": forms.TextInput(attrs={"placeholder": "Short title"}),
-            "description": forms.Textarea(attrs={"placeholder": "Details (optional)"}),
+            # HTML5 date input => browser calendar picker
+            "deadline": forms.DateInput(attrs={"type": "date"}),
         }
 
     def __init__(self, *args, **kwargs):
+        # these are passed in by the view's _WorkOrderBase.get_form_kwargs()
         user = kwargs.pop("user", None)
-        building = kwargs.pop("building", None)  # NEW: optionally scope to a building
+        building = kwargs.pop("building", None)
         super().__init__(*args, **kwargs)
 
-        qs = Unit.objects.select_related("building")
-        if building is not None:
-            qs = qs.filter(building=building)
-        if user and not getattr(user, "is_staff", False):
-            qs = qs.filter(building__owner=user)
+        # Unit is optional now
+        self.fields["unit"].required = False
+        self.fields["unit"].empty_label = "— None —"
 
-        self.fields["unit"].queryset = qs.order_by("building__name", "floor", "number")
+        # Limit units to the chosen building if provided; otherwise restrict to user's units
+        if building is not None:
+            self.fields["unit"].queryset = Unit.objects.filter(building=building)
+        elif user and not getattr(user, "is_staff", False):
+            self.fields["unit"].queryset = Unit.objects.filter(building__owner=user)
+
+        # keep the building for save()
+        self._building = building
+
+    def save(self, commit=True):
+        obj: WorkOrder = super().save(commit=False)
+
+        # ensure building is set even if no unit is chosen
+        if obj.unit_id and not obj.building_id:
+            obj.building = obj.unit.building
+        elif self._building and not obj.building_id:
+            obj.building = self._building
+
+        if commit:
+            obj.save()
+            self.save_m2m()
+        return obj
