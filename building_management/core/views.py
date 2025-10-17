@@ -1,11 +1,11 @@
-# path: core/views.py
 from __future__ import annotations
 
 from typing import Any, Dict
 
+from django.db.models.functions import Coalesce
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
-from django.db.models import Q, Count
+from django.db.models import Q, Count, F, Value, IntegerField, ExpressionWrapper
 from django.http import Http404, JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse, reverse_lazy
@@ -52,7 +52,11 @@ class BuildingListView(NavContextMixin, LoginRequiredMixin, ListView):
     model = Building
     template_name = "core/buildings_list.html"
     context_object_name = "buildings"
-    ALLOWED_SORT = {"name", "address", "units_count", "-name", "-address", "-units_count"}
+    ALLOWED_SORT = {
+        "name", "address", "units_count",
+        "-name", "-address", "-units_count",
+        "work_orders_count", "-work_orders_count",
+    }
 
     def _session_key_per(self) -> str:
         return "b_per"
@@ -78,6 +82,31 @@ class BuildingListView(NavContextMixin, LoginRequiredMixin, ListView):
                 | Q(description__icontains=q)
                 | Q(owner__username__icontains=q)
             )
+
+        # Why: previous error used 'workorder'; the correct reverse is 'work_orders'.
+        qs = qs.annotate(
+            wo_direct_open_count=Coalesce(
+                Count(
+                    "work_orders",
+                    filter=~Q(work_orders__status=WorkOrder.Status.CLOSED),
+                    distinct=True,
+                ),
+                Value(0),
+            ),
+            wo_via_units_open_count=Coalesce(
+                Count(
+                    "units__work_orders",
+                    filter=~Q(units__work_orders__status=WorkOrder.Status.CLOSED),
+                    distinct=True,
+                ),
+                Value(0),
+            ),
+        ).annotate(
+            work_orders_count=ExpressionWrapper(
+                F("wo_direct_open_count") + F("wo_via_units_open_count"),
+                output_field=IntegerField(),
+            )
+        )
 
         sort = (self.request.GET.get("sort") or "name").strip()
         if sort not in self.ALLOWED_SORT:

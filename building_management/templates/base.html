@@ -1,4 +1,3 @@
-<!-- path: templates/base.html -->
 {% load static %}
 <!doctype html>
 <html lang="en">
@@ -12,27 +11,34 @@
     <header class="site-topbar">
       <div class="container row space-between">
         <nav class="left row gap" aria-label="Primary">
-          {# REMOVED the brand link so only nav items show #}
-          <a class="navlink{% if request.path == request.build_absolute_uri|slice:':0' %}{% endif %}" href="{% url 'buildings_list' %}">Buildings</a>
-          {% if work_orders_enabled and work_orders_url %}
-            <a class="navlink" href="{{ work_orders_url }}">Work Orders</a>
-          {% endif %}
-          {% if user.is_staff %}
-            <a class="navlink" href="{% url 'admin:index' %}">Admin Panel</a>
-          {% endif %}
+          {% block topbar_left %}
+            <a class="navlink{% if request.path == request.build_absolute_uri|slice:':0' %}{% endif %}" href="{% url 'buildings_list' %}">Buildings</a>
+            {% if work_orders_enabled and work_orders_url %}
+              <a class="navlink" href="{{ work_orders_url }}">Work Orders</a>
+            {% endif %}
+            {% if user.is_staff %}
+              <a class="navlink" href="{% url 'admin:index' %}">Admin Panel</a>
+            {% endif %}
+          {% endblock %}
         </nav>
+
         <div class="right row gap">
-          {% if user.is_authenticated %}
-            <span class="muted">Welcome, {{ user.get_full_name|default:user.username }}</span>
-            <form class="inline-form" action="{% url 'logout' %}" method="post">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-secondary">Logout</button>
-            </form>
-          {% else %}
-            <a class="btn" href="{% url 'login' %}">Login</a>
-          {% endif %}
+          {% block topbar_right %}
+            {% if user.is_authenticated %}
+              <!-- Why: show today's date for logged-in users on all pages -->
+              <time class="muted" datetime="{% now 'c' %}">{% now 'D, M j, Y' %}</time>
+              <span class="muted">Welcome, {{ user.get_full_name|default:user.username }}</span>
+              <form class="inline-form" action="{% url 'logout' %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary">Logout</button>
+              </form>
+            {% else %}
+              <a class="btn" href="{% url 'login' %}">Login</a>
+            {% endif %}
+          {% endblock %}
         </div>
       </div>
+
       {% if messages %}
         <div class="container messages">
           {% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}

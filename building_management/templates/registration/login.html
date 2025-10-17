@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Login · Building Management{% endblock %}
 
+{# Hide topbar content only on this page #}
+{% block topbar_left %}{% endblock %}
+{% block topbar_right %}{% endblock %}
+
 {% block content %}
 <h2>Login</h2>
 
@@ -23,6 +27,6 @@
     {% if form.password.errors %}<div class="flash">{{ form.password.errors }}</div>{% endif %}
   </p>
 
-  <button class="btn" type="submit">Sign in</button>
+  <button class="btn" type="submit">Login in</button>
 </form>
 {% endblock %}
