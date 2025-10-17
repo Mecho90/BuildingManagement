@@ -13,7 +13,6 @@
   <li><strong>Last login:</strong> {{ user_obj.last_login|default:"—" }}</li>
 </ul>
 <p>
-  <a class="btn" href="{% url 'user_update' user_obj.id %}">Edit</a>
   <a class="btn" href="{% url 'user_password_reset' user_obj.id %}">Reset Password</a>
   {% if request.user.id != user_obj.id %}
     <a class="btn" href="{% url 'user_delete' user_obj.id %}">Delete</a>

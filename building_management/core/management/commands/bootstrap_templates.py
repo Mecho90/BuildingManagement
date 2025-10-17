@@ -119,7 +119,6 @@ WORK_ORDERS_LIST = """{% extends "base.html" %}
       <td>{{ w.unit.building.name }} #{{ w.unit.number }}</td>
       <td>{{ w.get_status_display }}</td>
       <td>{{ w.created_at }}</td>
-      <td><a class="btn" href="{% url 'work_order_update' w.id %}">Edit</a></td>
     </tr>
   {% empty %}
     <tr><td colspan="5">No work orders.</td></tr>
@@ -131,7 +130,6 @@ WORK_ORDERS_LIST = """{% extends "base.html" %}
 
 WORK_ORDER_FORM = """{% extends "base.html" %}
 {% block content %}
-<h2>{% if form.instance.pk %}Edit{% else %}New{% endif %} Work Order</h2>
 <form method="post">
   {% csrf_token %}
   {{ form.as_p }}

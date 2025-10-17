@@ -16,13 +16,13 @@
   {% endif %}
 
   <p>
-    <label for="{{ form.username.id_for_label }}">Username:</label><br/>
+    <label for="{{ form.username.id_for_label }}">Username</label><br/>
     {{ form.username }}
     {% if form.username.errors %}<div class="flash">{{ form.username.errors }}</div>{% endif %}
   </p>
 
   <p>
-    <label for="{{ form.password.id_for_label }}">Password:</label><br/>
+    <label for="{{ form.password.id_for_label }}">Password</label><br/>
     {{ form.password }}
     {% if form.password.errors %}<div class="flash">{{ form.password.errors }}</div>{% endif %}
   </p>

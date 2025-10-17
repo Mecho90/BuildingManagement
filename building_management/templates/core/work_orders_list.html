@@ -77,7 +77,6 @@
             <td>{{ w.created_at|date:"Y-m-d H:i" }}</td>
             <td class="text-right">
               <div class="row" style="gap:.5rem; justify-content:flex-end; flex-wrap:nowrap; white-space:nowrap;">
-                <a class="btn" href="{% url 'work_order_update' w.id %}">Edit</a>
                 <a class="btn btn-danger" href="{% url 'work_order_delete' w.id %}">Delete</a>
               </div>
             </td>

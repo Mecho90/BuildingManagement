@@ -1,300 +1,204 @@
+# core/views.py
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from django.db.models.functions import Coalesce
+from django.views import View
+from django.http import JsonResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
-from django.db.models import Q, Count, F, Value, IntegerField, ExpressionWrapper
-from django.http import Http404, JsonResponse, HttpRequest, HttpResponse
-from django.shortcuts import get_object_or_404
-from django.urls import NoReverseMatch, reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
+from django.db.models import Q, Count, Case, When, IntegerField
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse, reverse_lazy
+from django.views.generic import (
+    ListView,
+    DetailView,
+    CreateView,
+    UpdateView,
+    DeleteView,
+)
 
-from .forms import BuildingForm, UnitForm, WorkOrderForm
 from .models import Building, Unit, WorkOrder
+from .forms import BuildingForm, UnitForm, WorkOrderForm
 
 
-# -----------------------------
-# Helpers / shared mixins
-# -----------------------------
-class NavContextMixin:
-    """
-    Adds nav-related flags so templates don't call {% url %} for routes
-    that may not exist, preventing NoReverseMatch.
-    """
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["work_orders_enabled"] = False
-        ctx["work_orders_url"] = None
-        try:
-            url = reverse("work_orders_list")
-        except NoReverseMatch:
-            url = None
-        else:
-            ctx["work_orders_enabled"] = True
-            ctx["work_orders_url"] = url
-        return ctx
-
-
-def is_admin(user) -> bool:
-    return bool(user and user.is_staff)
-
-
-def user_owns_building(user, building: Building) -> bool:
-    return building.owner_id == getattr(user, "id", None)
-
-
-# -----------------------------
+# =============================================================================
 # Buildings
-# -----------------------------
-class BuildingListView(NavContextMixin, LoginRequiredMixin, ListView):
+# =============================================================================
+class BuildingListView(LoginRequiredMixin, ListView):
+    """
+    Buildings index with search, sorting, and safe annotations.
+
+    Annotations (names avoid clashing with potential @property attributes):
+      - units_total
+      - work_orders_open
+
+    Sorting map keeps old links working:
+      units_count -> units_total
+      work_orders_count -> work_orders_open
+    """
     model = Building
     template_name = "core/buildings_list.html"
     context_object_name = "buildings"
-    ALLOWED_SORT = {
-        "name", "address", "units_count",
-        "-name", "-address", "-units_count",
-        "work_orders_count", "-work_orders_count",
-    }
+    paginate_by = 10  # default, can be overridden by ?per=
 
-    def _session_key_per(self) -> str:
-        return "b_per"
-
+    # ---- Query building ----
     def get_queryset(self):
-        user = self.request.user
-        manager = Building.objects
-        if hasattr(manager, "with_unit_stats"):
-            qs = manager.with_unit_stats().select_related("owner")
-        else:
-            qs = manager.all().select_related("owner").annotate(
-                units_count=Count("units", distinct=True)
-            )
-
-        if not is_admin(user):
-            qs = qs.filter(owner=user)
-
         q = (self.request.GET.get("q") or "").strip()
-        if q:
-            qs = qs.filter(
-                Q(name__icontains=q)
-                | Q(address__icontains=q)
-                | Q(description__icontains=q)
-                | Q(owner__username__icontains=q)
-            )
+        sort = self.request.GET.get("sort") or "name"
 
-        # Why: previous error used 'workorder'; the correct reverse is 'work_orders'.
+        qs = Building.objects.all()
+
+        # Search across name + address (extend as needed)
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(address__icontains=q))
+
+        # Annotations — use names that don't collide with properties
         qs = qs.annotate(
-            wo_direct_open_count=Coalesce(
-                Count(
-                    "work_orders",
-                    filter=~Q(work_orders__status=WorkOrder.Status.CLOSED),
-                    distinct=True,
-                ),
-                Value(0),
+            units_total=Count("units", distinct=True),
+            work_orders_open=Count(
+                "work_orders",
+                filter=Q(work_orders__status__in=[
+                    WorkOrder.Status.OPEN,
+                    WorkOrder.Status.IN_PROGRESS,
+                ]),
+                distinct=True,
             ),
-            wo_via_units_open_count=Coalesce(
-                Count(
-                    "units__work_orders",
-                    filter=~Q(units__work_orders__status=WorkOrder.Status.CLOSED),
-                    distinct=True,
-                ),
-                Value(0),
-            ),
-        ).annotate(
-            work_orders_count=ExpressionWrapper(
-                F("wo_direct_open_count") + F("wo_via_units_open_count"),
-                output_field=IntegerField(),
-            )
         )
 
-        sort = (self.request.GET.get("sort") or "name").strip()
-        if sort not in self.ALLOWED_SORT:
+        # Legacy sort key mapping → new annotation names
+        sort_map = {
+            "units_count": "units_total",
+            "-units_count": "-units_total",
+            "work_orders_count": "work_orders_open",
+            "-work_orders_count": "-work_orders_open",
+        }
+        sort = sort_map.get(sort, sort)
+
+        allowed_sorts = {
+            "name", "-name",
+            "address", "-address",
+            "units_total", "-units_total",
+            "work_orders_open", "-work_orders_open",
+        }
+        if sort not in allowed_sorts:
             sort = "name"
+
         return qs.order_by(sort)
 
-    def get_paginate_by(self, queryset):
-        req = self.request
-        per = req.GET.get("per")
-        skey = self._session_key_per()
-        if per is not None:
-            per = int(per) if str(per).isdigit() else 10
-            req.session[skey] = per
-        else:
-            per = int(req.session.get(skey, 10))
-        return max(1, per)
-
-    def get_context_data(self, **kwargs):
+    # ---- Context ----
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         ctx = super().get_context_data(**kwargs)
-        req = self.request
-        ctx["q"] = (req.GET.get("q") or "").strip()
-        ctx["sort"] = (req.GET.get("sort") or "name").strip()
-        ctx["per"] = self.get_paginate_by(self.get_queryset())
-        ctx["per_choices"] = [10, 20, 50, 100]
-        ctx["show_owner_col"] = is_admin(req.user)
+        per = int(self.request.GET.get("per") or self.paginate_by)
+        # Reset paginator with chosen page size
+        paginator = Paginator(ctx["buildings"], per)
+        page = self.request.GET.get("page")
+        page_obj = paginator.get_page(page)
+
+        ctx.update(
+            {
+                "q": self.request.GET.get("q", ""),
+                "sort": self.request.GET.get("sort", "name"),
+                "per": per,
+                "page_obj": page_obj,
+                "paginator": paginator,
+                "is_paginated": page_obj.has_other_pages(),
+                "buildings": page_obj,  # what templates iterate over
+            }
+        )
         return ctx
 
 
-class BuildingDetailView(NavContextMixin, LoginRequiredMixin, DetailView):
+class BuildingDetailView(LoginRequiredMixin, DetailView):
     """
-    Detail page:
-      - permission check for non-admin owners
-      - Units: ?u_q, ?u_sort, ?u_per, ?u_page
-      - Work Orders (scoped to this building): ?w_q, ?w_status, ?w_per, ?w_page
+    Building details with:
+      - Units table: search, sort(number/floor), page size
+      - Work Orders table: search, status filter, page size
+        ordered by priority (High > Medium > Low) then newest
     """
     model = Building
     template_name = "core/building_detail.html"
     context_object_name = "building"
 
-    # UI alias → DB field
-    ALLOWED_UNIT_SORT = {
-        "number", "floor", "is_occupied",
-        "-number", "-floor", "-is_occupied",
-        "occupied", "-occupied",
-    }
-    SORT_ALIAS = {"occupied": "is_occupied", "-occupied": "-is_occupied"}
-
-    def _check_permission(self, building: Building):
-        if is_admin(self.request.user):
-            return
-        if not user_owns_building(self.request.user, building):
-            raise Http404("Not found")
-
-    def _session_key_u_per(self) -> str:
-        return "u_per"
-
-    def _session_key_w_per(self) -> str:
-        return "w_per"
-
-    def get(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
-        resp = super().get(request, *args, **kwargs)
-        self._check_permission(self.object)
-        return resp
-
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         ctx = super().get_context_data(**kwargs)
-        req = self.request
-        building: Building = self.object
+        bld: Building = self.object
+        request = self.request
 
-        # ---------- Units: search + sort + pagination ----------
-        units_qs = Unit.objects.filter(building=building)
+        # ===== Units filters
+        u_q = (request.GET.get("u_q") or "").strip()
+        u_sort = request.GET.get("u_sort") or "number"
+        u_per = int(request.GET.get("u_per") or 10)
 
-        u_q = (req.GET.get("u_q") or "").strip()
+        units_qs = Unit.objects.filter(building=bld)
         if u_q:
-            filters = Q(number__icontains=u_q) | Q(description__icontains=u_q)
-            if u_q.isdigit():
-                filters |= Q(floor=int(u_q))
-            units_qs = units_qs.filter(filters)
+            units_qs = units_qs.filter(
+                Q(number__icontains=u_q)
+                | Q(floor__icontains=u_q)
+                | Q(owner_name__icontains=u_q)
+                | Q(contact_phone__icontains=u_q)
+            )
 
-        u_sort_raw = (req.GET.get("u_sort") or "number").strip()
-        u_sort = self.SORT_ALIAS.get(u_sort_raw, u_sort_raw)
-        if u_sort not in self.ALLOWED_UNIT_SORT:
-            u_sort = "number"
-        units_qs = units_qs.order_by(u_sort)
+        if u_sort.lstrip("-") in {"number", "floor"}:
+            units_qs = units_qs.order_by(u_sort)
 
-        skey_u = self._session_key_u_per()
-        raw_u_per = req.GET.get("u_per")
-        if raw_u_per is not None:
-            try:
-                u_per = max(1, int(raw_u_per))
-            except ValueError:
-                u_per = 10
-            req.session[skey_u] = u_per
-        else:
-            u_per = int(req.session.get(skey_u, 10))
+        units_paginator = Paginator(units_qs, u_per)
+        units_page = units_paginator.get_page(request.GET.get("u_page"))
 
-        u_paginator = Paginator(units_qs, u_per)
-        u_page_num = req.GET.get("u_page") or 1
-        units_page = u_paginator.get_page(u_page_num)
+        # ===== Work Orders filters
+        w_q = (request.GET.get("w_q") or "").strip()
+        w_status = request.GET.get("w_status") or ""
+        w_per = int(request.GET.get("w_per") or 10)
 
-        # ---------- Work Orders: search + status + pagination ----------
-        w_q = (req.GET.get("w_q") or "").strip()
-        w_status = (req.GET.get("w_status") or "").strip()
+        w_qs = WorkOrder.objects.filter(building=bld)
 
-        w_qs = (
-            WorkOrder.objects
-            .filter(Q(building=building) | Q(unit__building=building))
-            .select_related("unit", "unit__building", "building")
-            .order_by("-created_at")
-        )
         if w_q:
             w_qs = w_qs.filter(Q(title__icontains=w_q) | Q(description__icontains=w_q))
-
-        choices_map = dict(WorkOrder.Status.choices)
-        if w_status in choices_map:
+        if w_status:
             w_qs = w_qs.filter(status=w_status)
 
-        skey_w = self._session_key_w_per()
-        raw_w_per = req.GET.get("w_per")
-        if raw_w_per is not None:
-            try:
-                w_per = max(1, int(raw_w_per))
-            except ValueError:
-                w_per = 10
-            req.session[skey_w] = w_per
-        else:
-            w_per = int(req.session.get(skey_w, 10))
+        # Priority rank: High (3) > Medium (2) > Low (1)
+        w_qs = w_qs.annotate(
+            priority_rank=Case(
+                When(priority=WorkOrder.PRIORITY_HIGH, then=3),
+                When(priority=WorkOrder.PRIORITY_MEDIUM, then=2),
+                When(priority=WorkOrder.PRIORITY_LOW, then=1),
+                default=0,
+                output_field=IntegerField(),
+            )
+        ).order_by("-priority_rank", "-created_at")
 
-        w_paginator = Paginator(w_qs, w_per)
-        w_page_num = req.GET.get("w_page") or 1
-        work_orders_page = w_paginator.get_page(w_page_num)
+        work_orders_paginator = Paginator(
+            w_qs.select_related("unit", "building"), w_per
+        )
+        work_orders_page = work_orders_paginator.get_page(request.GET.get("w_page"))
 
-        # ---------- expose to template ----------
-        # Units
-        ctx["units_page"] = units_page
-        ctx["u_q"] = u_q
-        ctx["u_sort"] = u_sort_raw  # keep UI value, not alias
-        ctx["u_per"] = u_per
-
-        # Work orders
-        ctx["w_q"] = w_q
-        ctx["w_status"] = w_status
-        ctx["w_status_choices"] = WorkOrder.Status.choices
-        ctx["w_per"] = w_per
-        ctx["work_orders_page"] = work_orders_page
-
-        # Permissions (enables Add buttons)
-        ctx["can_edit"] = is_admin(req.user) or user_owns_building(req.user, building)
-
+        ctx.update(
+            {
+                # Units bits
+                "u_q": u_q,
+                "u_sort": u_sort,
+                "u_per": u_per,
+                "units_page": units_page,
+                # Work Orders bits
+                "w_q": w_q,
+                "w_status": w_status,
+                "w_per": w_per,
+                "w_status_choices": WorkOrder.Status.choices,
+                "work_orders_page": work_orders_page,
+                # template flags
+                "can_edit": True,
+            }
+        )
         return ctx
 
 
-class BuildingCreateView(NavContextMixin, LoginRequiredMixin, CreateView):
+class BuildingCreateView(LoginRequiredMixin, CreateView):
     model = Building
     form_class = BuildingForm
     template_name = "core/building_form.html"
 
-    def get_form_kwargs(self) -> Dict[str, Any]:
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
-
-    def form_valid(self, form):
-        if not is_admin(self.request.user):
-            form.instance.owner = self.request.user
-        return super().form_valid(form)
-
-    def get_success_url(self) -> str:
-        return reverse("building_detail", args=[self.object.pk])
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["cancel_url"] = reverse("buildings_list")
-        return ctx
-
-
-class BuildingUpdateView(NavContextMixin, LoginRequiredMixin, UpdateView):
-    model = Building
-    form_class = BuildingForm
-    template_name = "core/building_form.html"
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if not is_admin(self.request.user):
-            qs = qs.filter(owner=self.request.user)
-        return qs
-
-    def get_form_kwargs(self) -> Dict[str, Any]:
+    def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
         return kwargs
@@ -302,42 +206,58 @@ class BuildingUpdateView(NavContextMixin, LoginRequiredMixin, UpdateView):
     def get_success_url(self) -> str:
         return reverse("building_detail", args=[self.object.pk])
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["cancel_url"] = reverse("building_detail", args=[self.object.pk])
-        return ctx
 
-
-class BuildingDeleteView(NavContextMixin, LoginRequiredMixin, DeleteView):
+class BuildingUpdateView(LoginRequiredMixin, UpdateView):
     model = Building
-    template_name = "core/building_confirm_delete.html"
+    form_class = BuildingForm
+    template_name = "core/building_form.html"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+    def get_success_url(self) -> str:
+        return reverse("building_detail", args=[self.object.pk])
+
+
+class BuildingDeleteView(LoginRequiredMixin, DeleteView):
+    model = Building
+    template_name = "core/confirm_delete.html"
     success_url = reverse_lazy("buildings_list")
 
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if not is_admin(self.request.user):
-            qs = qs.filter(owner=self.request.user)
-        return qs
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["cancel_url"] = reverse("buildings_list")
-        return ctx
-
-
-# -----------------------------
+# =============================================================================
 # Units
-# -----------------------------
-class UnitCreateView(NavContextMixin, LoginRequiredMixin, CreateView):
+# =============================================================================
+class UnitCreateView(LoginRequiredMixin, CreateView):
+    """
+    Creates a Unit for a specific Building.
+
+    Accepts building id from:
+      - path kwarg: pk / building_id
+      - querystring: ?building=<id>
+    """
     model = Unit
     form_class = UnitForm
     template_name = "core/unit_form.html"
 
+    def _pick_building_id(self) -> int | None:
+        return (
+            self.kwargs.get("pk")
+            or self.kwargs.get("building_id")
+            or self.request.GET.get("building")
+        )
+
     def dispatch(self, request, *args, **kwargs):
-        self.building = get_object_or_404(Building, pk=kwargs.get("building_id"))
-        if not (is_admin(request.user) or user_owns_building(request.user, self.building)):
-            raise Http404("Not found")
+        bid = self._pick_building_id()
+        self.building = get_object_or_404(Building, pk=bid)
         return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["building"] = self.building
+        return kwargs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -346,243 +266,494 @@ class UnitCreateView(NavContextMixin, LoginRequiredMixin, CreateView):
         return ctx
 
     def form_valid(self, form):
-        form.instance.building = self.building
-        return super().form_valid(form)
+        obj: Unit = form.save(commit=False)
+        obj.building = self.building
+        obj.save()
+        form.save_m2m()
+        return redirect(self.get_success_url())
 
     def get_success_url(self) -> str:
         return reverse("building_detail", args=[self.building.pk])
 
 
-class UnitUpdateView(NavContextMixin, LoginRequiredMixin, UpdateView):
+class UnitUpdateView(LoginRequiredMixin, UpdateView):
     model = Unit
     form_class = UnitForm
     template_name = "core/unit_form.html"
 
-    def get_queryset(self):
-        qs = super().get_queryset().select_related("building")
-        if not is_admin(self.request.user):
-            qs = qs.filter(building__owner=self.request.user)
-        return qs
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["building"] = self.object.building
-        ctx["cancel_url"] = reverse("building_detail", args=[self.object.building_id])
-        return ctx
-
-    def get_success_url(self) -> str:
-        return reverse("building_detail", args=[self.object.building_id])
-
-
-class UnitDeleteView(NavContextMixin, LoginRequiredMixin, DeleteView):
-    model = Unit
-    template_name = "core/unit_confirm_delete.html"
-
-    def get_queryset(self):
-        qs = super().get_queryset().select_related("building")
-        if not is_admin(self.request.user):
-            qs = qs.filter(building__owner=self.request.user)
-        return qs
-
-    def get_success_url(self) -> str:
-        return reverse("building_detail", args=[self.object.building_id])
-
-
-# -----------------------------
-# Lightweight APIs
-# -----------------------------
-def api_buildings(request: HttpRequest) -> JsonResponse:
-    """
-    Basic JSON list of buildings the user can see, including units_count.
-    """
-    manager = Building.objects
-    if hasattr(manager, "with_unit_stats"):
-        qs = manager.with_unit_stats()
-    else:
-        qs = manager.all().annotate(units_count=Count("units", distinct=True))
-
-    if not is_admin(request.user):
-        qs = qs.filter(owner=request.user)
-
-    data = [
-        {
-            "id": b.id,
-            "name": b.name,
-            "address": b.address,
-            "owner": b.owner.username if b.owner_id else None,
-            "units_count": getattr(b, "units_count", 0),
-        }
-        for b in qs.select_related("owner")
-    ]
-    return JsonResponse({"results": data})
-
-
-def api_units(request: HttpRequest) -> JsonResponse:
-    """
-    JSON list of units for a building if provided (?building=<id>).
-    """
-    qs = Unit.objects.all().select_related("building")
-    b_id = request.GET.get("building")
-    if b_id and str(b_id).isdigit():
-        qs = qs.filter(building_id=int(b_id))
-
-    if not is_admin(request.user):
-        qs = qs.filter(building__owner=request.user)
-
-    data = [
-        {
-            "id": u.id,
-            "building_id": u.building_id,
-            "number": u.number,
-            "floor": u.floor,
-            "occupied": u.occupied,  # property mapped to model's is_occupied
-            "description": u.description,
-        }
-        for u in qs
-    ]
-    return JsonResponse({"results": data})
-
-
-# -----------------------------
-# WorkOrders
-# -----------------------------
-class WorkOrderDetailView(NavContextMixin, LoginRequiredMixin, DetailView):
-    model = WorkOrder
-    template_name = "core/work_order_detail.html"
-    context_object_name = "order"
-
-    def get_queryset(self):
-        qs = super().get_queryset().select_related("unit", "unit__building", "building")
-        if not is_admin(self.request.user):
-            qs = qs.filter(
-                Q(unit__building__owner=self.request.user) |
-                Q(building__owner=self.request.user)
-            )
-        return qs
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        # Prefer cancel to building if provided
-        bid = self.request.GET.get("building")
-        if bid and str(bid).isdigit():
-            ctx["cancel_url"] = reverse("building_detail", args=[int(bid)])
-        else:
-            ctx["cancel_url"] = reverse("work_orders_list")
-        return ctx
-
-
-class WorkOrderListView(NavContextMixin, LoginRequiredMixin, ListView):
-    model = WorkOrder
-    template_name = "core/work_orders_list.html"  # match your template path
-    context_object_name = "orders"
-
-    def get_queryset(self):
-        qs = (
-            WorkOrder.objects
-            .select_related("unit", "unit__building", "building")
-            .order_by("-created_at")
-        )
-        # Owner filter once — include both unit->building owner and direct building owner
-        if not is_admin(self.request.user):
-            qs = qs.filter(
-                Q(unit__building__owner=self.request.user) |
-                Q(building__owner=self.request.user)
-            )
-
-        q = (self.request.GET.get("q") or "").strip()
-        if q:
-            qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
-
-        st = (self.request.GET.get("status") or "").strip()
-        if st in dict(WorkOrder.Status.choices):
-            qs = qs.filter(status=st)
-
-        return qs
-
-    def get_paginate_by(self, queryset):
-        per = self.request.GET.get("per")
-        return int(per) if (per and per.isdigit()) else 10
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        req = self.request
-        ctx["q"] = (req.GET.get("q") or "").strip()
-        ctx["status"] = (req.GET.get("status") or "").strip()
-        ctx["per"] = self.get_paginate_by(self.get_queryset())
-        ctx["per_choices"] = [10, 20, 50, 100]
-        ctx["status_choices"] = WorkOrder.Status.choices
-        return ctx
-
-
-class _WorkOrderBase(NavContextMixin, LoginRequiredMixin):
-    model = WorkOrder
-    form_class = WorkOrderForm
-    success_url = reverse_lazy("work_orders_list")  # fallback
-
-    # ----- helpers -----
-    def _requested_building(self):
-        bid = self.request.GET.get("building")
-        if bid and str(bid).isdigit():
-            return get_object_or_404(Building, pk=int(bid))
-        return None
-
-    def _resolved_building(self):
-        """Prefer ?building=, else derive from the order's unit/building."""
-        b = self._requested_building()
-        if not b and getattr(self, "object", None):
-            if self.object.building_id:
-                b = self.object.building
-            elif self.object.unit_id:
-                b = self.object.unit.building
-        return b
-
-    # ----- view overrides -----
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        b = self._resolved_building()
-        if b is not None:
-            kwargs["building"] = b
+        kwargs["building"] = self.object.building
         return kwargs
 
-    def get_initial(self):
-        initial = super().get_initial()
-        unit_id = self.request.GET.get("unit")
-        if unit_id and unit_id.isdigit():
-            initial["unit"] = int(unit_id)
-        return initial
+    def get_success_url(self) -> str:
+        return reverse("building_detail", args=[self.object.building_id])
+
+
+class UnitDeleteView(LoginRequiredMixin, DeleteView):
+    model = Unit
+    template_name = "core/confirm_delete.html"
+
+    def get_success_url(self) -> str:
+        return reverse("building_detail", args=[self.object.building_id])
+
+
+# =============================================================================
+# Work Orders
+# =============================================================================
+class WorkOrderListView(LoginRequiredMixin, ListView):
+    """
+    Global Work Orders list.
+
+    Query params:
+      - q:         free text (title, description, building name, unit number)
+      - status:    one of WorkOrder.Status values
+      - building:  building id to filter by
+      - sort:      one of:
+                     priority (default) | -priority
+                     created  | -created
+                     deadline | -deadline    (NULLs last)
+                     status   | -status
+                     building | -building
+                     unit     | -unit
+                     title    | -title
+      - per:       page size (default 20)
+
+    Sorting 'priority' shows High → Medium → Low, then newest.
+    """
+    model = WorkOrder
+    template_name = "core/work_orders_list.html"
+    context_object_name = "work_orders"
+    paginate_by = 20
+
+    def get_paginate_by(self, queryset):
+        try:
+            return int(self.request.GET.get("per") or self.paginate_by)
+        except (TypeError, ValueError):
+            return self.paginate_by
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related("unit", "unit__building", "building")
-        if not is_admin(self.request.user):
+        r = self.request
+        q = (r.GET.get("q") or "").strip()
+        status = r.GET.get("status") or ""
+        building_id = r.GET.get("building") or ""
+        sort = r.GET.get("sort") or "priority"
+
+        qs = (
+            WorkOrder.objects
+            .select_related("building", "unit")
+        )
+
+        if building_id:
+            qs = qs.filter(building_id=building_id)
+
+        if status:
+            qs = qs.filter(status=status)
+
+        if q:
             qs = qs.filter(
-                Q(unit__building__owner=self.request.user) |
-                Q(building__owner=self.request.user)
+                Q(title__icontains=q)
+                | Q(description__icontains=q)
+                | Q(building__name__icontains=q)
+                | Q(unit__number__icontains=q)
             )
-        return qs
+
+        # Priority rank (High 3 > Medium 2 > Low 1)
+        qs = qs.annotate(
+            priority_rank=Case(
+                When(priority=WorkOrder.PRIORITY_HIGH, then=3),
+                When(priority=WorkOrder.PRIORITY_MEDIUM, then=2),
+                When(priority=WorkOrder.PRIORITY_LOW, then=1),
+                default=0,
+                output_field=IntegerField(),
+            ),
+            # For NULLS LAST handling on deadline asc/desc
+            deadline_isnull=Case(
+                When(deadline__isnull=True, then=1),
+                default=0,
+                output_field=IntegerField(),
+            ),
+        )
+
+        # Map logical sort keys to actual ORDER BY
+        sort_map = {
+            "priority": ("-priority_rank", "-created_at"),
+            "-priority": ("priority_rank", "-created_at"),
+
+            "created": ("-created_at",),
+            "-created": ("created_at",),
+
+            # NULLS LAST on ascending deadline: sort by isnull first, then deadline
+            "deadline": ("deadline_isnull", "deadline"),
+            "-deadline": ("-deadline_isnull", "-deadline"),
+
+            "status": ("status", "building__name"),
+            "-status": ("-status", "building__name"),
+
+            "building": ("building__name", "-created_at"),
+            "-building": ("-building__name", "-created_at"),
+
+            "unit": ("unit__number", "-created_at"),
+            "-unit": ("-unit__number", "-created_at"),
+
+            "title": ("title",),
+            "-title": ("-title",),
+        }
+        order_by = sort_map.get(sort, sort_map["priority"])
+        return qs.order_by(*order_by)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        b = self._resolved_building()
-        ctx["cancel_url"] = reverse("building_detail", args=[b.pk]) if b else reverse("work_orders_list")
+        r = self.request
+        ctx.update({
+            "q": r.GET.get("q", ""),
+            "status": r.GET.get("status", ""),
+            "building_filter": r.GET.get("building", ""),
+            "sort": r.GET.get("sort", "priority"),
+            "per": int(r.GET.get("per") or self.paginate_by),
+            "status_choices": WorkOrder.Status.choices,
+            "priority_choices": WorkOrder.PRIORITY_CHOICES,
+            "buildings": Building.objects.only("id", "name").order_by("name"),
+        })
         return ctx
 
+
+class WorkOrderDetailView(LoginRequiredMixin, DetailView):
+    """
+    Detail page for a single Work Order.
+
+    Context extras:
+      - building:            the related Building
+      - back_to_building_url: URL to the building detail page
+      - status_label:        human-readable status
+      - priority_label:      human-readable priority
+    """
+    model = WorkOrder
+    template_name = "core/work_order_detail.html"
+    context_object_name = "work_order"
+
+    def get_queryset(self):
+        # Pull related objects to avoid N+1
+        return (
+            super()
+            .get_queryset()
+            .select_related("building", "unit")
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        wo: WorkOrder = self.object
+        ctx.update({
+            "building": wo.building,
+            "back_to_building_url": reverse("building_detail", args=[wo.building_id]),
+            "status_label": wo.get_status_display(),
+            "priority_label": wo.get_priority_display(),
+        })
+        return ctx
+    
+
+class WorkOrderCreateView(LoginRequiredMixin, CreateView):
+    """
+    Create a Work Order for a Building; building provided via query (?building=<id>)
+    or as a path kwarg if your URL pattern includes it.
+    """
+    model = WorkOrder
+    form_class = WorkOrderForm
+    template_name = "core/work_order_form.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        bid = request.GET.get("building") or kwargs.get("building_id") or kwargs.get("pk")
+        self.building = get_object_or_404(Building, pk=bid)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["building"] = self.building
+        return kwargs
+
+    def form_valid(self, form):
+        obj: WorkOrder = form.save(commit=False)
+        if not obj.building_id:
+            obj.building = self.building
+        obj.save()
+        form.save_m2m()
+        return redirect(self.get_success_url())
+
     def get_success_url(self) -> str:
-        """
-        After create/update/delete, return to the building page when known;
-        otherwise fall back to the work orders list.
-        """
-        b = self._resolved_building()
-        return reverse("building_detail", args=[b.pk]) if b else reverse("work_orders_list")
+        return reverse("building_detail", args=[self.building.pk])
 
 
-class WorkOrderCreateView(_WorkOrderBase, CreateView):
+class WorkOrderDeleteView(LoginRequiredMixin, DeleteView):
+    model = WorkOrder
+    template_name = "core/confirm_delete.html"
+
+    def get_success_url(self) -> str:
+        # keep return to source building even if called from anywhere
+        bpk = self.request.GET.get("building") or self.object.building_id
+        return reverse("building_detail", args=[bpk])
+
+
+# (Optional) keep update view available even if you hide the Edit button in UI.
+class WorkOrderUpdateView(LoginRequiredMixin, UpdateView):
+    model = WorkOrder
+    form_class = WorkOrderForm
     template_name = "core/work_order_form.html"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # For updates, default building context to the object's building
+        kwargs["building"] = getattr(self.object, "building", None)
+        return kwargs
 
-class WorkOrderUpdateView(_WorkOrderBase, UpdateView):
-    template_name = "core/work_order_form.html"
+    def get_success_url(self) -> str:
+        return reverse("building_detail", args=[self.object.building_id])
 
 
-class WorkOrderDeleteView(_WorkOrderBase, DeleteView):
-    template_name = "core/work_order_confirm_delete.html"
+class ApiBuildingsView(LoginRequiredMixin, View):
+    """
+    GET /api/buildings/?q=&sort=&per=&page=
+
+    - q:     search in name/address
+    - sort:  name|-name|address|-address|units_total|-units_total|work_orders_open|-work_orders_open
+    - per:   page size (default 20)
+    - page:  page number (default 1)
+
+    Returns:
+    {
+      "count": <int>,
+      "pages": <int>,
+      "page": <int>,
+      "per": <int>,
+      "results": [
+         {
+           "id": 1,
+           "name": "...",
+           "address": "...",
+           "units_total": 3,
+           "work_orders_open": 1,
+           "url": "/buildings/1/"
+         },
+         ...
+      ]
+    }
+    """
+    def get(self, request, *args, **kwargs):
+        # Query params
+        q = (request.GET.get("q") or "").strip()
+        sort = request.GET.get("sort") or "name"
+
+        try:
+            per = int(request.GET.get("per") or 20)
+        except (TypeError, ValueError):
+            per = 20
+        per = max(1, min(per, 200))  # basic guard
+
+        try:
+            page_num = int(request.GET.get("page") or 1)
+        except (TypeError, ValueError):
+            page_num = 1
+        page_num = max(1, page_num)
+
+        qs = Building.objects.all()
+
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(address__icontains=q))
+
+        # Keep annotation names unique (no clash with properties)
+        qs = qs.annotate(
+            units_total=Count("units", distinct=True),
+            work_orders_open=Count(
+                "work_orders",
+                filter=Q(work_orders__status__in=[
+                    WorkOrder.Status.OPEN,
+                    WorkOrder.Status.IN_PROGRESS,
+                ]),
+                distinct=True,
+            ),
+        )
+
+        # Map legacy keys → current keys (optional)
+        sort_map = {
+            "units_count": "units_total",
+            "-units_count": "-units_total",
+            "work_orders_count": "work_orders_open",
+            "-work_orders_count": "-work_orders_open",
+        }
+        sort = sort_map.get(sort, sort)
+
+        allowed = {
+            "name", "-name",
+            "address", "-address",
+            "units_total", "-units_total",
+            "work_orders_open", "-work_orders_open",
+        }
+        if sort not in allowed:
+            sort = "name"
+
+        qs = qs.order_by(sort)
+
+        # Paginate
+        paginator = Paginator(qs, per)
+        page_obj = paginator.get_page(page_num)
+
+        # Build results
+        results = []
+        for b in page_obj.object_list:
+            results.append({
+                "id": b.id,
+                "name": b.name,
+                "address": b.address,
+                "units_total": getattr(b, "units_total", 0),
+                "work_orders_open": getattr(b, "work_orders_open", 0),
+                "url": reverse("building_detail", args=[b.id]),
+            })
+
+        data = {
+            "count": paginator.count,
+            "pages": paginator.num_pages,
+            "page": page_obj.number,
+            "per": per,
+            "results": results,
+        }
+        return JsonResponse(data, status=200)
+    
+class ApiUnitsView(LoginRequiredMixin, View):
+    """
+    GET /api/units/?building=&q=&occupied=&sort=&per=&page=
+
+    Query params
+    - building:  Building ID to filter by (optional)
+    - q:         free text; searches owner/contact and, if numeric, number/floor
+    - occupied:  true/false/1/0/yes/no (optional)
+    - sort:      number | -number | floor | -floor | owner_name | -owner_name
+                 contact | -contact | occupied | -occupied | building | -building
+                 (aliases: owner -> owner_name, contact -> contact_phone)
+    - per:       page size (default 20, max 200)
+    - page:      page number (default 1)
+
+    Response
+    {
+      "count": <int>,
+      "pages": <int>,
+      "page": <int>,
+      "per": <int>,
+      "results": [
+        {
+          "id": 12,
+          "building": {"id": 3, "name": "Sunset Court"},
+          "number": 101,
+          "floor": 1,
+          "owner_name": "Jane Doe",
+          "contact_phone": "+359888123456",
+          "is_occupied": true,
+          "urls": {
+            "building": "/buildings/3/",
+            "update": "/units/12/edit/",
+            "delete": "/units/12/delete/"
+          }
+        },
+        ...
+      ]
+    }
+    """
+    def get(self, request, *args, **kwargs):
+        # ----- Parse inputs
+        r = request
+        building_id = r.GET.get("building")
+        q = (r.GET.get("q") or "").strip()
+        occupied_raw = (r.GET.get("occupied") or "").strip().lower()
+        sort = (r.GET.get("sort") or "number").strip()
+
+        try:
+            per = int(r.GET.get("per") or 20)
+        except (TypeError, ValueError):
+            per = 20
+        per = max(1, min(per, 200))
+
+        try:
+            page_num = int(r.GET.get("page") or 1)
+        except (TypeError, ValueError):
+            page_num = 1
+        page_num = max(1, page_num)
+
+        # ----- Base queryset
+        qs = Unit.objects.select_related("building")
+
+        if building_id:
+            qs = qs.filter(building_id=building_id)
+
+        # occupied filter
+        truthy = {"1", "true", "yes", "y"}
+        falsy = {"0", "false", "no", "n"}
+        if occupied_raw in truthy:
+            qs = qs.filter(is_occupied=True)
+        elif occupied_raw in falsy:
+            qs = qs.filter(is_occupied=False)
+
+        # search
+        if q:
+            numeric = q.isdigit()
+            cond = (
+                Q(owner_name__icontains=q) |
+                Q(contact_phone__icontains=q) |
+                Q(building__name__icontains=q)
+            )
+            if numeric:
+                # match exact on number/floor when q is numeric
+                cond = cond | Q(number=int(q)) | Q(floor=int(q))
+            qs = qs.filter(cond)
+
+        # ----- Sorting (map friendly keys to ORM fields)
+        sort_map = {
+            "number": "number",
+            "-number": "-number",
+            "floor": "floor",
+            "-floor": "-floor",
+            "owner": "owner_name",
+            "-owner": "-owner_name",
+            "owner_name": "owner_name",
+            "-owner_name": "-owner_name",
+            "contact": "contact_phone",
+            "-contact": "-contact_phone",
+            "contact_phone": "contact_phone",
+            "-contact_phone": "-contact_phone",
+            "occupied": "is_occupied",
+            "-occupied": "-is_occupied",
+            "building": "building__name",
+            "-building": "-building__name",
+        }
+        order_by = sort_map.get(sort, "number")
+        qs = qs.order_by(order_by, "id")  # stable secondary key
+
+        # ----- Paginate
+        paginator = Paginator(qs, per)
+        page_obj = paginator.get_page(page_num)
+
+        # ----- Build payload
+        results = []
+        for u in page_obj.object_list:
+            results.append({
+                "id": u.id,
+                "building": {"id": u.building_id, "name": u.building.name},
+                "number": u.number,
+                "floor": u.floor,
+                "owner_name": u.owner_name or "",
+                "contact_phone": u.contact_phone or "",
+                "is_occupied": bool(u.is_occupied),
+                "urls": {
+                    "building": reverse("building_detail", args=[u.building_id]),
+                    # keep these even if Edit button is hidden in UI
+                    "update": reverse("unit_update", args=[u.id]),
+                    "delete": reverse("unit_delete", args=[u.id]),
+                },
+            })
+
+        data = {
+            "count": paginator.count,
+            "pages": paginator.num_pages,
+            "page": page_obj.number,
+            "per": per,
+            "results": results,
+        }
+        return JsonResponse(data, status=200)
+    

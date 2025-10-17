@@ -5,7 +5,6 @@
 <p>
   <a class="btn" href="{% url 'building_detail' unit.building_id %}">← Back to {{ unit.building.name }}</a>
   {% if user.is_superuser or unit.building.owner_id == user.id %}
-    <a class="btn" href="{% url 'unit_update' unit.id %}">Edit</a>
     <a class="btn" href="{% url 'unit_delete' unit.id %}">Delete</a>
   {% endif %}
 </p>

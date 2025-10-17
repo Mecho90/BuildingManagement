@@ -1,17 +1,11 @@
 {% extends "base.html" %}
-{% load markdownify %}
 
 {% block title %}{{ building.name }} · Buildings{% endblock %}
 
 {% block content %}
-  {# Back only #}
-  <nav class="bm-subnav row gap">
-    <a class="btn" href="{% url 'buildings_list' %}">← Back</a>
-  </nav>
-
   <section>
-    {# Name + actions right-aligned #}
-    <div class="row space-between" style="align-items:center; gap:1rem; flex-wrap:wrap;">
+    <!-- Title + actions -->
+    <div class="row space-between" style="align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:.75rem;">
       <h2 class="mb-0">{{ building.name }}</h2>
       <div class="row gap">
         <a class="btn" href="{% url 'building_update' building.id %}">Edit</a>
@@ -20,38 +14,33 @@
     </div>
 
     <p class="mb-1"><strong>Address:</strong> {{ building.address }}</p>
-    <p class="mb-2"><strong>Owner:</strong> {% if building.owner %}{{ building.owner.username }}{% else %}—{% endif %}</p>
+    {% if building.owner %}
+      <p class="mb-2"><strong>Owner (user):</strong> {{ building.owner.username }}</p>
+    {% endif %}
 
-    <h3>Description</h3>
-    <div class="bm-description mb-2">
-      {% if building.description %}
-        {{ building.description|markdownify }}
-      {% else %}
-        <em>No description.</em>
-      {% endif %}
-    </div>
+    {% if building.description %}
+      <div class="bm-description mb-2"><strong>Description:</strong> {{ building.description }}</div>
+    {% endif %}
 
     <hr class="section-divider" />
 
-    {# ===== Units ===== #}
+    <!-- ===== Units ===== -->
     <div class="row space-between" style="gap:1rem; align-items:center; flex-wrap:wrap;">
       <h3 class="mb-0">Units</h3>
-      {% if can_edit %}
-        <a class="btn" href="{% url 'unit_create' building.id %}">Add Unit</a>
-      {% endif %}
+      <a class="btn" href="{% url 'unit_create' pk=building.id %}">Add Unit</a>
     </div>
 
-    {# Units: Search + Filter + Page size (on one line; wraps nicely on mobile) #}
+    <!-- Units toolbar: search + Filter, page size next to label -->
     <form method="get" class="row" style="gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-top:.6rem; margin-bottom:.5rem;">
       <div class="input-group joined" style="flex:1; min-width:320px; max-width:640px;">
         <label for="id_u_q" class="sr-only">Units search</label>
         <input id="id_u_q" class="input-search" type="text" name="u_q" value="{{ u_q }}"
-               placeholder="Number, floor or description"/>
+               placeholder="Number, floor, owner or contact"/>
         <button class="btn" type="submit">Filter</button>
       </div>
 
-      <div>
-        <label for="id_u_per">Page size:</label><br/>
+      <div class="row" style="gap:.5rem; align-items:center;">
+        <label for="id_u_per" style="margin:0;">Page size:</label>
         <select id="id_u_per" name="u_per" onchange="this.form.submit()">
           <option value="10"  {% if u_per == 10  %}selected{% endif %}>10</option>
           <option value="20"  {% if u_per == 20  %}selected{% endif %}>20</option>
@@ -66,7 +55,7 @@
         <div><a class="btn btn-secondary" href="{% url 'building_detail' building.id %}">Reset</a></div>
       {% endif %}
 
-      {# keep Work Orders state when changing Units #}
+      {# Keep Work Orders state while changing Units #}
       <input type="hidden" name="w_q" value="{{ w_q }}">
       <input type="hidden" name="w_status" value="{{ w_status }}">
       <input type="hidden" name="w_per" value="{{ w_per }}">
@@ -103,21 +92,9 @@
                 {% endif %}
               {% endwith %}
             </th>
-            <th>
-              {% with field='occupied' %}
-                {% if u_sort == field %}
-                  {% with next='-'|add:field %}
-                    <a href="?u_sort={{ next }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Occupied ▲</a>
-                  {% endwith %}
-                {% elif u_sort == '-'|add:field %}
-                  <a href="?u_sort=occupied{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Occupied ▼</a>
-                {% else %}
-                  <a href="?u_sort=occupied{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Occupied</a>
-                {% endif %}
-              {% endwith %}
-            </th>
-            <th>Description</th>
-            {% if can_edit %}<th class="text-right">Actions</th>{% endif %}
+            <th>Apartment Owner</th>
+            <th>Contact</th>
+            <th class="text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -125,20 +102,15 @@
             <tr>
               <td><a href="{% url 'unit_update' u.id %}">{{ u.number }}</a></td>
               <td>{{ u.floor }}</td>
-              <td>{{ u.occupied|yesno:"Yes,No" }}</td>
-              <td>{% if u.description %}{{ u.description|truncatechars:140 }}{% else %}<span class="muted">—</span>{% endif %}</td>
-              {% if can_edit %}
+              <td>{{ u.owner_name|default:"—" }}</td>
+              <td>{{ u.contact_phone|default:"—" }}</td>
               <td class="text-right">
-                <div class="row" style="gap:.5rem; justify-content:flex-end; flex-wrap:nowrap; white-space:nowrap;">
-                  <a class="btn" href="{% url 'unit_update' u.id %}">Edit</a>
-                  <a class="btn btn-danger" href="{% url 'unit_delete' u.id %}">Delete</a>
-                </div>
+                <a class="btn btn-danger" href="{% url 'unit_delete' u.id %}">Delete</a>
               </td>
-            {% endif %}
             </tr>
           {% empty %}
             <tr>
-              <td colspan="{% if can_edit %}5{% else %}4{% endif %}">No units.</td>
+              <td colspan="5">No units.</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -161,19 +133,17 @@
       </div>
     {% endif %}
 
-    {# ===== Work Orders ===== #}
     <hr class="section-divider" />
 
+    <!-- ===== Work Orders ===== -->
     <div class="row space-between" style="gap:1rem; align-items:center; flex-wrap:wrap;">
       <h3 class="mb-0">Work Orders</h3>
-      {% if can_edit %}
-        <a class="btn" href="{% url 'work_order_create' %}?building={{ building.id }}">Add Work Order</a>
-      {% endif %}
+      <a class="btn" href="{% url 'work_order_create' %}?building={{ building.id }}">Add Work Order</a>
     </div>
 
-    {# Work Orders toolbar: grid = [ search+filter | page size | status ] #}
-    <form method="get" class="filter-grid" style="margin-top:.6rem; margin-bottom:.5rem;">
-      {# Search + Filter (left, grows) #}
+    <!-- Work Orders toolbar -->
+    <form method="get" class="row" style="gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-top:.6rem; margin-bottom:.5rem;">
+      <!-- search + Filter -->
       <div class="input-group joined" style="min-width:320px; max-width:680px;">
         <label for="id_w_q" class="sr-only">Search work orders</label>
         <input
@@ -187,8 +157,8 @@
         <button class="btn" type="submit">Filter</button>
       </div>
 
-      {# Page size (right) #}
-      <div class="row" style="gap:.5rem; align-items:center; justify-self:end; white-space:nowrap;">
+      <!-- page size -->
+      <div class="row" style="gap:.5rem; align-items:center;">
         <label for="id_w_per" style="margin:0;">Page size:</label>
         <select id="id_w_per" name="w_per" onchange="this.form.submit()">
           <option value="10"  {% if w_per == 10  %}selected{% endif %}>10</option>
@@ -198,8 +168,8 @@
         </select>
       </div>
 
-      {# Status (right) #}
-      <div class="row" style="gap:.5rem; align-items:center; justify-self:end; white-space:nowrap;">
+      <!-- status filter -->
+      <div class="row" style="gap:.5rem; align-items:center;">
         <label for="id_w_status" style="margin:0;">Status:</label>
         <select id="id_w_status" name="w_status" onchange="this.form.submit()">
           <option value="" {% if not w_status %}selected{% endif %}>All</option>
@@ -222,30 +192,29 @@
           <tr>
             <th>Title</th>
             <th>Unit</th>
+            <th>Priority</th>
             <th>Status</th>
             <th>Deadline</th>
             <th>Created</th>
-            {% if can_edit %}<th class="text-right">Actions</th>{% endif %}
+            <th class="text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for w in work_orders_page %}
             <tr>
-              <td><a href="{% url 'work_order_update' w.id %}">{{ w.title }}</a></td>
+              <td>{{ w.title }}</td>
               <td>{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</td>
+              <td>{{ w.get_priority_display }}</td>
               <td>{{ w.get_status_display }}</td>
               <td>{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
               <td>{{ w.created_at|date:"Y-m-d H:i" }}</td>
-              {% if can_edit %}
-                <td class="text-right">
-                  <a class="btn" href="{% url 'work_order_update' w.id %}">Edit</a>
-                  <a class="btn btn-danger" href="{% url 'work_order_delete' w.id %}?building={{ building.id }}">Delete</a>
-                </td>
-              {% endif %}
+              <td class="text-right">
+                <a class="btn btn-danger" href="{% url 'work_order_delete' w.id %}?building={{ building.id }}">Delete</a>
+              </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="{% if can_edit %}6{% else %}5{% endif %}">No work orders for this building.</td>
+              <td colspan="7">No work orders for this building.</td>
             </tr>
           {% endfor %}
         </tbody>

@@ -19,23 +19,14 @@ class BuildingQuerySet(models.QuerySet):
 
 
 class Building(models.Model):
-    name = models.CharField(max_length=200)
-    address = models.CharField(max_length=300)
+    name = models.CharField(max_length=255)
+    address = models.CharField(max_length=255, blank=True, default="")
     description = models.TextField(blank=True, default="")
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="buildings",
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
     )
 
-    objects: BuildingQuerySet = BuildingQuerySet.as_manager()  # leverage annotations
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self) -> str:
+    def __str__(self):
         return self.name
 
     # Prefer annotations when available to avoid extra queries.
@@ -62,22 +53,23 @@ class Building(models.Model):
 
 
 class Unit(models.Model):
-    building = models.ForeignKey(
-        Building,
-        on_delete=models.CASCADE,
-        related_name="units",
-    )
-    number = models.CharField(max_length=50)
-    floor = models.IntegerField(validators=[MinValueValidator(-5)])
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name="units")
+    number = models.PositiveIntegerField("Apartment number")
+    floor = models.IntegerField()
+    owner_name = models.CharField("Unit Owner", max_length=200, blank=True, default="")
+    contact_phone = models.CharField("Contact", max_length=50, blank=True, default="")
     is_occupied = models.BooleanField(default=False)
     description = models.TextField(blank=True, default="")
 
     class Meta:
-        unique_together = ("building", "number")
-        ordering = ["building__name", "floor", "number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["building", "number"], name="unique_unit_number_per_building"
+            )
+        ]
 
-    def __str__(self) -> str:
-        return f"{self.building.name} #{self.number}"
+    def __str__(self):
+        return f"{self.building} • #{self.number}"
 
     @property
     def occupied(self) -> bool:  # compatibility with templates using `u.occupied`
@@ -104,37 +96,29 @@ class Tenant(models.Model):
 class WorkOrder(models.Model):
     class Status(models.TextChoices):
         OPEN = "open", "Open"
-        IN_PROGRESS = "in_progress", "In Progress"
-        CLOSED = "closed", "Closed"
+        IN_PROGRESS = "in_progress", "In progress"
+        DONE = "done", "Done"
 
-    # NEW: allow orders to belong to a building even if no specific unit is chosen
-    building = models.ForeignKey(
-        "core.Building",
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name="work_orders",
+    PRIORITY_HIGH = "high"
+    PRIORITY_MEDIUM = "medium"
+    PRIORITY_LOW = "low"
+    PRIORITY_CHOICES = (
+        (PRIORITY_HIGH, "High"),
+        (PRIORITY_MEDIUM, "Medium"),
+        (PRIORITY_LOW, "Low"),
     )
 
-    # CHANGED: unit is optional; if a unit is deleted we keep the order (set to NULL)
-    unit = models.ForeignKey(
-        "core.Unit",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="work_orders",
-    )
-
-    title = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.OPEN
-    )
-
-    # NEW: deadline (date only) – renders as a browser calendar with the form widget below
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name="work_orders")
+    unit = models.ForeignKey(Unit, null=True, blank=True, on_delete=models.SET_NULL, related_name="work_orders")
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default=PRIORITY_MEDIUM, db_index=True)
     deadline = models.DateField(null=True, blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
 
     def __str__(self):
         return self.title
