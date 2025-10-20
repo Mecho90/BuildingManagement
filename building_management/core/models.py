@@ -261,8 +261,6 @@ class WorkOrder(TimeStampedModel):
         without a `deadline`.
         """
         super().clean()
-        if self.deadline is None:
-            raise ValidationError({"deadline": "Deadline is required."})
 
         # If a unit is set but building is missing/mismatched, align it
         if self.unit_id and self.building_id and self.unit.building_id != self.building_id:

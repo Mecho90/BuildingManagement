@@ -36,15 +36,38 @@ img, svg, canvas, video { max-width: 100%; display: block; }
   padding:.55rem .9rem;border:1px solid var(--bd);border-radius:.6rem;
   background:var(--bg);color:var(--fg);font-weight:500;cursor:pointer;user-select:none;
   transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+  text-decoration: none; /* keep buttons (and a.btn) from underlining */
 }
-.btn:hover { background: #fff; }
+.btn:hover { background: #fff; text-decoration: none; }
+
+/* Make anchor buttons 100% identical to <button class="btn"> */
+a.btn { display:inline-flex; align-items:center; justify-content:center; }
+a.btn, a.btn:visited { color: var(--fg); text-decoration: none; } /* no visited purple */
+a.btn:hover { text-decoration: none; }
+
+.btn:focus-visible,
+a.btn:focus-visible {
+  outline: 2px solid #93c5fd; /* blue-300 */
+  outline-offset: 2px;
+}
+
 .btn-secondary { --bg:#eef2ff; --bd:#c7d2fe; --fg:#3730a3; }
 .btn-danger { --bg:#fef2f2; --bd:#fecaca; --fg:#b91c1c; }
-.btn.is-disabled,[disabled].btn{opacity:.55;pointer-events:none}
+.btn.is-disabled,[disabled].btn,a.btn.is-disabled{opacity:.55;pointer-events:none}
 .btn-equal { min-width: 160px; }
 
 /* Forms */
 label { font-weight: 600; color: #0f172a; display:inline-block; margin-bottom:.35rem; }
+
+/* Field rows (used by _form_layout.html) */
+.form-row { margin-bottom: .9rem; }
+.form-row.has-errors .input,
+.form-row.has-errors input,
+.form-row.has-errors select,
+.form-row.has-errors textarea {
+  border-color: #fecaca; /* red-200 */
+  box-shadow: 0 0 0 .15rem rgba(239, 68, 68, .12); /* red-500 @ 12% */
+}
 
 /* Unified controls (add .input so forms can opt-in explicitly too) */
 .input,
@@ -77,6 +100,14 @@ input[type=number]:focus, input[type=date]:focus, select:focus, textarea:focus {
   border-color:#93c5fd;
   box-shadow:0 0 0 .15rem rgba(59,130,246,.15);
 }
+
+/* Help/error blocks used by _form_layout.html */
+.help { color:#64748b; margin-top:.3rem; font-size:.925rem; }
+.errors { color:#b91c1c; margin-top:.35rem; }
+.alert { background:#fef2f2; color:#7f1d1d; border:1px solid #fecaca; padding:.6rem .75rem; border-radius:.5rem; }
+
+/* Checkbox label style used in _form_layout.html */
+.checkbox { display:flex; align-items:center; gap:.5rem; }
 
 /* Textarea sizing */
 textarea, textarea.input { resize: vertical; min-height: 6rem; height: auto; }

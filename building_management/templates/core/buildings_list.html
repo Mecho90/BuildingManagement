@@ -5,29 +5,31 @@
 {% block content %}
   <h1>Buildings</h1>
 
-  <form method="get" class="row" style="gap:1rem; flex-wrap:wrap; align-items:flex-end; margin:.5rem 0 1rem;">
-    <div class="input-group joined" style="flex:1; min-width:320px; max-width:640px;">
-      <label for="id_q" class="sr-only">Search</label>
-      <input id="id_q" class="input-search" type="text" name="q" value="{{ q }}" placeholder="Name, address, owner"/>
-      <button class="btn" type="submit">Filter</button>
-    </div>
+  <div class="row space-between" style="gap:1rem; flex-wrap:wrap; align-items:flex-end; margin:.5rem 0 1rem;">
+    <form method="get" class="row" style="gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+      <div class="input-group joined" style="flex:1; min-width:320px; max-width:640px;">
+        <label for="id_q" class="sr-only">Search</label>
+        <input id="id_q" class="input-search" type="text" name="q" value="{{ q }}" placeholder="Name, address, owner"/>
+        <button class="btn" type="submit">Filter</button>
+      </div>
 
-    <div class="row" style="gap:.5rem; align-items:center;">
-      <label for="id_per" style="margin:0;">Page size:</label>
-      <select id="id_per" name="per" onchange="this.form.submit()">
-        <option value="10"  {% if per == 10  %}selected{% endif %}>10</option>
-        <option value="20"  {% if per == 20  %}selected{% endif %}>20</option>
-        <option value="50"  {% if per == 50  %}selected{% endif %}>50</option>
-        <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
-      </select>
-    </div>
+      <div class="row" style="gap:.5rem; align-items:center;">
+        <label for="id_per" style="margin:0;">Page size:</label>
+        <select id="id_per" name="per" onchange="this.form.submit()">
+          <option value="10"  {% if per == 10  %}selected{% endif %}>10</option>
+          <option value="20"  {% if per == 20  %}selected{% endif %}>20</option>
+          <option value="50"  {% if per == 50  %}selected{% endif %}>50</option>
+          <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
+        </select>
+      </div>
 
-    {% if q or sort != 'name' or per != 10 %}
-      <div><a class="btn btn-secondary" href="{% url 'buildings_list' %}">Reset</a></div>
-    {% endif %}
+      {% if q or sort != 'name' or per != 10 %}
+        <div><a class="btn btn-secondary" href="{% url 'buildings_list' %}">Reset</a></div>
+      {% endif %}
+    </form>
 
     <a class="btn" href="{% url 'building_create' %}">Add new building</a>
-  </form>
+  </div>
 
   <div class="table-wrap">
     <table class="bm-table">
