@@ -109,7 +109,7 @@ class WorkOrder(models.Model):
         (PRIORITY_LOW, "Low"),
     )
 
-    building = models.ForeignKey("core.Building", on_delete=models.CASCADE)
+    building = models.ForeignKey("core.Building",on_delete=models.CASCADE, related_name="work_orders")
     unit = models.ForeignKey("core.Unit", null=True, blank=True, on_delete=models.SET_NULL)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")

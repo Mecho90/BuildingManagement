@@ -44,23 +44,24 @@ class BuildingListView(LoginRequiredMixin, ListView):
 
     # ---- Query building ----
     def get_queryset(self):
-        q = (self.request.GET.get("q") or "").strip()
+        q = self.request.GET.get("q", "").strip()
         sort = self.request.GET.get("sort") or "name"
 
         qs = Building.objects.all()
 
         # Search across name + address (extend as needed)
         if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(address__icontains=q))
+            qs = qs.filter(Q(name__icontains=q) | Q(address__icontains=q) | Q(owner__username__icontains=q))
+
 
         # Annotations — use names that don't collide with properties
         qs = qs.annotate(
             units_total=Count("units", distinct=True),
             work_orders_open=Count(
-                "workorder",                                 # <-- not "work_orders"
+                "work_orders",
                 filter=Q(
-                    workorder__archived_at__isnull=True,
-                    workorder__status__in=[
+                    work_orders__archived_at__isnull=True,
+                    work_orders__status__in=[
                         WorkOrder.Status.OPEN,
                         WorkOrder.Status.IN_PROGRESS,
                     ],
@@ -78,13 +79,14 @@ class BuildingListView(LoginRequiredMixin, ListView):
         }
         sort = self.request.GET.get("sort") or "name"
 
-        allowed_sorts = {
+        allowed = {
             "name", "-name",
             "address", "-address",
             "units_total", "-units_total",
             "work_orders_open", "-work_orders_open",
         }
-        if sort not in allowed_sorts:
+        
+        if sort not in allowed:
             sort = "name"
 
         return qs.order_by(sort)
