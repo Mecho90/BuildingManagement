@@ -40,7 +40,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
     model = Building
     template_name = "core/buildings_list.html"
     context_object_name = "buildings"
-    paginate_by = 10  # default, can be overridden by ?per=
+    paginate_by = 10
 
     # ---- Query building ----
     def get_queryset(self):
@@ -57,11 +57,14 @@ class BuildingListView(LoginRequiredMixin, ListView):
         qs = qs.annotate(
             units_total=Count("units", distinct=True),
             work_orders_open=Count(
-                "work_orders",
-                filter=Q(work_orders__status__in=[
-                    WorkOrder.Status.OPEN,
-                    WorkOrder.Status.IN_PROGRESS,
-                ]),
+                "workorder",                                 # <-- not "work_orders"
+                filter=Q(
+                    workorder__archived_at__isnull=True,
+                    workorder__status__in=[
+                        WorkOrder.Status.OPEN,
+                        WorkOrder.Status.IN_PROGRESS,
+                    ],
+                ),
                 distinct=True,
             ),
         )
@@ -73,7 +76,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
             "work_orders_count": "work_orders_open",
             "-work_orders_count": "-work_orders_open",
         }
-        sort = sort_map.get(sort, sort)
+        sort = self.request.GET.get("sort") or "name"
 
         allowed_sorts = {
             "name", "-name",
