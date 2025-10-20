@@ -150,7 +150,7 @@ class BuildingDetailView(LoginRequiredMixin, DetailView):
         w_status = request.GET.get("w_status") or ""
         w_per = int(request.GET.get("w_per") or 10)
 
-        w_qs = WorkOrder.objects.filter(building=bld)
+        w_qs = WorkOrder.objects.filter(building=bld, archived_at__isnull=True)
 
         if w_q:
             w_qs = w_qs.filter(Q(title__icontains=w_q) | Q(description__icontains=w_q))
@@ -339,10 +339,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         building_id = r.GET.get("building") or ""
         sort = r.GET.get("sort") or "priority"
 
-        qs = (
-            WorkOrder.objects
-            .select_related("building", "unit")
-        )
+        qs = WorkOrder.objects.select_related("building", "unit").filter(archived_at__isnull=True)
 
         if building_id:
             qs = qs.filter(building_id=building_id)
@@ -506,6 +503,19 @@ class WorkOrderUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_success_url(self) -> str:
         return reverse("building_detail", args=[self.object.building_id])
+
+
+class WorkOrderArchiveView(LoginRequiredMixin, View):
+    def post(self, request, pk, *args, **kwargs):
+        wo = get_object_or_404(WorkOrder, pk=pk)
+        # Allow archive only if status is DONE
+        if wo.status == WorkOrder.Status.DONE:
+            wo.archive()
+        # send back to the building detail, preserving some filters if present
+        bpk = wo.building_id
+        return redirect(
+            f"{reverse('building_detail', args=[bpk])}"
+        )
 
 
 class ApiBuildingsView(LoginRequiredMixin, View):

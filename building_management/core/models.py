@@ -4,6 +4,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 from django.db.models import Count, Q
 
 
@@ -108,17 +109,26 @@ class WorkOrder(models.Model):
         (PRIORITY_LOW, "Low"),
     )
 
-    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name="work_orders")
-    unit = models.ForeignKey(Unit, null=True, blank=True, on_delete=models.SET_NULL, related_name="work_orders")
+    building = models.ForeignKey("core.Building", on_delete=models.CASCADE)
+    unit = models.ForeignKey("core.Unit", null=True, blank=True, on_delete=models.SET_NULL)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default=PRIORITY_MEDIUM, db_index=True)
     deadline = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return self.title
+    
+    def save(self, *args, **kwargs):
+        if self.title:
+            self.title = self.title.strip()
+        if self.unit_id and self.building_id != self.unit.building_id:
+            self.building_id = self.unit.building_id
+        super().save(*args, **kwargs)
+        

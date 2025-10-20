@@ -46,16 +46,67 @@ img, svg, canvas, video { max-width: 100%; display: block; }
 /* Forms */
 label { font-weight: 600; color: #0f172a; display:inline-block; margin-bottom:.35rem; }
 
+/* Unified controls (add .input so forms can opt-in explicitly too) */
+.input,
 input[type=text], input[type=password], input[type=email], input[type=tel],
-input[type=number], select, textarea {
-  width:100%; padding:.6rem .7rem; border:1px solid #e2e8f0; border-radius:.6rem;
-  background:#fff; color:#0f172a; outline:none;
+input[type=number], input[type=date], select, textarea {
+  width:100%;
+  display:block;
+  padding:.6rem .7rem;
+  border:1px solid #e2e8f0;
+  border-radius:.6rem;
+  background:#fff;
+  color:#0f172a;
+  outline:none;
   transition: border-color .15s ease, box-shadow .15s ease;
+  box-sizing: border-box;
 }
-input:focus, select:focus, textarea:focus {
-  border-color:#93c5fd; box-shadow:0 0 0 .15rem rgba(59,130,246,.15);
+
+/* Keep a consistent height for single-line controls */
+.input,
+input[type=text], input[type=password], input[type=email], input[type=tel],
+input[type=number], input[type=date], select {
+  height: 44px;
+  line-height: 1.4;
 }
-textarea { resize: vertical; min-height: 6rem; }
+
+/* Focus styles identical across all controls */
+.input:focus,
+input[type=text]:focus, input[type=password]:focus, input[type=email]:focus, input[type=tel]:focus,
+input[type=number]:focus, input[type=date]:focus, select:focus, textarea:focus {
+  border-color:#93c5fd;
+  box-shadow:0 0 0 .15rem rgba(59,130,246,.15);
+}
+
+/* Textarea sizing */
+textarea, textarea.input { resize: vertical; min-height: 6rem; height: auto; }
+
+/* Placeholder color */
+.input::placeholder,
+input::placeholder,
+textarea::placeholder { color:#94a3b8; }
+
+/* Date input normalization so it matches other fields */
+input[type=date] {
+  -webkit-appearance: none; /* Safari/Chrome */
+  appearance: none;
+  background-color: #fff;
+}
+
+/* Calendar icon tweak (WebKit) */
+input[type=date]::-webkit-calendar-picker-indicator {
+  opacity: .7;
+  cursor: pointer;
+  margin-right: .05rem;
+}
+
+/* Firefox alignment for date text */
+@-moz-document url-prefix() {
+  input[type=date] {
+    padding-top: .6rem;
+    padding-bottom: .6rem;
+  }
+}
 
 .input-search { padding:.65rem .8rem; }
 .input-group.joined { display:flex; }
@@ -80,5 +131,12 @@ textarea { resize: vertical; min-height: 6rem; }
 .bm-description p { margin:.5rem 0; }
 
 /* Responsive tweaks */
-@media (max-width:720px){ .row{flex-wrap:wrap} .btn-equal{min-width:140px} }
-@media (max-width:480px){ .bm-table th,.bm-table td{padding:.75rem} .btn{padding:.5rem .75rem} .btn-equal{min-width:120px} }
+@media (max-width:720px){
+  .row{flex-wrap:wrap}
+  .btn-equal{min-width:140px}
+}
+@media (max-width:480px){
+  .bm-table th,.bm-table td{padding:.75rem}
+  .btn{padding:.5rem .75rem}
+  .btn-equal{min-width:120px}
+}

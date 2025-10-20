@@ -102,12 +102,17 @@ class WorkOrderForm(forms.ModelForm):
     Expects `building` in __init__(..., building=<Building>, ...)
     and restricts the Unit field to units from that building.
     """
-
     class Meta:
         model = WorkOrder
         fields = ["title", "description", "unit", "priority", "status", "deadline"]
         widgets = {
-            "deadline": forms.DateInput(attrs={"type": "date"}),
+            "title": forms.TextInput(attrs={"class": "input"}),
+            "description": forms.Textarea(attrs={"class": "input", "rows": 4}),
+            "unit": forms.Select(attrs={"class": "input"}),
+            "priority": forms.Select(attrs={"class": "input"}),
+            "status": forms.Select(attrs={"class": "input"}),
+            # 👇 identical class, type=date for native calendar
+            "deadline": forms.DateInput(attrs={"type": "date", "class": "input"}),
         }
 
     def __init__(self, *args, building=None, **kwargs):

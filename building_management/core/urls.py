@@ -23,6 +23,7 @@ urlpatterns = [
     path("work-orders/<int:pk>/", views.WorkOrderDetailView.as_view(), name="work_order_detail"),
     path("work-orders/<int:pk>/edit/", views.WorkOrderUpdateView.as_view(), name="work_order_update"),
     path("work-orders/<int:pk>/delete/", views.WorkOrderDeleteView.as_view(), name="work_order_delete"),
+    path("work-orders/<int:pk>/archive/", views.WorkOrderArchiveView.as_view(), name="work_order_archive"),
 
     # APIs (optional)
     path("api/buildings/", views.ApiBuildingsView.as_view(), name="api_buildings"),

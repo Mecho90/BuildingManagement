@@ -207,8 +207,14 @@
               <td>{{ w.get_priority_display }}</td>
               <td>{{ w.get_status_display }}</td>
               <td>{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
-              <td>{{ w.created_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ w.created_at|date:"Y-m-d" }}</td>
               <td class="text-right">
+                {% if w.status == 'done' and not w.archived_at %}
+                  <form action="{% url 'work_order_archive' w.id %}?building={{ building.id }}" method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <button class="btn btn-secondary">Archive</button>
+                  </form>
+                {% endif %}
                 <a class="btn btn-danger" href="{% url 'work_order_delete' w.id %}?building={{ building.id }}">Delete</a>
               </td>
             </tr>
