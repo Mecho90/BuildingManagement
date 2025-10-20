@@ -468,7 +468,7 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs["building"] = self.building
+        kwargs["building"] = self.building   # set in dispatch()
         return kwargs
 
     def form_valid(self, form):
@@ -501,8 +501,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        # For updates, default building context to the object's building
-        kwargs["building"] = getattr(self.object, "building", None)
+        kwargs["building"] = self.object.building
         return kwargs
 
     def get_success_url(self) -> str:

@@ -98,27 +98,50 @@ class UnitForm(forms.ModelForm):
 # Work order form
 # -------------------
 class WorkOrderForm(forms.ModelForm):
-    """Accepts optional `user` (ignored) and `building` (to prefill/lock)."""
+    """
+    Expects `building` in __init__(..., building=<Building>, ...)
+    and restricts the Unit field to units from that building.
+    """
+
     class Meta:
         model = WorkOrder
-        fields = ["building", "unit", "title", "description", "priority", "status", "deadline"]
+        fields = ["title", "description", "unit", "priority", "status", "deadline"]
         widgets = {
             "deadline": forms.DateInput(attrs={"type": "date"}),
-            "description": forms.Textarea(attrs={"rows": 6, "placeholder": "Optional details"}),
         }
 
-    def __init__(self, *args, building: Building | None = None, user=None, **kwargs):
+    def __init__(self, *args, building=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._building = building
-        if building is not None:
-            self.fields["building"].initial = building.pk
-            # To lock the building, uncomment next line:
-            # self.fields["building"].widget = forms.HiddenInput()
+
+        # Remember the building (from view or instance)
+        self.building = building or getattr(self.instance, "building", None)
+
+        # Unit is optional in most flows; keep it explicit.
+        self.fields["unit"].required = False
+
+        # Limit the Unit queryset to the current building
+        if self.building:
+            self.fields["unit"].queryset = (
+                Unit.objects.filter(building=self.building).order_by("number")
+            )
+            self.fields["unit"].help_text = f"Only units from “{self.building.name}”."
+        else:
+            # No building context → no choices
+            self.fields["unit"].queryset = Unit.objects.none()
+            self.fields["unit"].help_text = "Select a building first."
+
+    def clean(self):
+        cleaned = super().clean()
+        unit = cleaned.get("unit")
+        if unit and self.building and unit.building_id != self.building.id:
+            self.add_error("unit", "Selected unit does not belong to this building.")
+        return cleaned
 
     def save(self, commit=True):
-        obj: WorkOrder = super().save(commit=False)
-        if not obj.building_id and self._building:
-            obj.building = self._building
+        obj = super().save(commit=False)
+        # Ensure the work order is bound to the building provided by the view
+        if self.building:
+            obj.building = self.building
         if commit:
             obj.save()
             self.save_m2m()

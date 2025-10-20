@@ -202,7 +202,7 @@
         <tbody>
           {% for w in work_orders_page %}
             <tr>
-              <td>{{ w.title }}</td>
+              <td><a href="{% url 'work_order_update' w.id %}">{{ w.title }}</a></td>
               <td>{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</td>
               <td>{{ w.get_priority_display }}</td>
               <td>{{ w.get_status_display }}</td>
