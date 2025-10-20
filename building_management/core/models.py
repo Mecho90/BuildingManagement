@@ -1,134 +1,301 @@
-# app/models.py
+# core/models.py
 from __future__ import annotations
 
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
-from django.utils import timezone
 from django.db.models import Count, Q
+from django.db.models.functions import Lower
+from django.utils import timezone
 
+
+# ---------------------------------------------------------------------------
+# QuerySets with per-user visibility helpers
+# ---------------------------------------------------------------------------
 
 class BuildingQuerySet(models.QuerySet):
-    def with_unit_stats(self) -> "BuildingQuerySet":
+    def visible_to(self, user):
+        if not user or not user.is_authenticated:
+            return self.none()
+        if user.is_staff or user.is_superuser:
+            return self
+        return self.filter(owner=user)
+
+    def with_unit_stats(self):
         """
-        Annotate counts so templates can render numbers without extra queries.
+        Annotate each Building with:
+          - _units_count: total units
+          - _work_orders_count: ACTIVE work orders (OPEN + IN_PROGRESS), non-archived
         """
         return self.annotate(
-            total_units=Count("units", distinct=True),
-            occupied_units=Count("units", filter=Q(units__is_occupied=True), distinct=True),
+            _units_count=Count("units", distinct=True),
+            _work_orders_count=Count(
+                "work_orders",
+                filter=Q(work_orders__archived_at__isnull=True)
+                       & Q(work_orders__status__in=[
+                            WorkOrder.Status.OPEN,
+                            WorkOrder.Status.IN_PROGRESS
+                         ]),
+                distinct=True,
+            ),
         )
 
 
-class Building(models.Model):
-    name = models.CharField(max_length=255)
-    address = models.CharField(max_length=255, blank=True, default="")
-    description = models.TextField(blank=True, default="")
-    owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
-    )
+class UnitQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        if not user or not user.is_authenticated:
+            return self.none()
+        if user.is_staff or user.is_superuser:
+            return self
+        return self.filter(building__owner=user)
 
-    def __str__(self):
+
+class WorkOrderQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        if not user or not user.is_authenticated:
+            return self.none()
+        if user.is_staff or user.is_superuser:
+            return self
+        return self.filter(building__owner=user)
+
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
+
+class TimeStampedModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class Building(TimeStampedModel):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="buildings",
+    )
+    name = models.CharField(max_length=255, db_index=True)
+    address = models.CharField(max_length=512, blank=True)
+    description = models.TextField(blank=True)
+
+    objects = BuildingQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["name", "id"]
+
+    def __str__(self) -> str:  # pragma: no cover
         return self.name
 
-    # Prefer annotations when available to avoid extra queries.
+    # ---------------------- Derived counters (for templates) -----------------
+
     @property
     def units_count(self) -> int:
-        val = getattr(self, "total_units", None)
+        """Prefer annotated value (_units_count), fall back to live count."""
+        val = getattr(self, "_units_count", None)
         return int(val) if val is not None else self.units.count()
 
     @property
-    def occupied_count(self) -> int:
-        val = getattr(self, "occupied_units", None)
+    def work_orders_count(self) -> int:
+        """
+        ACTIVE work orders count = OPEN + IN_PROGRESS (non-archived).
+        Prefer annotated value (_work_orders_count); fall back to live count.
+        """
+        val = getattr(self, "_work_orders_count", None)
         if val is not None:
             return int(val)
-        return self.units.filter(is_occupied=True).count()
-
-    @property
-    def vacancy_count(self) -> int:
-        return self.units_count - self.occupied_count
-
-    @property
-    def occupancy_rate(self) -> float:
-        # Avoid ZeroDivisionError in empty buildings
-        return (self.occupied_count / self.units_count) if self.units_count else 0.0
+        return self.work_orders.filter(
+            archived_at__isnull=True,
+            status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
+        ).count()
 
 
-class Unit(models.Model):
-    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name="units")
-    number = models.PositiveIntegerField("Apartment number")
-    floor = models.IntegerField()
-    owner_name = models.CharField("Unit Owner", max_length=200, blank=True, default="")
-    contact_phone = models.CharField("Contact", max_length=50, blank=True, default="")
+phone_validator = RegexValidator(
+    r"^\+?\d{7,15}$",
+    "Enter a valid phone number (digits with optional leading +, 7–15 digits).",
+)
+
+
+class Unit(TimeStampedModel):
+    """
+    A single apartment/unit belonging to a Building.
+
+    - `number` is unique per building (case-insensitive)
+    - `contact_phone` is stored but deliberately *not* shown in list views
+    """
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        related_name="units",  # used by counts/annotations
+    )
+
+    # Apartment/Unit number (unique within the building)
+    number = models.CharField("Apartment number", max_length=32)
+
+    floor = models.IntegerField(null=True, blank=True)
+
+    # The person who owns the apartment
+    owner_name = models.CharField("Apartment owner", max_length=255, blank=True)
+
+    # Private contact field (not shown in list)
+    contact_phone = models.CharField(
+        "Contact phone",
+        max_length=32,
+        blank=True,
+        validators=[phone_validator]
+    )
+
     is_occupied = models.BooleanField(default=False)
-    description = models.TextField(blank=True, default="")
+
+    # Optional description of the unit
+    description = models.TextField(blank=True)
+
+    objects = UnitQuerySet.as_manager()
 
     class Meta:
+        ordering = ["building_id", "number", "id"]
+        # Case-insensitive uniqueness within a building
         constraints = [
             models.UniqueConstraint(
-                fields=["building", "number"], name="unique_unit_number_per_building"
+                Lower("number"),
+                "building",
+                name="unique_unit_number_ci_per_building",
             )
         ]
+        # Helpful index for lookups and counts
+        indexes = [
+            models.Index(fields=["building", "number"]),
+        ]
 
-    def __str__(self):
-        return f"{self.building} • #{self.number}"
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.number} @ {self.building.name}"
 
-    @property
-    def occupied(self) -> bool:  # compatibility with templates using `u.occupied`
-        return self.is_occupied
+    # ---------- Validation & normalization ---------------------------------
+
+    def clean(self):
+        """Application-level guard to match the DB constraint and give a nice error."""
+        super().clean()
+        # Use the raw FK id so we don't trigger a RelatedObjectDoesNotExist
+        if not self.building_id:
+            return
+
+        normalized = (self.number or "").strip()
+        qs = Unit.objects.filter(building_id=self.building_id, number__iexact=normalized)
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
+        if qs.exists():
+            raise ValidationError(
+                {"number": "Apartment number must be unique within this building."}
+            )
+
+    def save(self, *args, **kwargs):
+        # light normalization to avoid surprises
+        if self.number is not None:
+            self.number = self.number.strip()
+        if self.contact_phone:
+            self.contact_phone = self.contact_phone.strip()
+        super().save(*args, **kwargs)
 
 
-class Tenant(models.Model):
-    unit = models.OneToOneField(
-        Unit,
-        on_delete=models.CASCADE,
-        related_name="tenant",
-    )
-    full_name = models.CharField(max_length=200)
-    email = models.EmailField()
-    phone = models.CharField(max_length=50)
-
-    class Meta:
-        ordering = ["full_name"]
-
-    def __str__(self) -> str:
-        return self.full_name
-
-
-class WorkOrder(models.Model):
+class WorkOrder(TimeStampedModel):
     class Status(models.TextChoices):
-        OPEN = "open", "Open"
-        IN_PROGRESS = "in_progress", "In progress"
-        DONE = "done", "Done"
+        OPEN = "OPEN", "Open"
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        DONE = "DONE", "Done"
 
-    PRIORITY_HIGH = "high"
-    PRIORITY_MEDIUM = "medium"
-    PRIORITY_LOW = "low"
-    PRIORITY_CHOICES = (
-        (PRIORITY_HIGH, "High"),
-        (PRIORITY_MEDIUM, "Medium"),
-        (PRIORITY_LOW, "Low"),
+    class Priority(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        related_name="work_orders",  # used by annotations in views
+    )
+    unit = models.ForeignKey(
+        Unit,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="work_orders",
     )
 
-    building = models.ForeignKey("core.Building",on_delete=models.CASCADE, related_name="work_orders")
-    unit = models.ForeignKey("core.Unit", null=True, blank=True, on_delete=models.SET_NULL)
     title = models.CharField(max_length=255)
-    description = models.TextField(blank=True, default="")
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
-    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default=PRIORITY_MEDIUM, db_index=True)
-    deadline = models.DateField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(blank=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+        db_index=True,
+    )
+    priority = models.CharField(
+        max_length=10,
+        choices=Priority.choices,
+        default=Priority.MEDIUM,
+        db_index=True,
+    )
+    # Mandatory deadline (non-nullable at DB level)
+    deadline = models.DateField(null=False, blank=False)
+
+    # Archiving toggle (when done and user archives)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
-    class Meta:
-        ordering = ["-created_at"]
+    objects = WorkOrderQuerySet.as_manager()
 
-    def __str__(self):
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:  # pragma: no cover
         return self.title
-    
+
+    # ---------------------------- Validation & persistence -------------------
+
+    def clean(self):
+        """
+        Model-level validation to ensure we never save a WorkOrder
+        without a `deadline`.
+        """
+        super().clean()
+        if self.deadline is None:
+            raise ValidationError({"deadline": "Deadline is required."})
+
+        # If a unit is set but building is missing/mismatched, align it
+        if self.unit_id and self.building_id and self.unit.building_id != self.building_id:
+            raise ValidationError(
+                {"unit": "Selected unit does not belong to the selected building."}
+            )
+
     def save(self, *args, **kwargs):
+        """
+        Normalize and ensure relational consistency:
+        - Trim the title
+        - If a unit is provided, force the building to that unit's building
+        - Run `full_clean()` to enforce model validation (deadline required, etc.)
+        """
         if self.title:
             self.title = self.title.strip()
+
+        # Align building with unit if unit is present
         if self.unit_id and self.building_id != self.unit.building_id:
             self.building_id = self.unit.building_id
-        super().save(*args, **kwargs)
-        
+
+        # Always validate
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    # ---------------------------- Convenience API ---------------------------
+
+    @property
+    def is_archived(self) -> bool:
+        return self.archived_at is not None
+
+    def archive(self):
+        """Mark as archived (caller should ensure status is DONE in views/UI)."""
+        if not self.is_archived:
+            self.archived_at = timezone.now()
+            self.save(update_fields=["archived_at"])

@@ -56,24 +56,24 @@
             {% endwith %}
           </th>
           <th class="text-right">
-            {% with field='units_total' %}
+            {% with field='units_count' %}
               {% if sort == field %}
-                <a href="?q={{ q|urlencode }}&sort=-units_total&per={{ per }}">Units ▲</a>
+                <a href="?q={{ q|urlencode }}&sort=-units_count&per={{ per }}">Units ▲</a>
               {% elif sort == '-'|add:field %}
-                <a href="?q={{ q|urlencode }}&sort=units_total&per={{ per }}">Units ▼</a>
+                <a href="?q={{ q|urlencode }}&sort=units_count&per={{ per }}">Units ▼</a>
               {% else %}
-                <a href="?q={{ q|urlencode }}&sort=units_total&per={{ per }}">Units</a>
+                <a href="?q={{ q|urlencode }}&sort=units_count&per={{ per }}">Units</a>
               {% endif %}
             {% endwith %}
           </th>
           <th class="text-right">
-            {% with field='work_orders_open' %}
+            {% with field='work_orders_count' %}
               {% if sort == field %}
-                <a href="?q={{ q|urlencode }}&sort=-work_orders_open&per={{ per }}">Work Orders (Open) ▲</a>
+                <a href="?q={{ q|urlencode }}&sort=-work_orders_count&per={{ per }}">Work Orders▲</a>
               {% elif sort == '-'|add:field %}
-                <a href="?q={{ q|urlencode }}&sort=work_orders_open&per={{ per }}">Work Orders (Open) ▼</a>
+                <a href="?q={{ q|urlencode }}&sort=work_orders_count&per={{ per }}">Work Orders▼</a>
               {% else %}
-                <a href="?q={{ q|urlencode }}&sort=work_orders_open&per={{ per }}">Work Orders (Open)</a>
+                <a href="?q={{ q|urlencode }}&sort=work_orders_count&per={{ per }}">Work Orders</a>
               {% endif %}
             {% endwith %}
           </th>
@@ -84,8 +84,8 @@
           <tr>
             <td><a href="{% url 'building_detail' b.id %}">{{ b.name }}</a></td>
             <td>{{ b.address }}</td>
-            <td class="text-right">{{ b.units_total|default:0 }}</td>
-            <td class="text-right">{{ b.work_orders_open|default:0 }}</td>
+            <td class="text-right">{{ b.units_count }}</td>
+            <td class="text-right">{{ b.work_orders_count }}</td>
           </tr>
         {% empty %}
           <tr><td colspan="4">No buildings found.</td></tr>

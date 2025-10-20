@@ -1,18 +1,21 @@
 {% extends "base.html" %}
-{% load {% load markdownify %} %}
+{% load markdownify %}
+
 {% block title %}Unit {{ unit.number }} · {{ unit.building.name }} · Building Management{% endblock %}
+
 {% block content %}
 <p>
   <a class="btn" href="{% url 'building_detail' unit.building_id %}">← Back to {{ unit.building.name }}</a>
   {% if user.is_superuser or unit.building.owner_id == user.id %}
+    <a class="btn" href="{% url 'unit_update' unit.id %}">Edit</a>
     <a class="btn" href="{% url 'unit_delete' unit.id %}">Delete</a>
   {% endif %}
 </p>
 
 <h2>Unit {{ unit.number }}</h2>
 <p><strong>Building:</strong> {{ unit.building.name }}</p>
-<p><strong>Floor:</strong> {{ unit.floor }}</p>
-<p><strong>Occupied:</strong> {{ unit.is_occupied }}</p>
+<p><strong>Floor:</strong> {{ unit.floor|default:"—" }}</p>
+<p><strong>Occupied:</strong> {{ unit.is_occupied|yesno:"Yes,No" }}</p>
 
 <h3>Description</h3>
 <div>

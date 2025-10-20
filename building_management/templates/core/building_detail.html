@@ -3,204 +3,197 @@
 {% block title %}{{ building.name }} · Buildings{% endblock %}
 
 {% block content %}
-  <section>
-    <!-- Title + actions -->
-    <div class="row space-between" style="align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:.75rem;">
-      <h2 class="mb-0">{{ building.name }}</h2>
-      <div class="row gap">
-        <a class="btn" href="{% url 'building_update' building.id %}">Edit</a>
-        <a class="btn btn-danger" href="{% url 'building_delete' building.id %}">Delete</a>
-      </div>
+<section>
+  <!-- Title + actions -->
+  <div class="row space-between" style="align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:.75rem;">
+    <h2 class="mb-0">{{ building.name }}</h2>
+    <div class="row gap">
+      <a class="btn" href="{% url 'building_update' building.id %}">Edit</a>
+      <a class="btn btn-danger" href="{% url 'building_delete' building.id %}">Delete</a>
+    </div>
+  </div>
+
+  <p class="mb-1"><strong>Address:</strong> {{ building.address }}</p>
+  {% if building.owner %}
+    <p class="mb-2"><strong>Owner (user):</strong> {{ building.owner.username }}</p>
+  {% endif %}
+
+  {% if building.description %}
+    <div class="bm-description mb-2"><strong>Description:</strong> {{ building.description }}</div>
+  {% endif %}
+
+  <hr class="section-divider" />
+
+  <!-- ===== Units ===== -->
+  <div class="row space-between" style="gap:1rem; align-items:center; flex-wrap:wrap;">
+    <h3 class="mb-0">Units</h3>
+    <a class="btn" href="{% url 'unit_create' pk=building.id %}">Add Unit</a>
+  </div>
+
+  <!-- Units toolbar -->
+  <form method="get" class="row" style="gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-top:.6rem; margin-bottom:.5rem;">
+    <div class="input-group joined" style="flex:1; min-width:320px; max-width:640px;">
+      <label for="id_u_q" class="sr-only">Units search</label>
+      <input id="id_u_q" class="input-search" type="text" name="u_q" value="{{ u_q }}"
+             placeholder="Number, floor, owner or contact"/>
+      <button class="btn" type="submit">Filter</button>
     </div>
 
-    <p class="mb-1"><strong>Address:</strong> {{ building.address }}</p>
-    {% if building.owner %}
-      <p class="mb-2"><strong>Owner (user):</strong> {{ building.owner.username }}</p>
-    {% endif %}
-
-    {% if building.description %}
-      <div class="bm-description mb-2"><strong>Description:</strong> {{ building.description }}</div>
-    {% endif %}
-
-    <hr class="section-divider" />
-
-    <!-- ===== Units ===== -->
-    <div class="row space-between" style="gap:1rem; align-items:center; flex-wrap:wrap;">
-      <h3 class="mb-0">Units</h3>
-      <a class="btn" href="{% url 'unit_create' pk=building.id %}">Add Unit</a>
+    <div class="row" style="gap:.5rem; align-items:center;">
+      <label for="id_u_per" style="margin:0;">Page size:</label>
+      <select id="id_u_per" name="u_per" onchange="this.form.submit()">
+        <option value="10"  {% if u_per == 10  %}selected{% endif %}>10</option>
+        <option value="20"  {% if u_per == 20  %}selected{% endif %}>20</option>
+        <option value="50"  {% if u_per == 50  %}selected{% endif %}>50</option>
+        <option value="100" {% if u_per == 100 %}selected{% endif %}>100</option>
+      </select>
     </div>
 
-    <!-- Units toolbar: search + Filter, page size next to label -->
-    <form method="get" class="row" style="gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-top:.6rem; margin-bottom:.5rem;">
-      <div class="input-group joined" style="flex:1; min-width:320px; max-width:640px;">
-        <label for="id_u_q" class="sr-only">Units search</label>
-        <input id="id_u_q" class="input-search" type="text" name="u_q" value="{{ u_q }}"
-               placeholder="Number, floor, owner or contact"/>
-        <button class="btn" type="submit">Filter</button>
-      </div>
+    <input type="hidden" name="u_sort" value="{{ u_sort }}"/>
 
-      <div class="row" style="gap:.5rem; align-items:center;">
-        <label for="id_u_per" style="margin:0;">Page size:</label>
-        <select id="id_u_per" name="u_per" onchange="this.form.submit()">
-          <option value="10"  {% if u_per == 10  %}selected{% endif %}>10</option>
-          <option value="20"  {% if u_per == 20  %}selected{% endif %}>20</option>
-          <option value="50"  {% if u_per == 50  %}selected{% endif %}>50</option>
-          <option value="100" {% if u_per == 100 %}selected{% endif %}>100</option>
-        </select>
-      </div>
+    {% if u_q or u_per != 10 or u_sort != 'number' %}
+      <div><a class="btn btn-secondary" href="{% url 'building_detail' building.id %}">Reset</a></div>
+    {% endif %}
 
-      <input type="hidden" name="u_sort" value="{{ u_sort }}"/>
+    {# Keep Work Orders state while changing Units #}
+    <input type="hidden" name="w_q" value="{{ w_q }}">
+    <input type="hidden" name="w_status" value="{{ w_status }}">
+    <input type="hidden" name="w_per" value="{{ w_per }}">
+    {% if workorders_page %}<input type="hidden" name="w_page" value="{{ workorders_page.number }}">{% endif %}
+  </form>
 
-      {% if u_q or u_per != 10 or u_sort != 'number' %}
-        <div><a class="btn btn-secondary" href="{% url 'building_detail' building.id %}">Reset</a></div>
-      {% endif %}
-
-      {# Keep Work Orders state while changing Units #}
-      <input type="hidden" name="w_q" value="{{ w_q }}">
-      <input type="hidden" name="w_status" value="{{ w_status }}">
-      <input type="hidden" name="w_per" value="{{ w_per }}">
-      {% if work_orders_page %}<input type="hidden" name="w_page" value="{{ work_orders_page.number }}">{% endif %}
-    </form>
-
-    <div class="table-wrap">
-      <table class="bm-table">
-        <thead>
+  <div class="table-wrap">
+    <table class="bm-table">
+      <thead>
+        <tr>
+          <th>
+            {% with field='number' %}
+              {% if u_sort == field %}
+                {% with next='-'|add:field %}
+                  <a href="?u_sort={{ next }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number ▲</a>
+                {% endwith %}
+              {% elif u_sort == '-'|add:field %}
+                <a href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number ▼</a>
+              {% else %}
+                <a href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number</a>
+              {% endif %}
+            {% endwith %}
+          </th>
+          <th>
+            {% with field='floor' %}
+              {% if u_sort == field %}
+                {% with next='-'|add:field %}
+                  <a href="?u_sort={{ next }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor ▲</a>
+                {% endwith %}
+              {% elif u_sort == '-'|add:field %}
+                <a href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor ▼</a>
+              {% else %}
+                <a href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor</a>
+              {% endif %}
+            {% endwith %}
+          </th>
+          <th>Apartment Owner</th>
+          <th>Contact</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in units_page %}
           <tr>
-            <th>
-              {% with field='number' %}
-                {% if u_sort == field %}
-                  {% with next='-'|add:field %}
-                    <a href="?u_sort={{ next }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number ▲</a>
-                  {% endwith %}
-                {% elif u_sort == '-'|add:field %}
-                  <a href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number ▼</a>
-                {% else %}
-                  <a href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Apartment number</a>
-                {% endif %}
-              {% endwith %}
-            </th>
-            <th>
-              {% with field='floor' %}
-                {% if u_sort == field %}
-                  {% with next='-'|add:field %}
-                    <a href="?u_sort={{ next }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor ▲</a>
-                  {% endwith %}
-                {% elif u_sort == '-'|add:field %}
-                  <a href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor ▼</a>
-                {% else %}
-                  <a href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor</a>
-                {% endif %}
-              {% endwith %}
-            </th>
-            <th>Apartment Owner</th>
-            <th>Contact</th>
-            <th class="text-right">Actions</th>
+            <td><a href="{% url 'unit_update' u.id %}">{{ u.number }}</a></td>
+            <td>{{ u.floor }}</td>
+            <td>{{ u.owner_name|default:"—" }}</td>
+            <td>{{ u.contact_phone|default:"—" }}</td>
+            <td class="text-right">
+              <a class="btn btn-danger" href="{% url 'unit_delete' u.id %}">Delete</a>
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {% for u in units_page %}
-            <tr>
-              <td><a href="{% url 'unit_update' u.id %}">{{ u.number }}</a></td>
-              <td>{{ u.floor }}</td>
-              <td>{{ u.owner_name|default:"—" }}</td>
-              <td>{{ u.contact_phone|default:"—" }}</td>
-              <td class="text-right">
-                <a class="btn btn-danger" href="{% url 'unit_delete' u.id %}">Delete</a>
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="5">No units.</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+        {% empty %}
+          <tr>
+            <td colspan="5">No units.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if units_page.has_other_pages %}
+    <div class="row gap mt-2" style="flex-wrap:wrap;">
+      {% if units_page.has_previous %}
+        <a class="btn" href="?u_page={{ units_page.previous_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">‹ Prev</a>
+      {% else %}
+        <span class="btn is-disabled">‹ Prev</span>
+      {% endif %}
+      <span class="muted">Page {{ units_page.number }} of {{ units_page.paginator.num_pages }}</span>
+      {% if units_page.has_next %}
+        <a class="btn" href="?u_page={{ units_page.next_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Next ›</a>
+      {% else %}
+        <span class="btn is-disabled">Next ›</span>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <hr class="section-divider" />
+
+  <!-- ===== Work Orders ===== -->
+  <div class="row space-between" style="gap:1rem; align-items:center; flex-wrap:wrap;">
+    <h3 class="mb-0">Work Orders</h3>
+    <a class="btn" href="{% url 'work_order_create' %}?building={{ building.id }}">Add Work Order</a>
+  </div>
+
+  <!-- Work Orders toolbar -->
+  <form method="get" class="row" style="gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-top:.6rem; margin-bottom:.5rem;">
+    <div class="input-group joined" style="min-width:320px; max-width:680px;">
+      <label for="id_w_q" class="sr-only">Search work orders</label>
+      <input id="id_w_q" class="input-search" type="text" name="w_q" value="{{ w_q }}" placeholder="Title or description"/>
+      <button class="btn" type="submit">Filter</button>
     </div>
 
-    {% if units_page.has_other_pages %}
-      <div class="row gap mt-2" style="flex-wrap:wrap;">
-        {% if units_page.has_previous %}
-          <a class="btn" href="?u_page={{ units_page.previous_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">‹ Prev</a>
-        {% else %}
-          <span class="btn is-disabled">‹ Prev</span>
-        {% endif %}
-        <span class="muted">Page {{ units_page.number }} of {{ units_page.paginator.num_pages }}</span>
-        {% if units_page.has_next %}
-          <a class="btn" href="?u_page={{ units_page.next_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Next ›</a>
-        {% else %}
-          <span class="btn is-disabled">Next ›</span>
-        {% endif %}
-      </div>
-    {% endif %}
-
-    <hr class="section-divider" />
-
-    <!-- ===== Work Orders ===== -->
-    <div class="row space-between" style="gap:1rem; align-items:center; flex-wrap:wrap;">
-      <h3 class="mb-0">Work Orders</h3>
-      <a class="btn" href="{% url 'work_order_create' %}?building={{ building.id }}">Add Work Order</a>
+    <div class="row" style="gap:.5rem; align-items:center;">
+      <label for="id_w_per" style="margin:0;">Page size:</label>
+      <select id="id_w_per" name="w_per" onchange="this.form.submit()">
+        <option value="10"  {% if w_per|add:0 == 10  %}selected{% endif %}>10</option>
+        <option value="20"  {% if w_per|add:0 == 20  %}selected{% endif %}>20</option>
+        <option value="50"  {% if w_per|add:0 == 50  %}selected{% endif %}>50</option>
+        <option value="100" {% if w_per|add:0 == 100 %}selected{% endif %}>100</option>
+      </select>
     </div>
 
-    <!-- Work Orders toolbar -->
-    <form method="get" class="row" style="gap:1rem; flex-wrap:wrap; align-items:flex-end; margin-top:.6rem; margin-bottom:.5rem;">
-      <!-- search + Filter -->
-      <div class="input-group joined" style="min-width:320px; max-width:680px;">
-        <label for="id_w_q" class="sr-only">Search work orders</label>
-        <input
-          id="id_w_q"
-          class="input-search"
-          type="text"
-          name="w_q"
-          value="{{ w_q }}"
-          placeholder="Title or description"
-        />
-        <button class="btn" type="submit">Filter</button>
-      </div>
-
-      <!-- page size -->
-      <div class="row" style="gap:.5rem; align-items:center;">
-        <label for="id_w_per" style="margin:0;">Page size:</label>
-        <select id="id_w_per" name="w_per" onchange="this.form.submit()">
-          <option value="10"  {% if w_per == 10  %}selected{% endif %}>10</option>
-          <option value="20"  {% if w_per == 20  %}selected{% endif %}>20</option>
-          <option value="50"  {% if w_per == 50  %}selected{% endif %}>50</option>
-          <option value="100" {% if w_per == 100 %}selected{% endif %}>100</option>
-        </select>
-      </div>
-
-      <!-- status filter -->
-      <div class="row" style="gap:.5rem; align-items:center;">
-        <label for="id_w_status" style="margin:0;">Status:</label>
-        <select id="id_w_status" name="w_status" onchange="this.form.submit()">
-          <option value="" {% if not w_status %}selected{% endif %}>All</option>
+    <div class="row" style="gap:.5rem; align-items:center;">
+      <label for="id_w_status" style="margin:0;">Status:</label>
+      <select id="id_w_status" name="w_status" onchange="this.form.submit()">
+        <option value="" {% if not w_status %}selected{% endif %}>All</option>
+        {% if w_status_choices %}
           {% for v, label in w_status_choices %}
             <option value="{{ v }}" {% if w_status == v %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
-        </select>
-      </div>
+        {% endif %}
+      </select>
+    </div>
 
-      {# Preserve Units filters while filtering Work Orders #}
-      <input type="hidden" name="u_q"    value="{{ u_q }}">
-      <input type="hidden" name="u_sort" value="{{ u_sort }}">
-      <input type="hidden" name="u_per"  value="{{ u_per }}">
-      {% if units_page %}<input type="hidden" name="u_page" value="{{ units_page.number }}">{% endif %}
-    </form>
+    {# Preserve Units filters while filtering Work Orders #}
+    <input type="hidden" name="u_q"    value="{{ u_q }}">
+    <input type="hidden" name="u_sort" value="{{ u_sort }}">
+    <input type="hidden" name="u_per"  value="{{ u_per }}">
+    {% if units_page %}<input type="hidden" name="u_page" value="{{ units_page.number }}">{% endif %}
+  </form>
 
-    <div class="table-wrap">
-      <table class="bm-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Unit</th>
-            <th>Priority</th>
-            <th>Status</th>
-            <th>Deadline</th>
-            <th>Created</th>
-            <th class="text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for w in work_orders_page %}
+  <div class="table-wrap">
+    <table class="bm-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Unit</th>
+          <th>Priority</th>
+          <th>Status</th>
+          <th>Deadline</th>
+          <th>Created</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if workorders_page and workorders_page.object_list %}
+          {% for w in workorders_page.object_list %}
             <tr>
               <td><a href="{% url 'work_order_update' w.id %}">{{ w.title }}</a></td>
               <td>{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</td>
@@ -209,7 +202,7 @@
               <td>{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
               <td>{{ w.created_at|date:"Y-m-d" }}</td>
               <td class="text-right">
-                {% if w.status == 'done' and not w.archived_at %}
+                {% if w.status == 'DONE' and not w.archived_at %}
                   <form action="{% url 'work_order_archive' w.id %}?building={{ building.id }}" method="post" style="display:inline;">
                     {% csrf_token %}
                     <button class="btn btn-secondary">Archive</button>
@@ -218,29 +211,28 @@
                 <a class="btn btn-danger" href="{% url 'work_order_delete' w.id %}?building={{ building.id }}">Delete</a>
               </td>
             </tr>
-          {% empty %}
-            <tr>
-              <td colspan="7">No work orders for this building.</td>
-            </tr>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
+        {% else %}
+          <tr><td colspan="7">No work orders for this building.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
 
-    {% if work_orders_page.has_other_pages %}
-      <div class="row gap mt-2" style="flex-wrap:wrap;">
-        {% if work_orders_page.has_previous %}
-          <a class="btn" href="?w_page={{ work_orders_page.previous_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">‹ Prev</a>
-        {% else %}
-          <span class="btn is-disabled">‹ Prev</span>
-        {% endif %}
-        <span class="muted">Page {{ work_orders_page.number }} of {{ work_orders_page.paginator.num_pages }}</span>
-        {% if work_orders_page.has_next %}
-          <a class="btn" href="?w_page={{ work_orders_page.next_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">Next ›</a>
-        {% else %}
-          <span class="btn is-disabled">Next ›</span>
-        {% endif %}
-      </div>
-    {% endif %}
-  </section>
+  {% if workorders_page and workorders_page.has_other_pages %}
+    <div class="row gap mt-2" style="flex-wrap:wrap;">
+      {% if workorders_page.has_previous %}
+        <a class="btn" href="?w_page={{ workorders_page.previous_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">‹ Prev</a>
+      {% else %}
+        <span class="btn is-disabled">‹ Prev</span>
+      {% endif %}
+      <span class="muted">Page {{ workorders_page.number }} of {{ workorders_page.paginator.num_pages }}</span>
+      {% if workorders_page.has_next %}
+        <a class="btn" href="?w_page={{ workorders_page.next_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">Next ›</a>
+      {% else %}
+        <span class="btn is-disabled">Next ›</span>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
 {% endblock %}

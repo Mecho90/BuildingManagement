@@ -1,20 +1,55 @@
 {% extends "base.html" %}
 {% load static %}
 
+{# ------------------ <title> ------------------ #}
 {% block title %}
-  {% with bld=building|default:form.instance.building %}
-    {% with t=form.instance.pk|yesno:"Edit Unit,New Unit" %}
-      {{ t }} · {{ bld.name }}
-    {% endwith %}
-  {% endwith %}
+  {# Prefer the building injected by the view; otherwise, only use instance.building
+     when a building_id exists to avoid RelatedObjectDoesNotExist. #}
+  {% if building %}
+    {% if form.instance.pk %}
+      Edit Unit · {{ building.name }}
+    {% else %}
+      New Unit · {{ building.name }}
+    {% endif %}
+  {% elif form.instance.building_id %}
+    {% if form.instance.pk %}
+      Edit Unit · {{ form.instance.building.name }}
+    {% else %}
+      New Unit · {{ form.instance.building.name }}
+    {% endif %}
+  {% else %}
+    {% if form.instance.pk %}Edit Unit{% else %}New Unit{% endif %}
+  {% endif %}
 {% endblock %}
 
+{# ------------------ Page content ------------------ #}
 {% block content %}
-  {% with bld=building|default:form.instance.building %}
-    {% with t=form.instance.pk|yesno:"Edit Unit in,New Unit in" %}
-      {% with page_title=t|add:" "|add:bld.name %}
+  {% if building %}
+    {% if form.instance.pk %}
+      {% with page_title="Edit Unit in "|add:building.name %}
         {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
       {% endwith %}
+    {% else %}
+      {% with page_title="New Unit in "|add:building.name %}
+        {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
+      {% endwith %}
+    {% endif %}
+
+  {% elif form.instance.building_id %}
+    {% if form.instance.pk %}
+      {% with page_title="Edit Unit in "|add:form.instance.building.name %}
+        {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
+      {% endwith %}
+    {% else %}
+      {% with page_title="New Unit in "|add:form.instance.building.name %}
+        {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
+      {% endwith %}
+    {% endif %}
+
+  {% else %}
+    {# Robust fallback if no building is available yet #}
+    {% with page_title=form.instance.pk|yesno:"Edit Unit,New Unit" %}
+      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% endwith %}
-  {% endwith %}
+  {% endif %}
 {% endblock %}

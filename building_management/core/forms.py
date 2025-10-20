@@ -1,153 +1,226 @@
 from __future__ import annotations
 
-from typing import Any, Optional
-
+import re
 from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
 from .models import Building, Unit, WorkOrder
 
-import re
-
-# ---------------------------
-# Helpers for widget styling
-# ---------------------------
-def _add_cls(widget: forms.Widget, cls: str) -> None:
-    """Merge CSS classes into a widget (idempotent)."""
-    existing = widget.attrs.get("class", "")
-    classes = {c for c in existing.split() if c}
-    classes.update(cls.split())
-    widget.attrs["class"] = " ".join(sorted(classes))
+User = get_user_model()
 
 
-def _default_text_widgets() -> dict[str, forms.Widget]:
-    # Common widgets used across forms for a consistent look
-    return {
-        "name": forms.TextInput(attrs={"placeholder": "Name"}),
-        "address": forms.TextInput(attrs={"placeholder": "Address"}),
-        "description": forms.Textarea(attrs={"rows": 6, "placeholder": "Optional description (Markdown supported)"}),
-    }
-
-
-# ---------------
-# Building form
-# ---------------
+# -----------------------------
+# Buildings
+# -----------------------------
 class BuildingForm(forms.ModelForm):
-    """No owner_name / contact in the form."""
+    """
+    - Staff users can choose an Owner from a dropdown.
+    - Non-staff users do not see the Owner field; the form will force
+      owner = request.user on save.
+    - Pass the current user via: BuildingForm(..., user=request.user)
+    """
+
     class Meta:
         model = Building
-        fields = ["name", "address", "description", "owner"]
+        fields = ["name", "address", "description", "owner"]  # 'owner' shown only to staff
         widgets = {
-            "description": forms.Textarea(attrs={"rows": 6, "placeholder": "Optional description (Markdown supported)"}),
+            "description": forms.Textarea(attrs={"rows": 6}),
         }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if user and not getattr(user, "is_superuser", False):
-            self.fields["owner"].widget = forms.HiddenInput()
-            if self.instance and self.instance.pk:
-                self.initial["owner"] = self.instance.owner_id
+        self._user = user
+
+        if user and user.is_staff:
+            # Admins can assign to anyone
+            self.fields["owner"].queryset = User.objects.order_by("username")
+        else:
+            # Non-admins must not control the owner; remove the field completely
+            self.fields.pop("owner", None)
+
+    def save(self, commit: bool = True):
+        obj: Building = super().save(commit=False)
+
+        # Safety net: non-staff cannot set arbitrary owners
+        if not (self._user and self._user.is_staff):
+            if self._user is not None:
+                obj.owner = self._user
+
+        if commit:
+            obj.save()
+        return obj
 
 
 _PHONE_RE = re.compile(r"^\+?\d{7,15}$")
-# ----------
-# Unit form
-# ----------
+# -----------------------------
+# Units
+# -----------------------------
 class UnitForm(forms.ModelForm):
-    number = forms.IntegerField(min_value=0, label="Apartment number")
-
     class Meta:
         model = Unit
-        fields = ["number", "floor", "owner_name", "contact_phone", "is_occupied", "description"]
-        widgets = {
-            "contact_phone": forms.TextInput(attrs={
-                "type": "tel",
-                "placeholder": "e.g. +359...",
-                "pattern": _PHONE_RE.pattern,
-                "title": "Phone number, digits only; e.g. +3591234567",
-            }),
-            "description": forms.Textarea(attrs={"rows": 5}),
-        }
+        fields = ("number", "floor", "owner_name", "contact_phone", "is_occupied", "description")
+        # If your form includes "building", keep it in fields and this class will lock it.
 
-    def __init__(self, *args, building: Building | None = None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, user=None, building=None, **kwargs):
+        # ALWAYS set these attributes so save() never fails
+        self._user = user
         self._building = building
-
-    def clean_contact_phone(self):
-        val = (self.cleaned_data.get("contact_phone") or "").strip()
-        if not val:
-            return ""
-        bad = re.sub(r"[\s().-]+", "", val)
-        if not _PHONE_RE.fullmatch(bad):
-            raise ValidationError("Enter a valid phone number (digits only, e.g. +3591234567).")
-        return bad
-
-    def clean(self):
-        cleaned = super().clean()
-        bld = self._building or getattr(self.instance, "building", None)
-        num = cleaned.get("number")
-        if bld and num is not None:
-            exists = Unit.objects.filter(building=bld, number=num).exclude(pk=self.instance.pk).exists()
-            if exists:
-                self.add_error("number", "A unit with this apartment number already exists in this building.")
-        return cleaned
-
-
-# -------------------
-# Work order form
-# -------------------
-class WorkOrderForm(forms.ModelForm):
-    """
-    Expects `building` in __init__(..., building=<Building>, ...)
-    and restricts the Unit field to units from that building.
-    """
-    class Meta:
-        model = WorkOrder
-        fields = ["title", "description", "unit", "priority", "status", "deadline"]
-        widgets = {
-            "title": forms.TextInput(attrs={"class": "input"}),
-            "description": forms.Textarea(attrs={"class": "input", "rows": 4}),
-            "unit": forms.Select(attrs={"class": "input"}),
-            "priority": forms.Select(attrs={"class": "input"}),
-            "status": forms.Select(attrs={"class": "input"}),
-            # 👇 identical class, type=date for native calendar
-            "deadline": forms.DateInput(attrs={"type": "date", "class": "input"}),
-        }
-
-    def __init__(self, *args, building=None, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Remember the building (from view or instance)
-        self.building = building or getattr(self.instance, "building", None)
+        # If your form exposes the building field, lock it to the provided building
+        if "building" in self.fields:
+            if self._building is not None:
+                self.fields["building"].initial = self._building
+                self.fields["building"].disabled = True
+                
+                # show an inline hint in the input
+        self.fields["contact_phone"].widget.attrs.setdefault(
+            "placeholder", "+359..."
+        )
 
-        # Unit is optional in most flows; keep it explicit.
-        self.fields["unit"].required = False
+    def clean_number(self):
+        number = (self.cleaned_data.get("number") or "").strip()
 
-        # Limit the Unit queryset to the current building
-        if self.building:
-            self.fields["unit"].queryset = (
-                Unit.objects.filter(building=self.building).order_by("number")
-            )
-            self.fields["unit"].help_text = f"Only units from “{self.building.name}”."
-        else:
-            # No building context → no choices
-            self.fields["unit"].queryset = Unit.objects.none()
-            self.fields["unit"].help_text = "Select a building first."
+        # Decide which building to validate against without touching a missing relation
+        building_id = getattr(self._building, "pk", None) or self.instance.building_id
 
-    def clean(self):
-        cleaned = super().clean()
-        unit = cleaned.get("unit")
-        if unit and self.building and unit.building_id != self.building.id:
-            self.add_error("unit", "Selected unit does not belong to this building.")
-        return cleaned
+        # Enforce uniqueness only when we know the building
+        if building_id and number:
+            qs = Unit.objects.filter(building_id=building_id, number__iexact=number)
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(
+                    "Apartment number must be unique within this building."
+                )
+        return number
 
     def save(self, commit=True):
         obj = super().save(commit=False)
-        # Ensure the work order is bound to the building provided by the view
-        if self.building:
-            obj.building = self.building
+
+        # Ensure the unit is bound to the building coming from the view
+        if self._building is not None:
+            obj.building = self._building
+
+        # Optional permission safety: only owners/staff can save
+        if self._user and not (self._user.is_staff or self._user.is_superuser):
+            if obj.building and obj.building.owner_id != self._user.id:
+                raise forms.ValidationError("You don't have permission to edit this unit.")
+
         if commit:
             obj.save()
-            self.save_m2m()
+        return obj
+
+# -----------------------------
+# Work Orders
+# -----------------------------
+
+class WorkOrderForm(forms.ModelForm):
+    """
+    Usage from views:
+        WorkOrderForm(..., user=request.user, building=<Building|id|None>)
+
+    - If `building` is provided → lock to it, hide the Building field,
+      and filter Unit choices to that building.
+    - Otherwise → limit Building choices to those visible to the user,
+      and filter Unit based on current selection/instance.
+    - Validates Unit belongs to Building and that non-staff own the Building.
+    """
+
+    class Meta:
+        model = WorkOrder
+        fields = ["title", "building", "unit", "priority", "status", "deadline", "description"]
+        widgets = {
+            "deadline": forms.DateInput(attrs={"type": "date", "class": "input-date"}),
+            "description": forms.Textarea(attrs={"rows": 6}),
+        }
+
+    # ---------- helpers ----------
+    @staticmethod
+    def _resolve_building_id(b) -> int | None:
+        if isinstance(b, Building):
+            return b.pk
+        if b in (None, ""):
+            return None
+        try:
+            return int(b)
+        except (TypeError, ValueError):
+            return None
+
+    # ---------- init ----------
+    def __init__(self, *args, user=None, building=None, **kwargs):
+        self._user = user
+        self._building = building
+        super().__init__(*args, **kwargs)
+
+        # 1) Building choices / lock + hide if provided
+        if self._building is not None:
+            b_id = self._resolve_building_id(self._building)
+            self.fields["building"].queryset = Building.objects.filter(pk=b_id)
+            self.fields["building"].initial = b_id
+            self.fields["building"].widget = forms.HiddenInput()
+        else:
+            bqs = Building.objects.all()
+            if user and not (user.is_staff or user.is_superuser):
+                # Use your visibility helper if available
+                try:
+                    bqs = Building.objects.visible_to(user)
+                except AttributeError:
+                    bqs = bqs.filter(owner=user)
+            self.fields["building"].queryset = bqs
+
+        # 2) Units: filter by effective building (kwarg > POST > initial > instance)
+        effective_b = (
+            self._building
+            if self._building is not None
+            else self.data.get("building")
+                or self.initial.get("building")
+                or getattr(self.instance, "building_id", None)
+        )
+        b_id = self._resolve_building_id(effective_b)
+        self.fields["unit"].queryset = (
+            Unit.objects.filter(building_id=b_id).order_by("number") if b_id else Unit.objects.none()
+        )
+
+    # ---------- validation ----------
+    def clean(self):
+        cleaned = super().clean()
+
+        # Prefer locked building when provided
+        building = cleaned.get("building")
+        if building is None and self._building is not None:
+            b_id = self._resolve_building_id(self._building)
+            building = Building.objects.filter(pk=b_id).first()
+
+        unit = cleaned.get("unit")
+
+        # Unit must belong to building
+        if building and unit and unit.building_id != building.id:
+            self.add_error("unit", "Selected unit does not belong to the chosen building.")
+
+        # Non-staff must own the building
+        if self._user and not (self._user.is_staff or self._user.is_superuser) and building:
+            if building.owner_id != self._user.id:
+                self.add_error("building", "You cannot create work orders for buildings you do not own.")
+
+        return cleaned
+
+    # ---------- save ----------
+    def save(self, commit: bool = True):
+        obj: WorkOrder = super().save(commit=False)
+
+        # Force building when form initialized with one
+        if self._building is not None:
+            b_id = self._resolve_building_id(self._building)
+            if b_id:
+                obj.building_id = b_id
+
+        # Extra safety: enforce ownership
+        if self._user and not (self._user.is_staff or self._user.is_superuser):
+            if obj.building_id and not Building.objects.filter(pk=obj.building_id, owner=self._user).exists():
+                raise ValidationError("You cannot assign work orders to this building.")
+
+        if commit:
+            obj.save()
         return obj

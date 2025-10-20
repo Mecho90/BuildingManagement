@@ -26,6 +26,6 @@ urlpatterns = [
     path("work-orders/<int:pk>/archive/", views.WorkOrderArchiveView.as_view(), name="work_order_archive"),
 
     # APIs (optional)
-    path("api/buildings/", views.ApiBuildingsView.as_view(), name="api_buildings"),
-    path("api/units/", views.ApiUnitsView.as_view(), name="api_units"),
+    path("api/buildings/", views.api_buildings, name="api_buildings"),
+    path("api/buildings/<int:building_id>/units/", views.api_units, name="api_units"),
 ]

@@ -11,8 +11,17 @@
     </div>
   {% endif %}
 
-  {% for field in form %}
-    <div class="form-row">
+  {# 1) Hidden inputs first (e.g., locked Building). Keep their errors visible. #}
+  {% for h in form.hidden_fields %}
+    {{ h }}
+    {% if h.errors %}
+      <div class="errors">{% for e in h.errors %}<div>{{ e }}</div>{% endfor %}</div>
+    {% endif %}
+  {% endfor %}
+
+  {# 2) Render only visible fields (no labels for hidden ones). #}
+  {% for field in form.visible_fields %}
+    <div class="form-row{% if field.errors %} has-errors{% endif %}">
       {% if field.field.widget.input_type == 'checkbox' %}
         <label class="checkbox">
           {{ field }} <span>{{ field.label }}</span>
@@ -32,8 +41,8 @@
     </div>
   {% endfor %}
 
-  <div class="row mt-2">
+  <div class="row gap mt-2">
     <button class="btn" type="submit">Save</button>
-    <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">Cancel</a>
+    <a class="btn" href="{{ cancel_url|default:'javascript:history.back()' }}">Cancel</a>
   </div>
 </form>
