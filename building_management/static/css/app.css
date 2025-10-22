@@ -124,11 +124,38 @@ input[type=number]:focus, input[type=date]:focus, select:focus, textarea:focus {
   color: #92400e;
 }
 
+.alert--info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
 .alert--error,
 .alert--danger {
   background: #fef2f2;
   border-color: #fecaca;
   color: #7f1d1d;
+}
+
+.notifications-block {
+  margin-bottom: 1.5rem;
+}
+
+.notifications-block h2 {
+  margin-bottom: .5rem;
+}
+
+.notifications-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.notifications-list .alert {
+  margin: 0;
 }
 
 /* Checkbox label style used in _form_layout.html */

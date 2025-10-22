@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -19,6 +21,7 @@ from django.views.generic import (
     DeleteView,
 )
 
+from django.utils import timezone
 from .forms import BuildingForm, UnitForm, WorkOrderForm
 from .models import Building, Unit, WorkOrder
 
@@ -109,7 +112,112 @@ class BuildingListView(LoginRequiredMixin, ListView):
             ctx["per"] = 10
         ctx["sort"] = getattr(self, "_effective_sort", "name")
         ctx["show_owner_column"] = self.request.user.is_staff or self.request.user.is_superuser
+        ctx["notifications"] = self._build_notifications()
         return ctx
+
+    def _build_notifications(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return []
+
+        visible_buildings = (
+            Building.objects.visible_to(user).values_list("id", flat=True)
+        )
+        visible_ids = list(visible_buildings)
+        if not visible_ids:
+            return []
+
+        is_admin = user.is_staff or user.is_superuser
+        window_start = timezone.now() - timedelta(days=30)
+        today = timezone.localdate()
+
+        notifications: list[dict[str, str]] = []
+
+        # ---- Newly created work orders ----
+        wo_new_qs = (
+            WorkOrder.objects.filter(building_id__in=visible_ids, created_at__gte=window_start)
+            .select_related("building__owner", "unit")
+            .order_by("-created_at")[:10]
+        )
+        for wo in wo_new_qs:
+            building = wo.building
+            building_id = wo.building_id
+            building_name = building.name if building_id else "your building"
+            owner_label = None
+            if is_admin and building_id:
+                owner = getattr(building, "owner", None)
+                if owner:
+                    owner_label = owner.get_full_name() or owner.username
+            unit_part = f" (unit {wo.unit.number})" if wo.unit_id else ""
+            message = f"New work order \"{wo.title}\" assigned to {building_name}{unit_part}"
+            if owner_label:
+                message += f" (owner: {owner_label})"
+            notifications.append(
+                {
+                    "level": "info",
+                    "message": message + ".",
+                }
+            )
+
+        # ---- Upcoming deadlines ----
+        base_open = (
+            WorkOrder.objects.filter(
+                building_id__in=visible_ids,
+                archived_at__isnull=True,
+                status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
+            )
+            .select_related("building__owner", "unit")
+        )
+
+        thresholds = {
+            WorkOrder.Priority.HIGH: 7,
+            WorkOrder.Priority.MEDIUM: 7,
+            WorkOrder.Priority.LOW: 30,
+        }
+        priority_levels = {
+            WorkOrder.Priority.HIGH: "danger",
+            WorkOrder.Priority.MEDIUM: "warning",
+            WorkOrder.Priority.LOW: "info",
+        }
+
+        for priority, window in thresholds.items():
+            window_end = today + timedelta(days=window)
+            upcoming = (
+                base_open.filter(priority=priority, deadline__gte=today, deadline__lte=window_end)
+                .order_by("deadline")[:10]
+            )
+            for wo in upcoming:
+                building = wo.building
+                building_id = wo.building_id
+                building_name = building.name if building_id else "your building"
+                owner_label = None
+                if is_admin and building_id:
+                    owner = getattr(building, "owner", None)
+                    if owner:
+                        owner_label = owner.get_full_name() or owner.username
+                days_left = (wo.deadline - today).days
+                if days_left < 0:
+                    due_text = f"overdue by {abs(days_left)} days"
+                elif days_left == 0:
+                    due_text = "due today"
+                elif days_left == 1:
+                    due_text = "due tomorrow"
+                else:
+                    due_text = f"due in {days_left} days"
+                message = (
+                    f"{wo.get_priority_display()} priority work order \"{wo.title}\" "
+                    f"in {building_name} is {due_text} (deadline {wo.deadline})"
+                )
+                if owner_label:
+                    message += f" (owner: {owner_label})"
+                notifications.append(
+                    {
+                        "level": priority_levels[priority],
+                        "message": message + ".",
+                    }
+                )
+
+        return notifications
 
 class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = Building

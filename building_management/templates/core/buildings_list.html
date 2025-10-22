@@ -141,4 +141,17 @@
       {% endif %}
     </div>
   {% endif %}
+
+  <section class="notifications-block">
+    <h2 class="mb-1">Notifications</h2>
+    {% if notifications %}
+      <ul class="notifications-list">
+        {% for note in notifications %}
+          <li class="alert alert--{{ note.level }}">{{ note.message }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted mb-2">No notifications right now.</p>
+    {% endif %}
+  </section>
 {% endblock %}
