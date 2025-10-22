@@ -51,7 +51,11 @@ class BuildingListView(LoginRequiredMixin, ListView):
         user = self.request.user
 
         # Per-user visibility + annotate the exact stats the template uses
-        qs = Building.objects.visible_to(user).with_unit_stats()
+        qs = (
+            Building.objects.visible_to(user)
+            .with_unit_stats()
+            .select_related("owner")
+        )
 
         # Search
         q = (self.request.GET.get("q") or "").strip()
@@ -64,12 +68,19 @@ class BuildingListView(LoginRequiredMixin, ListView):
 
         # Sorting
         sort = (self.request.GET.get("sort") or "name").strip()
+        allow_owner_sort = user.is_staff or user.is_superuser
         allowed = {
-            "name", "-name",
-            "address", "-address",
-            "units_count", "-units_count",
-            "work_orders_count", "-work_orders_count",
+            "name",
+            "-name",
+            "address",
+            "-address",
+            "units_count",
+            "-units_count",
+            "work_orders_count",
+            "-work_orders_count",
         }
+        if allow_owner_sort:
+            allowed.update({"owner", "-owner"})
         if sort not in allowed:
             sort = "name"
 
@@ -77,6 +88,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
         sort_map = {
             "units_count": "_units_count",
             "work_orders_count": "_work_orders_count",
+            "owner": "owner__username",
         }
         if sort.lstrip("-") in sort_map:
             base = sort_map[sort.lstrip("-")]
@@ -95,6 +107,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
         except (TypeError, ValueError):
             ctx["per"] = 10
         ctx["sort"] = (self.request.GET.get("sort") or "name").strip()
+        ctx["show_owner_column"] = self.request.user.is_staff or self.request.user.is_superuser
         return ctx
 
 class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
