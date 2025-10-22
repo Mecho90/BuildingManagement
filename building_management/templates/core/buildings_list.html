@@ -60,6 +60,17 @@
             </th>
           {% endif %}
           <th>
+            {% with field='role' %}
+              {% if sort == field %}
+                <a href="?q={{ q|urlencode }}&sort=-role&per={{ per }}">Role ▲</a>
+              {% elif sort == '-'|add:field %}
+                <a href="?q={{ q|urlencode }}&sort=role&per={{ per }}">Role ▼</a>
+              {% else %}
+                <a href="?q={{ q|urlencode }}&sort=role&per={{ per }}">Role</a>
+              {% endif %}
+            {% endwith %}
+          </th>
+          <th>
             {% with field='address' %}
               {% if sort == field %}
                 <a href="?q={{ q|urlencode }}&sort=-address&per={{ per }}">Address ▲</a>
@@ -101,12 +112,13 @@
             {% if show_owner_column %}
               <td>{{ b.owner }}</td>
             {% endif %}
+            <td>{{ b.get_role_display }}</td>
             <td>{{ b.address }}</td>
             <td class="text-right">{{ b.units_count }}</td>
             <td class="text-right">{{ b.work_orders_count }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="{{ show_owner_column|yesno:'5,4' }}">No buildings found.</td></tr>
+          <tr><td colspan="{{ show_owner_column|yesno:'6,5' }}">No buildings found.</td></tr>
         {% endfor %}
       </tbody>
     </table>

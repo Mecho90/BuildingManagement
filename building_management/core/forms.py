@@ -23,7 +23,7 @@ class BuildingForm(forms.ModelForm):
 
     class Meta:
         model = Building
-        fields = ["name", "address", "description", "owner"]  # 'owner' shown only to staff
+        fields = ["name", "role", "address", "description", "owner"]  # 'owner' shown only to staff
         widgets = {
             "description": forms.Textarea(attrs={"rows": 6}),
         }

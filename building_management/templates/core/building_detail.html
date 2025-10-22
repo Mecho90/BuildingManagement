@@ -17,6 +17,7 @@
   {% if building.owner %}
     <p class="mb-2"><strong>Owner (user):</strong> {{ building.owner.username }}</p>
   {% endif %}
+  <p class="mb-2"><strong>Role:</strong> {{ building.get_role_display }}</p>
 
   {% if building.description %}
     <div class="bm-description mb-2"><strong>Description:</strong> {{ building.description }}</div>

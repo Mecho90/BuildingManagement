@@ -72,6 +72,8 @@ class BuildingListView(LoginRequiredMixin, ListView):
         allowed = {
             "name",
             "-name",
+            "role",
+            "-role",
             "address",
             "-address",
             "units_count",
@@ -90,14 +92,13 @@ class BuildingListView(LoginRequiredMixin, ListView):
             "work_orders_count": "_work_orders_count",
             "owner": "owner__username",
         }
+        sort_field = sort
         if sort.lstrip("-") in sort_map:
             base = sort_map[sort.lstrip("-")]
-            if sort.startswith("-"):
-                sort = "-" + base
-            else:
-                sort = base
+            sort_field = "-" + base if sort.startswith("-") else base
 
-        return qs.order_by(sort, "id")
+        self._effective_sort = sort
+        return qs.order_by(sort_field, "id")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -106,7 +107,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
             ctx["per"] = int(self.request.GET.get("per", 10))
         except (TypeError, ValueError):
             ctx["per"] = 10
-        ctx["sort"] = (self.request.GET.get("sort") or "name").strip()
+        ctx["sort"] = getattr(self, "_effective_sort", "name")
         ctx["show_owner_column"] = self.request.user.is_staff or self.request.user.is_superuser
         return ctx
 

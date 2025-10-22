@@ -73,6 +73,11 @@ class TimeStampedModel(models.Model):
 
 
 class Building(TimeStampedModel):
+    class Role(models.TextChoices):
+        TECH_SUPPORT = "TECH_SUPPORT", "Technical Support"
+        PROPERTY_MANAGER = "PROPERTY_MANAGER", "Property Manager"
+        EXTERNAL_CONTRACTOR = "EXTERNAL_CONTRACTOR", "External Contractor"
+
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -81,6 +86,11 @@ class Building(TimeStampedModel):
     name = models.CharField(max_length=255, db_index=True)
     address = models.CharField(max_length=512, blank=True)
     description = models.TextField(blank=True)
+    role = models.CharField(
+        max_length=32,
+        choices=Role.choices,
+        default=Role.TECH_SUPPORT,
+    )
 
     objects = BuildingQuerySet.as_manager()
 
