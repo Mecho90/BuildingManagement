@@ -128,36 +128,9 @@ class BuildingListView(LoginRequiredMixin, ListView):
             return []
 
         is_admin = user.is_staff or user.is_superuser
-        window_start = timezone.now() - timedelta(days=30)
         today = timezone.localdate()
 
         notifications: list[dict[str, str]] = []
-
-        # ---- Newly created work orders ----
-        wo_new_qs = (
-            WorkOrder.objects.filter(building_id__in=visible_ids, created_at__gte=window_start)
-            .select_related("building__owner", "unit")
-            .order_by("-created_at")[:10]
-        )
-        for wo in wo_new_qs:
-            building = wo.building
-            building_id = wo.building_id
-            building_name = building.name if building_id else "your building"
-            owner_label = None
-            if is_admin and building_id:
-                owner = getattr(building, "owner", None)
-                if owner:
-                    owner_label = owner.get_full_name() or owner.username
-            unit_part = f" (unit {wo.unit.number})" if wo.unit_id else ""
-            message = f"New work order \"{wo.title}\" assigned to {building_name}{unit_part}"
-            if owner_label:
-                message += f" (owner: {owner_label})"
-            notifications.append(
-                {
-                    "level": "info",
-                    "message": message + ".",
-                }
-            )
 
         # ---- Upcoming deadlines ----
         base_open = (
@@ -212,8 +185,10 @@ class BuildingListView(LoginRequiredMixin, ListView):
                     message += f" (owner: {owner_label})"
                 notifications.append(
                     {
+                        "id": f"wo-deadline-{wo.id}",
                         "level": priority_levels[priority],
                         "message": message + ".",
+                        "category": "deadline",
                     }
                 )
 
@@ -399,6 +374,19 @@ class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 # ----------------------------------------------------------------------
 # Units
 # ----------------------------------------------------------------------
+
+class UnitDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    model = Unit
+    template_name = "core/unit_detail.html"
+    context_object_name = "unit"
+
+    def get_queryset(self):
+        return Unit.objects.select_related("building")
+
+    def test_func(self):
+        unit = self.get_object()
+        return _user_can_access_building(self.request.user, unit.building)
+
 
 class UnitCreateView(LoginRequiredMixin, CreateView):
     model = Unit
@@ -685,20 +673,6 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
 # JSON APIs (simple, function-based)
 # ----------------------------------------------------------------------
 
-def api_buildings(request):
-    """
-    JSON list of buildings visible to the current user.
-    Staff: all buildings. Non-staff: own buildings.
-    """
-    if not request.user.is_authenticated:
-        raise Http404()
-
-    qs = Building.objects.visible_to(request.user).order_by("name", "id")
-
-    data = list(qs.values("id", "name", "address", "owner_id"))
-    return JsonResponse(data, safe=False)
-
-
 def api_units(request):
     """
     JSON list of units visible to the current user.
@@ -730,4 +704,17 @@ def api_units(request):
         qs.values("id", "number", "floor", "owner_name", "building_id")
           .order_by("building_id", "number", "id")
     )
+    return JsonResponse(data, safe=False)
+
+def api_buildings(request):
+    """
+    JSON list of buildings visible to the current user.
+    Staff: all buildings. Non-staff: own buildings.
+    """
+    if not request.user.is_authenticated:
+        raise Http404()
+
+    qs = Building.objects.visible_to(request.user).order_by("name", "id")
+
+    data = list(qs.values("id", "name", "address", "owner_id"))
     return JsonResponse(data, safe=False)

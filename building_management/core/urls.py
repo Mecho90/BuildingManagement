@@ -12,7 +12,7 @@ urlpatterns = [
 
     # Units
     path("buildings/<int:pk>/units/new/", views.UnitCreateView.as_view(), name="unit_create"),
-    path("units/<int:pk>/", views.DetailView.as_view(), name="unit_detail"),
+    path("units/<int:pk>/", views.UnitDetailView.as_view(), name="unit_detail"),
     path("units/<int:pk>/edit/", views.UnitUpdateView.as_view(), name="unit_update"),
     path("units/<int:pk>/delete/", views.UnitDeleteView.as_view(), name="unit_delete"),
     
