@@ -1,24 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}Delete {{ object._meta.verbose_name|capfirst }} · Building Management{% endblock %}
+{% block title %}Delete {{ object_verbose_name|default:'item'|capfirst }} · Building Management{% endblock %}
 
 {% block content %}
   <section>
-    <h2 class="mb-2">Delete {{ object._meta.verbose_name|capfirst }}</h2>
+    <h2 class="mb-2">Delete {{ object_verbose_name|default:'item'|capfirst }}</h2>
 
     <p class="mb-2">
       Are you sure you want to delete
       <strong>
         {# Prefer a readable identifier if present #}
-        {% if object._meta.model_name == 'unit' %}
+        {% if object_model_name == 'unit' %}
           Unit {{ object.number }}
-        {% elif object._meta.model_name == 'building' %}
+        {% elif object_model_name == 'building' %}
           {{ object.name }}
         {% else %}
           {{ object }}
         {% endif %}
       </strong>
-      {% if object._meta.model_name == 'unit' and object.building %}
+      {% if object_model_name == 'unit' and object.building %}
         in <strong>{{ object.building.name }}</strong>
       {% endif %}
       ?
@@ -33,7 +33,7 @@
         <a class="btn btn-secondary" href="{{ cancel_url }}">Cancel</a>
       {% else %}
         {# Sensible defaults if the view didn't pass cancel_url #}
-        {% if object._meta.model_name == 'unit' and object.building_id %}
+        {% if object_model_name == 'unit' and object.building_id %}
           <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">Cancel</a>
         {% else %}
           <a class="btn btn-secondary" href="{% url 'buildings_list' %}">Cancel</a>

@@ -6,7 +6,7 @@
   {% csrf_token %}
 
   {% if form.non_field_errors %}
-    <div class="alert">
+    <div class="alert alert--error">
       {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
     </div>
   {% endif %}

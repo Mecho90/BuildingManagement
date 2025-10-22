@@ -234,6 +234,7 @@ class BuildingCreateView(LoginRequiredMixin, CreateView):
         if not self.request.user.is_staff:
             obj.owner = self.request.user
         obj.save()
+        messages.success(self.request, "Building created.")
         return super().form_valid(form)
 
 
@@ -241,7 +242,6 @@ class BuildingUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Building
     form_class = BuildingForm
     template_name = "core/building_form.html"
-    success_url = reverse_lazy("buildings_list")
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -258,7 +258,11 @@ class BuildingUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             # Safety: prevent tampering with owner
             obj.owner = self.request.user
         obj.save()
+        messages.warning(self.request, "Building updated.")
         return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse("building_detail", args=[self.object.pk])
 
 
 class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
@@ -269,6 +273,19 @@ class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     def test_func(self):
         building = self.get_object()
         return _user_can_access_building(self.request.user, building)
+
+    def post(self, request, *args, **kwargs):
+        messages.error(request, "Building deleted.")
+        return super().post(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        obj = getattr(self, "object", None) or self.get_object()
+        meta = obj._meta
+        ctx.setdefault("object_verbose_name", meta.verbose_name)
+        ctx.setdefault("object_model_name", meta.model_name)
+        ctx.setdefault("cancel_url", reverse("building_detail", args=[obj.pk]))
+        return ctx
 
 
 # ----------------------------------------------------------------------
@@ -342,6 +359,11 @@ class UnitUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         kwargs["user"] = self.request.user
         return kwargs
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.warning(self.request, "Unit updated.")
+        return response
+
     def get_success_url(self):
         return reverse("building_detail", args=[self.building.pk])
 
@@ -361,6 +383,19 @@ class UnitDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
     def get_success_url(self):
         return reverse("building_detail", args=[self.building.pk])
+
+    def post(self, request, *args, **kwargs):
+        messages.error(request, "Unit deleted.")
+        return super().post(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        obj = getattr(self, "object", None) or self.get_object()
+        meta = obj._meta
+        ctx.setdefault("object_verbose_name", meta.verbose_name)
+        ctx.setdefault("object_model_name", meta.model_name)
+        ctx.setdefault("cancel_url", reverse("building_detail", args=[self.building.pk]))
+        return ctx
 
 
 # ----------------------------------------------------------------------
@@ -433,6 +468,7 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
         if not _user_can_access_building(self.request.user, obj.building):
             raise Http404()
         obj.save()
+        messages.success(self.request, "Work order created.")
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -469,7 +505,9 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         if not _user_can_access_building(self.request.user, obj.building):
             raise Http404()
         obj.save()
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        messages.warning(self.request, "Work order updated.")
+        return response
 
     def get_success_url(self):
         return reverse("building_detail", args=[self.object.building_id])
@@ -487,12 +525,18 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         # after delete, go back to the building detail
         return reverse_lazy("building_detail", args=[self.object.building_id])
 
-    def delete(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        building_id = self.object.building_id
-        response = super().delete(request, *args, **kwargs)
-        messages.success(request, "Work order deleted.")
-        return redirect("building_detail", building_id)
+    def post(self, request, *args, **kwargs):
+        messages.error(request, "Work order deleted.")
+        return super().post(request, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        obj = getattr(self, "object", None) or self.get_object()
+        meta = obj._meta
+        ctx.setdefault("object_verbose_name", meta.verbose_name)
+        ctx.setdefault("object_model_name", meta.model_name)
+        ctx.setdefault("cancel_url", reverse("building_detail", args=[obj.building_id]))
+        return ctx
     
 
 class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):

@@ -52,7 +52,7 @@
         {% if messages %}
           <div style="margin-top:.5rem;">
             {% for message in messages %}
-              <div class="alert">{{ message }}</div>
+              <div class="alert{% if message.tags %} alert--{{ message.tags }}{% endif %}">{{ message }}</div>
             {% endfor %}
           </div>
         {% endif %}
