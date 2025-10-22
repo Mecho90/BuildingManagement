@@ -4,6 +4,7 @@ import re
 from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from .models import Building, Unit, WorkOrder
 
@@ -203,6 +204,10 @@ class WorkOrderForm(forms.ModelForm):
         if self._user and not (self._user.is_staff or self._user.is_superuser) and building:
             if building.owner_id != self._user.id:
                 self.add_error("building", "You cannot create work orders for buildings you do not own.")
+
+        deadline = cleaned.get("deadline")
+        if deadline and deadline < timezone.localdate():
+            self.add_error("deadline", "Deadline cannot be in the past.")
 
         return cleaned
 
