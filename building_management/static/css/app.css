@@ -171,6 +171,15 @@
     @apply bg-emerald-500 text-white;
   }
 
+  .break-words {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  .hyphens-auto {
+    hyphens: auto;
+  }
+
   .form-actions {
     @apply mt-2 flex gap-4;
   }

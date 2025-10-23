@@ -43,7 +43,7 @@
         <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
           <div class="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <a href="{% url 'building_detail' b.id %}" class="text-lg font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{{ b.name }}</a>
+              <a href="{% url 'building_detail' b.id %}" class="text-lg font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
               <p class="text-sm text-slate-500 dark:text-slate-400">{{ b.get_role_display }}</p>
             </div>
             {% if show_owner_column %}
@@ -151,7 +151,7 @@
           {% for b in buildings %}
             <tr class="text-sm text-slate-700 dark:text-slate-200">
               <td class="px-4 py-3 font-medium">
-                <a href="{% url 'building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{{ b.name }}</a>
+                <a href="{% url 'building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
               </td>
               {% if show_owner_column %}
                 <td class="px-4 py-3">{{ b.owner }}</td>
