@@ -3,44 +3,41 @@
 {% block title %}Work Orders · Building Management{% endblock %}
 
 {% block content %}
-  <h1 class="mb-2">Work Orders</h1>
-
-  {# Title + Add button (same as building_detail) #}
-  <div class="row space-between" style="gap:1rem; align-items:center; flex-wrap:wrap;">
-    <div></div>
-    <div><a class="btn" href="{% url 'work_order_create' %}">Add Work Order</a></div>
+<section class="space-y-8">
+  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">Work Orders</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">Track maintenance and tasks across your portfolio.</p>
+    </div>
+    <a class="btn self-start md:self-center" href="{% url 'work_order_create' %}">Add work order</a>
   </div>
 
-  {# Toolbar: search + Filter (left) | Page size + Status (right) #}
-  <form method="get" class="filter-grid" style="margin-top:.6rem; margin-bottom:.5rem;">
-    {# Search + Filter button #}
-    <div class="input-group joined" style="min-width:320px; max-width:680px;">
+  <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
+    <div class="flex flex-col gap-2 md:flex-row md:items-center">
       <label class="sr-only" for="id_q">Search work orders</label>
       <input
         id="id_q"
-        class="input-search"
+        class="input"
         type="text"
         name="q"
         value="{{ q }}"
         placeholder="Title or description"
       />
-      <button class="btn" type="submit">Filter</button>
+      <button class="btn md:ml-2 md:mt-0" type="submit">Filter</button>
     </div>
 
-    {# Page size (right) #}
-    <div class="row" style="gap:.5rem; align-items:center; justify-self:end; white-space:nowrap;">
-      <label for="id_per" style="margin:0;">Page size:</label>
-      <select id="id_per" name="per" onchange="this.form.submit()">
+    <div class="flex items-center gap-2 justify-self-end">
+      <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">Page size</label>
+      <select id="id_per" name="per" onchange="this.form.submit()" class="input w-24">
         {% for opt in per_choices %}
           <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
         {% endfor %}
       </select>
     </div>
 
-    {# Status (right) #}
-    <div class="row" style="gap:.5rem; align-items:center; justify-self:end; white-space:nowrap;">
-      <label for="id_status" style="margin:0;">Status:</label>
-      <select id="id_status" name="status" onchange="this.form.submit()">
+    <div class="flex items-center gap-2 justify-self-end">
+      <label for="id_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">Status</label>
+      <select id="id_status" name="status" onchange="this.form.submit()" class="input w-32">
         <option value="" {% if not status %}selected{% endif %}>All</option>
         {% for val, label in status_choices %}
           <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
@@ -49,56 +46,115 @@
     </div>
   </form>
 
-  <div class="table-wrap">
-    <table class="bm-table">
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>Unit</th>
-          <th>Status</th>
-          <th>Deadline</th>
-          <th>Created</th>
-          <th class="text-right">Actions</th>
+  <div class="grid gap-4 md:hidden">
+    {% for w in orders %}
+      <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-sky-600 dark:text-sky-300">{{ w.title }}</h2>
+            <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
+              <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ w.get_status_display }}</span>
+              <span class="{% if w.priority == 'HIGH' %}bg-rose-500 text-white{% elif w.priority == 'MEDIUM' %}bg-amber-500 text-white{% else %}bg-emerald-500 text-white{% endif %} rounded-full px-3 py-1">{{ w.get_priority_display }}</span>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <a class="btn btn-secondary btn-sm" href="{% url 'work_order_update' w.id %}">View</a>
+            <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}">Delete</a>
+          </div>
+        </div>
+        <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <div>
+            <dt class="font-semibold text-slate-500 dark:text-slate-400">Unit</dt>
+            <dd>
+              {% if w.unit_id %}
+                <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'building_detail' w.unit.building_id %}">{{ w.unit.building.name }} — #{{ w.unit.number }}</a>
+              {% else %}—{% endif %}
+            </dd>
+          </div>
+          <div>
+            <dt class="font-semibold text-slate-500 dark:text-slate-400">Deadline</dt>
+            <dd>{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</dd>
+          </div>
+          <div>
+            <dt class="font-semibold text-slate-500 dark:text-slate-400">Created</dt>
+            <dd>{{ w.created_at|date:"Y-m-d H:i" }}</dd>
+          </div>
+        </dl>
+      </article>
+    {% empty %}
+      <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">No work orders.</p>
+    {% endfor %}
+  </div>
+
+  <div class="hidden overflow-x-auto md:block">
+    <table class="min-w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900">
+      <thead class="bg-slate-50 dark:bg-slate-800">
+        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+          <th class="px-4 py-3">Title</th>
+          <th class="px-4 py-3">Unit</th>
+          <th class="px-4 py-3">Priority</th>
+          <th class="px-4 py-3">Status</th>
+          <th class="px-4 py-3">Deadline</th>
+          <th class="px-4 py-3">Created</th>
+          <th class="px-4 py-3 text-right">Actions</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
         {% for w in orders %}
-          <tr>
-            <td><a href="{% url 'work_order_update' w.id %}">{{ w.title }}</a></td>
-            <td>
+          <tr class="text-sm text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
+              <a href="{% url 'work_order_update' w.id %}">{{ w.title }}</a>
+            </td>
+            <td class="px-4 py-3">
               {% if w.unit_id %}
-                <a href="{% url 'building_detail' w.unit.building_id %}">
-                  {{ w.unit.building.name }} — #{{ w.unit.number }}
-                </a>
+                <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'building_detail' w.unit.building_id %}">{{ w.unit.building.name }} — #{{ w.unit.number }}</a>
               {% else %}—{% endif %}
             </td>
-            <td>{{ w.get_status_display }}</td>
-            <td>{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
-            <td>{{ w.created_at|date:"Y-m-d H:i" }}</td>
-            <td class="text-right">
-              <div class="row" style="gap:.5rem; justify-content:flex-end; flex-wrap:nowrap; white-space:nowrap;">
-                <a class="btn btn-danger" href="{% url 'work_order_delete' w.id %}">Delete</a>
-              </div>
+            <td class="px-4 py-3">
+              <span class="{% if w.priority == 'HIGH' %}bg-rose-500 text-white{% elif w.priority == 'MEDIUM' %}bg-amber-500 text-white{% else %}bg-emerald-500 text-white{% endif %} rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                {{ w.get_priority_display }}
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {{ w.get_status_display }}
+              </span>
+            </td>
+            <td class="px-4 py-3">{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+            <td class="px-4 py-3">{{ w.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="px-4 py-3 text-right">
+              <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}">Delete</a>
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="6">No work orders.</td></tr>
+          <tr>
+            <td colspan="7" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">No work orders.</td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
   {% if is_paginated %}
-    <div class="row" style="margin-top:1rem; flex-wrap:wrap; gap:.5rem;">
-      {% if page_obj.has_previous %}
-        <a class="btn" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page=1">« First</a>
-        <a class="btn" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ page_obj.previous_page_number }}">‹ Prev</a>
-      {% endif %}
-      <span class="muted">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
-      {% if page_obj.has_next %}
-        <a class="btn" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ page_obj.next_page_number }}">Next ›</a>
-        <a class="btn" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ paginator.num_pages }}">Last »</a>
-      {% endif %}
-    </div>
+    <nav class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div class="flex flex-wrap items-center gap-2">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page=1">« First</a>
+          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ page_obj.previous_page_number }}">‹ Prev</a>
+        {% else %}
+          <span class="btn is-disabled">« First</span>
+          <span class="btn is-disabled">‹ Prev</span>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ page_obj.next_page_number }}">Next ›</a>
+          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ paginator.num_pages }}">Last »</a>
+        {% else %}
+          <span class="btn is-disabled">Next ›</span>
+          <span class="btn is-disabled">Last »</span>
+        {% endif %}
+      </div>
+      <span class="text-sm text-slate-500 dark:text-slate-300">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+    </nav>
   {% endif %}
+</section>
 {% endblock %}

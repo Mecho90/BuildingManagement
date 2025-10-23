@@ -3,15 +3,59 @@
 {% block title %}Work Order · {{ order.title }}{% endblock %}
 
 {% block content %}
-  <nav class="bm-subnav row gap">
-    <a class="btn" href="{{ cancel_url|default:request.META.HTTP_REFERER|default:'/' }}">← Back</a>
-  </nav>
+<section class="space-y-6">
+  <div class="flex flex-wrap items-center gap-3">
+    <a class="btn btn-secondary" href="{{ cancel_url|default:request.META.HTTP_REFERER|default:'/' }}">← Back</a>
+    <a class="btn" href="{% url 'work_order_update' order.id %}">Edit</a>
+    <a class="btn btn-danger" href="{% url 'work_order_delete' order.id %}">Delete</a>
+  </div>
 
-  <h2 class="mb-1">{{ order.title }}</h2>
-  <p class="mb-1"><strong>Building:</strong> {{ order.unit.building.name }}</p>
-  <p class="mb-1"><strong>Unit:</strong> {% if order.unit_id %}#{{ order.unit.number }}{% else %}—{% endif %}</p>
-  <p class="mb-1"><strong>Status:</strong> {{ order.get_status_display }}</p>
-  <p class="mb-2"><strong>Created:</strong> {{ order.created_at|date:"Y-m-d" }}</p>
+  <article class="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+    <header class="space-y-2">
+      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">{{ order.title }}</h1>
+      <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
+        <span class="{% if order.priority == 'HIGH' %}bg-rose-500 text-white{% elif order.priority == 'MEDIUM' %}bg-amber-500 text-white{% else %}bg-emerald-500 text-white{% endif %} rounded-full px-3 py-1">
+          {{ order.get_priority_display }}
+        </span>
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          {{ order.get_status_display }}
+        </span>
+      </div>
+    </header>
 
-  {% if order.description %}<pre style="white-space:pre-wrap">{{ order.description }}</pre>{% endif %}
+    <dl class="grid gap-4 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
+      <div>
+        <dt class="font-semibold text-slate-500 dark:text-slate-400">Building</dt>
+        <dd>{{ order.building.name }}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-slate-500 dark:text-slate-400">Unit</dt>
+        <dd>{% if order.unit_id %}#{{ order.unit.number }}{% else %}—{% endif %}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-slate-500 dark:text-slate-400">Deadline</dt>
+        <dd>{% if order.deadline %}{{ order.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-slate-500 dark:text-slate-400">Created</dt>
+        <dd>{{ order.created_at|date:"Y-m-d H:i" }}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-slate-500 dark:text-slate-400">Last updated</dt>
+        <dd>{{ order.updated_at|date:"Y-m-d H:i" }}</dd>
+      </div>
+    </dl>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">Description</h2>
+      <div class="prose prose-sm max-w-none dark:prose-invert">
+        {% if order.description %}
+          <p>{{ order.description }}</p>
+        {% else %}
+          <p class="text-slate-500 dark:text-slate-400"><em>No description provided.</em></p>
+        {% endif %}
+      </div>
+    </section>
+  </article>
+</section>
 {% endblock %}

@@ -3,24 +3,23 @@
 {% block title %}Delete Unit · Building Management{% endblock %}
 
 {% block content %}
-<section>
-  <h2 class="mb-2">Delete Unit</h2>
-
-  <p class="mb-2">
-    Are you sure you want to delete
-    <strong>Unit {{ object.number }}</strong>
-    {% if object.building %}in <strong>{{ object.building.name }}</strong>{% endif %}?
-    This will also delete any related work orders.
-  </p>
-
-  <form method="post" class="mt-2">
-    {% csrf_token %}
-    <button class="btn btn-danger" type="submit">Yes, delete</button>
-    {% if object.building_id %}
-      <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">Cancel</a>
-    {% else %}
-      <a class="btn btn-secondary" href="{% url 'buildings_list' %}">Cancel</a>
-    {% endif %}
-  </form>
+<section class="flex min-h-[50vh] items-center justify-center px-4">
+  <div class="w-full max-w-lg space-y-5 rounded-2xl border border-rose-200/60 bg-white p-6 text-center shadow-card dark:border-rose-700/50 dark:bg-slate-900">
+    <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">Delete unit</h1>
+    <p class="text-sm text-slate-600 dark:text-slate-300">
+      Are you sure you want to delete <strong>Unit {{ object.number }}</strong>
+      {% if object.building %}in <strong>{{ object.building.name }}</strong>{% endif %}?<br>
+      This action cannot be undone.
+    </p>
+    <form method="post" class="flex flex-col gap-3 sm:flex-row sm:justify-center">
+      {% csrf_token %}
+      <button class="btn btn-danger min-w-[160px]">Yes, delete</button>
+      {% if object.building_id %}
+        <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">Cancel</a>
+      {% else %}
+        <a class="btn btn-secondary" href="{% url 'buildings_list' %}">Cancel</a>
+      {% endif %}
+    </form>
+  </div>
 </section>
 {% endblock %}

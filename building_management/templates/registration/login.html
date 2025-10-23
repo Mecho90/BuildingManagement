@@ -6,27 +6,46 @@
 {% block topbar_right %}{% endblock %}
 
 {% block content %}
-<h2>Login</h2>
+<section class="flex min-h-[60vh] w-full items-center justify-center px-4">
+  <div class="w-full max-w-md space-y-6 rounded-2xl bg-white p-6 shadow-card ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+    <header class="space-y-2 text-center">
+      <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">Sign in</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">Enter your credentials to access Building Management.</p>
+    </header>
 
-<form method="post" action="{% url 'login' %}">
-  {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert--danger">
+        {% for err in form.non_field_errors %}
+          <div>{{ err }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
 
-  {% if form.non_field_errors %}
-    <div class="flash">{{ form.non_field_errors }}</div>
-  {% endif %}
+    <form method="post" action="{% url 'login' %}" class="space-y-4" novalidate>
+      {% csrf_token %}
 
-  <p>
-    <label for="{{ form.username.id_for_label }}">Username</label><br/>
-    {{ form.username }}
-    {% if form.username.errors %}<div class="flash">{{ form.username.errors }}</div>{% endif %}
-  </p>
+      <div class="space-y-1">
+        <label for="{{ form.username.id_for_label }}">Username</label>
+        {{ form.username }}
+        {% if form.username.errors %}
+          <div class="errors">
+            {% for err in form.username.errors %}<div>{{ err }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      </div>
 
-  <p>
-    <label for="{{ form.password.id_for_label }}">Password</label><br/>
-    {{ form.password }}
-    {% if form.password.errors %}<div class="flash">{{ form.password.errors }}</div>{% endif %}
-  </p>
+      <div class="space-y-1">
+        <label for="{{ form.password.id_for_label }}">Password</label>
+        {{ form.password }}
+        {% if form.password.errors %}
+          <div class="errors">
+            {% for err in form.password.errors %}<div>{{ err }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      </div>
 
-  <button class="btn" type="submit">Login in</button>
-</form>
+      <button class="btn w-full justify-center" type="submit">Sign in</button>
+    </form>
+  </div>
+</section>
 {% endblock %}

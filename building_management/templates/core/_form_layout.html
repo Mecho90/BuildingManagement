@@ -1,48 +1,55 @@
 {# Generic form layout used by all create/update pages #}
-<h2 class="mb-1">{{ title }}</h2>
-{% if subtitle %}<p class="muted mt-0">{{ subtitle }}</p>{% endif %}
+<section class="space-y-6">
+  <header class="space-y-1">
+    <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{{ title }}</h1>
+    {% if subtitle %}<p class="text-sm text-slate-500 dark:text-slate-400">{{ subtitle }}</p>{% endif %}
+  </header>
 
-<form method="post" novalidate>
-  {% csrf_token %}
+  <form method="post" novalidate class="space-y-6">
+    {% csrf_token %}
 
-  {% if form.non_field_errors %}
-    <div class="alert alert--error">
-      {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
-    </div>
-  {% endif %}
-
-  {# 1) Hidden inputs first (e.g., locked Building). Keep their errors visible. #}
-  {% for h in form.hidden_fields %}
-    {{ h }}
-    {% if h.errors %}
-      <div class="errors">{% for e in h.errors %}<div>{{ e }}</div>{% endfor %}</div>
+    {% if form.non_field_errors %}
+      <div class="alert alert--danger">
+        {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+      </div>
     {% endif %}
-  {% endfor %}
 
-  {# 2) Render only visible fields (no labels for hidden ones). #}
-  {% for field in form.visible_fields %}
-    <div class="form-row{% if field.errors %} has-errors{% endif %}">
-      {% if field.field.widget.input_type == 'checkbox' %}
-        <label class="checkbox">
-          {{ field }} <span>{{ field.label }}</span>
-        </label>
-        {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
-        {% if field.errors %}
-          <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
-        {% endif %}
-      {% else %}
-        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-        {{ field }}
-        {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
-        {% if field.errors %}
-          <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
-        {% endif %}
+    {% for h in form.hidden_fields %}
+      {{ h }}
+      {% if h.errors %}
+        <div class="errors">{% for e in h.errors %}<div>{{ e }}</div>{% endfor %}</div>
       {% endif %}
-    </div>
-  {% endfor %}
+    {% endfor %}
 
-  <div class="row gap mt-2">
-    <button class="btn" type="submit">Save</button>
-    <a class="btn" href="{{ cancel_url|default:'javascript:history.back()' }}">Cancel</a>
-  </div>
-</form>
+    <div class="grid gap-5">
+      {% for field in form.visible_fields %}
+        {% if field.field.widget.input_type == 'checkbox' %}
+          <div class="space-y-1">
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ field }}
+              <span>{{ field.label }}</span>
+            </label>
+            {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
+            {% if field.errors %}
+              <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="space-y-1">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
+            {% if field.errors %}
+              <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <button class="btn" type="submit">Save</button>
+      <a class="btn" href="{{ cancel_url|default:'javascript:history.back()' }}">Cancel</a>
+    </div>
+  </form>
+</section>

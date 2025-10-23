@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Logged out · Building Management{% endblock %}
 {% block content %}
-<h2>Logged out</h2>
-<p>You have been logged out.</p>
-<p><a class="btn" href="{% url 'login' %}">Return to login</a></p>
+<section class="flex min-h-[50vh] w-full items-center justify-center px-4">
+  <div class="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 text-center shadow-card ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+    <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">Signed out</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">You have been logged out safely.</p>
+    <a class="btn w-full justify-center" href="{% url 'login' %}">Return to login</a>
+  </div>
+</section>
 {% endblock %}
