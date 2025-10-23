@@ -4,11 +4,13 @@
   "version": "0.1.0",
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i ./static/css/app.css -o ./static/css/dist.css --minify",
-    "watch:css": "tailwindcss -c tailwind.config.js -i ./static/css/app.css -o ./static/css/dist.css --watch"
+    "watch:css": "tailwindcss -c tailwind.config.js -i ./static/css/app.css -o ./static/css/dist.css --watch",
+    "test:ui": "playwright test"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/typography": "^0.5.10",
+    "@playwright/test": "^1.46.0",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.13"
