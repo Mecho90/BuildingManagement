@@ -135,28 +135,7 @@
   }
 
   .alert {
-    @apply rounded-xl border px-3 py-2 font-medium shadow-sm;
-  }
-
-  .alert--success {
-    @apply border-emerald-200 bg-emerald-50 text-emerald-700
-           dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200;
-  }
-
-  .alert--warning {
-    @apply border-amber-200 bg-amber-50 text-amber-700
-           dark:border-amber-600 dark:bg-amber-950 dark:text-amber-200;
-  }
-
-  .alert--info {
-    @apply border-sky-200 bg-sky-50 text-sky-700
-           dark:border-sky-700 dark:bg-sky-950 dark:text-sky-200;
-  }
-
-  .alert--danger,
-  .alert--error {
-    @apply border-rose-200 bg-rose-50 text-rose-700
-           dark:border-rose-700 dark:bg-rose-950 dark:text-rose-200;
+    @apply rounded-xl border px-3 py-3 font-medium shadow-sm transition-colors;
   }
 
   .muted {
@@ -176,6 +155,22 @@
     @apply min-h-[6rem] resize-y;
   }
 
+  .priority-badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide;
+  }
+
+  .priority-badge--high {
+    @apply bg-rose-500 text-white;
+  }
+
+  .priority-badge--medium {
+    @apply bg-amber-500 text-white;
+  }
+
+  .priority-badge--low {
+    @apply bg-emerald-500 text-white;
+  }
+
   .form-actions {
     @apply mt-2 flex gap-4;
   }
@@ -193,4 +188,39 @@
     white-space: nowrap;
     border-width: 0;
   }
+}
+@layer base {
+  input[data-theme-toggle] {
+    @apply hidden;
+  }
+}
+
+/* Flash message colors */
+.alert--success {
+  border-color: #86efac;
+  background-color: #dcfce7;
+  color: #065f46;
+  box-shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.25);
+}
+
+.alert--warning {
+  border-color: #fcd34d;
+  background-color: #fef3c7;
+  color: #92400e;
+  box-shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.25);
+}
+
+.alert--info {
+  border-color: #bfdbfe;
+  background-color: #e0f2fe;
+  color: #1e3a8a;
+  box-shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.25);
+}
+
+.alert--danger,
+.alert--error {
+  border-color: #fca5a5;
+  background-color: #fee2e2;
+  color: #991b1b;
+  box-shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.25);
 }

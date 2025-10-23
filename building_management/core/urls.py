@@ -10,6 +10,8 @@ urlpatterns = [
     path("buildings/<int:pk>/edit/", views.BuildingUpdateView.as_view(), name="building_update"),
     path("buildings/<int:pk>/delete/", views.BuildingDeleteView.as_view(), name="building_delete"),
 
+    path("toggle-theme/", views.toggle_theme, name="toggle_theme"),
+
     # Units
     path("buildings/<int:pk>/units/new/", views.UnitCreateView.as_view(), name="unit_create"),
     path("units/<int:pk>/", views.UnitDetailView.as_view(), name="unit_detail"),

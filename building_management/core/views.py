@@ -24,6 +24,7 @@ from django.views.generic import (
 from django.utils import timezone
 from .forms import BuildingForm, UnitForm, WorkOrderForm
 from .models import Building, Unit, WorkOrder
+from .views_theme import toggle_theme
 
 
 # ----------------------------------------------------------------------

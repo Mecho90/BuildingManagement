@@ -1,6 +1,6 @@
 {% load static %}
 <!doctype html>
-<html lang="en" class="h-full">
+<html lang="en" class="h-full {% if theme == 'dark' %}dark{% endif %}">
   <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -11,7 +11,7 @@
     {% block extra_css %}{% endblock %}
   </head>
 
-  <body class="min-h-screen bg-slate-50 text-brand-foreground dark:bg-slate-950 dark:text-slate-100">
+  <body class="min-h-screen bg-slate-50 text-brand-foreground transition-colors dark:bg-slate-950 dark:text-slate-100">
     <div class="flex min-h-screen flex-col">
       <header class="border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
         <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
@@ -36,7 +36,13 @@
                   {% csrf_token %}
                   <button type="submit" class="btn btn-secondary btn-sm">Logout</button>
                 </form>
+                <a class="btn btn-secondary btn-sm" href="{% url 'toggle_theme' %}">
+                  {% if theme == 'dark' %}Light mode{% else %}Dark mode{% endif %}
+                </a>
               {% else %}
+                <a class="btn btn-secondary btn-sm" href="{% url 'toggle_theme' %}">
+                  {% if theme == 'dark' %}Light mode{% else %}Dark mode{% endif %}
+                </a>
                 <a class="btn" href="{% url 'login' %}">Login</a>
               {% endif %}
             {% endblock %}

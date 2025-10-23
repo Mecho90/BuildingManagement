@@ -7,7 +7,7 @@
   <div class="w-full max-w-lg space-y-5 rounded-2xl border border-rose-200/60 bg-white p-6 text-center shadow-card dark:border-rose-700/50 dark:bg-slate-900">
     <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">Delete unit</h1>
     <p class="text-sm text-slate-600 dark:text-slate-300">
-      Are you sure you want to delete <strong>Unit {{ object.number }}</strong>
+      Are you sure you want to delete <strong>{{ object.number }}</strong>
       {% if object.building %}in <strong>{{ object.building.name }}</strong>{% endif %}?<br>
       This action cannot be undone.
     </p>
