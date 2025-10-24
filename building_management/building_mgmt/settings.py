@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -60,12 +63,90 @@ TEMPLATES = [
     },
 ]
 
-# --- Database (SQLite for dev) ---
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+def _database_config_from_env() -> dict[str, object]:
+    """
+    Parse DATABASE_URL and produce a PostgreSQL Django DATABASES entry.
+
+    Supported schemes: postgres:// or postgresql://
+    Query parameters (e.g. sslmode) are passed through to OPTIONS.
+    """
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        raise ImproperlyConfigured(
+            "DATABASE_URL environment variable is required and must point to your "
+            "PostgreSQL instance."
+        )
+
+    parsed = urlparse(url)
+    scheme = parsed.scheme.lower()
+    if scheme not in {"postgres", "postgresql"}:
+        raise ImproperlyConfigured(
+            "Unsupported DATABASE_URL scheme. Expected postgres:// or postgresql://."
+        )
+
+    db_name = parsed.path.lstrip("/")
+    if not db_name:
+        raise ImproperlyConfigured("DATABASE_URL must include a database name.")
+
+    query_params = {k: v[-1] for k, v in parse_qs(parsed.query).items() if v}
+    options: dict[str, object] = {}
+
+    sslmode_override = query_params.pop("sslmode", None)
+    if sslmode_override:
+        options["sslmode"] = sslmode_override
+
+    config: dict[str, object] = {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": db_name,
+        "USER": parsed.username or "",
+        "PASSWORD": parsed.password or "",
+        "HOST": parsed.hostname or "",
+        "PORT": parsed.port or "",
     }
+
+
+    def _env_int(name: str, *, default: int) -> int:
+        raw = os.environ.get(name)
+        if raw is None or raw == "":
+            return default
+        try:
+            return int(raw)
+        except ValueError as exc:
+            raise ImproperlyConfigured(f"{name} must be an integer.") from exc
+
+    conn_max_age = _env_int("DJANGO_DB_CONN_MAX_AGE", default=60)
+    if conn_max_age < 0:
+        raise ImproperlyConfigured("DJANGO_DB_CONN_MAX_AGE must be >= 0.")
+    if conn_max_age:
+        config["CONN_MAX_AGE"] = conn_max_age
+
+    health_checks_env = os.environ.get("DJANGO_DB_CONN_HEALTH_CHECKS")
+    if health_checks_env is None:
+        enable_health_checks = bool(conn_max_age)
+    else:
+        enable_health_checks = health_checks_env.lower() in {"1", "true", "yes"}
+    if enable_health_checks:
+        config["CONN_HEALTH_CHECKS"] = True
+
+    sslmode_env = os.environ.get("DJANGO_DB_SSLMODE")
+    if "sslmode" not in options:
+        if sslmode_env:
+            options["sslmode"] = sslmode_env
+        elif parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+            options["sslmode"] = "require"
+
+    if options:
+        config["OPTIONS"] = options
+
+    application_name = os.environ.get("DJANGO_DB_APP_NAME")
+    if application_name:
+        config.setdefault("OPTIONS", {})["application_name"] = application_name
+
+    return config
+
+
+DATABASES: dict[str, dict[str, object]] = {
+    "default": _database_config_from_env(),
 }
 
 # --- Auth ---

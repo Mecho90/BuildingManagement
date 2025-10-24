@@ -20,6 +20,50 @@ Responsive Django/Tailwind UI for managing buildings, units, and work orders.
 
 Tailwind is configured with purge-aware `content` globs so unused utilities are removed in the production bundle.
 
+## Database Configuration
+
+The application now requires PostgreSQL. For local development:
+
+1. Launch the database (uses `docker-compose.yml`):
+   ```bash
+   docker compose up -d postgres
+   ```
+   The first run provisions the `building_mgmt` user, password, and database.
+2. Install Python requirements (includes the `psycopg` driver) and run migrations:
+   ```bash
+   pip install -r requirements.txt
+   export DATABASE_URL=postgres://building_mgmt:building_mgmt@localhost:5432/building_mgmt
+   python manage.py migrate
+   ```
+   Stop the container with `docker compose down` when you're done.
+
+Prefer a one-off container instead of compose? Run `docker run` with the same env vars/port mapping.
+
+Optional env vars:
+
+- `DJANGO_DB_CONN_MAX_AGE` – persistent connection lifetime in seconds (default `60`).
+- `DJANGO_DB_CONN_HEALTH_CHECKS` – defaults to `true` when pooling is enabled; override with `false` to disable.
+- `DJANGO_DB_SSLMODE` – override the default SSL mode (`require` for non-local hosts, unset for localhost).
+- `DJANGO_DB_APP_NAME` – registers a custom `application_name` with Postgres for monitoring.
+
+### Postgres Schema Verification
+
+After importing data into PostgreSQL you can sanity-check the schema and row counts:
+
+```bash
+DATABASE_URL=postgres://… python manage.py verify_pg_schema --show-counts
+```
+
+The command confirms that the case-insensitive unit number constraint and supporting index exist and echoes record totals for the core models so you can compare them with a pre-migration dump (e.g., `python manage.py dumpdata core --indent 2 > backup.json`).
+
+### Staging Cutover
+
+Follow `docs/staging_cutover.md` for the exact steps to point staging at PostgreSQL, migrate data, validate the deployment, and roll back if needed.
+
+### Production Cutover
+
+Use `docs/production_cutover.md` during the production switchover. It outlines the downtime playbook, final export/import flow, validation checklist, and rollback procedure.
+
 ## Playwright Smoke Tests
 
 Lightweight responsive smoke tests live in `tests/playwright/`.
