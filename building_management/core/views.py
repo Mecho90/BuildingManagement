@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import json
+from itertools import groupby
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Case, When, IntegerField, Q, Count, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Lower, Trim, Replace
@@ -22,6 +25,7 @@ from django.views.generic import (
 )
 
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from .forms import BuildingForm, UnitForm, WorkOrderForm
 from .models import Building, Unit, WorkOrder
 from .views_theme import toggle_theme
@@ -34,6 +38,18 @@ from .views_theme import toggle_theme
 def _user_can_access_building(user, building: Building) -> bool:
     """Staff can access everything; others only their own buildings."""
     return user.is_staff or building.owner_id == user.id
+
+
+def _safe_next_url(request):
+    """Return a user-supplied 'next' URL if it's safe; otherwise None."""
+    next_url = request.POST.get("next") or request.GET.get("next")
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return None
 
 
 # ----------------------------------------------------------------------
@@ -500,12 +516,35 @@ class UnitDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 # ----------------------------------------------------------------------
 class WorkOrderListView(LoginRequiredMixin, ListView):
     model = WorkOrder
-    template_name = "core/workorders_list.html"
-    context_object_name = "workorders"
+    template_name = "core/work_orders_list.html"
+    context_object_name = "orders"
+    paginate_by = 10
+
+    _per_choices = (10, 20, 50, 100)
 
     def get_queryset(self):
+        request = self.request
+        user = request.user
+
+        # Page size (validated later in get_paginate_by)
+        try:
+            per = int(request.GET.get("per", self.paginate_by))
+        except (TypeError, ValueError):
+            per = self.paginate_by
+        self._per = per
+
+        search = (request.GET.get("q") or "").strip()
+        status = (request.GET.get("status") or "").strip().upper()
+        valid_status = {choice[0] for choice in WorkOrder.Status.choices}
+        if status and status not in valid_status:
+            status = ""
+
         # Use visibility helper + pull related objects
-        qs = WorkOrder.objects.visible_to(self.request.user).select_related("building", "unit")
+        qs = (
+            WorkOrder.objects.visible_to(user)
+            .filter(archived_at__isnull=True)
+            .select_related("building", "unit")
+        )
 
         # Priority ordering: High > Medium > Low, then by deadline asc, then newest
         qs = qs.annotate(
@@ -516,9 +555,41 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 default=3,
                 output_field=IntegerField(),
             )
-        ).order_by("priority_order", "deadline", "-pk")
+        )
+
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search) | Q(description__icontains=search)
+            )
+
+        if status:
+            qs = qs.filter(status=status)
+
+        qs = qs.order_by("priority_order", "deadline", "-pk")
+
+        self._search = search
+        self._status = status
+
         return qs
 
+    def get_paginate_by(self, queryset):
+        per = getattr(self, "_per", self.paginate_by)
+        if per not in self._per_choices:
+            per = self.paginate_by
+        return per
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(
+            {
+                "q": getattr(self, "_search", ""),
+                "status": getattr(self, "_status", ""),
+                "status_choices": WorkOrder.Status.choices,
+                "per": self.get_paginate_by(self.object_list),
+                "per_choices": self._per_choices,
+            }
+        )
+        return ctx
 
 class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = WorkOrder
@@ -553,10 +624,37 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["building"] = getattr(self, "building", None)
-        ctx["cancel_url"] = (
-            reverse("building_detail", args=[self.building.pk])
-            if getattr(self, "building", None)
-            else reverse("workorders_list")
+        safe_next = _safe_next_url(self.request)
+        ctx["next_url"] = safe_next
+        if safe_next:
+            ctx["cancel_url"] = safe_next
+        else:
+            ctx["cancel_url"] = (
+                reverse("building_detail", args=[self.building.pk])
+                if getattr(self, "building", None)
+                else reverse("work_orders_list")
+            )
+        ctx["units_api_template"] = reverse("api_units", args=[0]).replace("/0/", "/{id}/")
+
+        units_qs = (
+            Unit.objects.visible_to(self.request.user)
+            .select_related("building")
+            .order_by("building__name", "number")
+        )
+        if getattr(self, "building", None):
+            units_qs = units_qs.filter(building=self.building)
+
+        ctx["units_dataset"] = json.dumps(
+            [
+                {
+                    "id": u.id,
+                    "number": u.number,
+                    "label": f"{u.building.name} — #{u.number}" if u.building_id else (u.number or ""),
+                    "building_id": u.building_id,
+                }
+                for u in units_qs
+            ],
+            cls=DjangoJSONEncoder,
         )
         return ctx
 
@@ -569,6 +667,9 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
     def get_success_url(self):
+        next_url = _safe_next_url(self.request)
+        if next_url:
+            return next_url
         return reverse("building_detail", args=[self.object.building_id])
 
 
@@ -591,6 +692,34 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["building"] = getattr(self, "building", None)
+        building = getattr(self, "building", None)
+        safe_next = _safe_next_url(self.request)
+        ctx["next_url"] = safe_next
+        if safe_next:
+            ctx["cancel_url"] = safe_next
+        elif building is not None:
+            ctx["cancel_url"] = reverse("building_detail", args=[building.pk])
+        ctx["units_api_template"] = reverse("api_units", args=[0]).replace("/0/", "/{id}/")
+        units_qs = (
+            Unit.objects.visible_to(self.request.user)
+            .select_related("building")
+            .order_by("building__name", "number")
+        )
+        if building is not None:
+            units_qs = units_qs.filter(building=building)
+
+        ctx["units_dataset"] = json.dumps(
+            [
+                {
+                    "id": u.id,
+                    "number": u.number,
+                    "label": f"{u.building.name} — #{u.number}" if building is None else f"#{u.number}",
+                    "building_id": u.building_id,
+                }
+                for u in units_qs
+            ],
+            cls=DjangoJSONEncoder,
+        )
         return ctx
 
     def test_func(self):
@@ -607,6 +736,9 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return response
 
     def get_success_url(self):
+        next_url = _safe_next_url(self.request)
+        if next_url:
+            return next_url
         return reverse("building_detail", args=[self.object.building_id])
 
 
@@ -619,7 +751,9 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return _user_can_access_building(self.request.user, wo.building)
 
     def get_success_url(self):
-        # after delete, go back to the building detail
+        next_url = _safe_next_url(self.request)
+        if next_url:
+            return next_url
         return reverse_lazy("building_detail", args=[self.object.building_id])
 
     def post(self, request, *args, **kwargs):
@@ -632,7 +766,12 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         meta = obj._meta
         ctx.setdefault("object_verbose_name", meta.verbose_name)
         ctx.setdefault("object_model_name", meta.model_name)
-        ctx.setdefault("cancel_url", reverse("building_detail", args=[obj.building_id]))
+        next_url = _safe_next_url(self.request)
+        if next_url:
+            ctx["next_url"] = next_url
+            ctx["cancel_url"] = next_url
+        else:
+            ctx.setdefault("cancel_url", reverse("building_detail", args=[obj.building_id]))
         return ctx
     
 
@@ -664,20 +803,66 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
             wo.archive()
             messages.success(request, "Work order archived.")
 
+        next_url = _safe_next_url(request)
+        if next_url:
+            return redirect(next_url)
         return redirect("building_detail", wo.building_id)
 
     # Optional: allow GET-triggered archive links; remove to enforce POST-only.
     def get(self, request, *args, **kwargs):
         return self.post(request, *args, **kwargs)
+
+
+class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    """
+    Staff-only list of archived work orders, grouped by building for easy browsing.
+    """
+
+    model = WorkOrder
+    template_name = "core/work_orders_archive.html"
+    context_object_name = "orders"
+    raise_exception = True
+
+    def test_func(self):
+        user = self.request.user
+        return user.is_staff or user.is_superuser
+
+    def get_queryset(self):
+        return (
+            WorkOrder.objects.visible_to(self.request.user)
+            .filter(archived_at__isnull=False)
+            .select_related("building__owner", "unit")
+            .order_by("building__name", "building_id", "-archived_at", "-id")
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        orders = list(ctx.get("orders", []))
+
+        grouped = []
+        for _, items in groupby(orders, key=lambda wo: wo.building):
+            items_list = list(items)
+            if not items_list:
+                continue
+            building = items_list[0].building
+            grouped.append(
+                {
+                    "building": building,
+                    "orders": items_list,
+                }
+            )
+
+        ctx["grouped_orders"] = grouped
+        return ctx
     
 # ----------------------------------------------------------------------
 # JSON APIs (simple, function-based)
 # ----------------------------------------------------------------------
 
-def api_units(request):
+def api_units(request, building_id: int | None = None):
     """
     JSON list of units visible to the current user.
-    Optional filter: ?building=<id> (validated for visibility).
+    Optional filter: ?building=<id> (validated for visibility) or via path parameter.
     """
     if not request.user.is_authenticated:
         raise Http404()
@@ -689,10 +874,10 @@ def api_units(request):
         qs = Unit.objects.select_related("building").filter(building__owner=request.user)
         bld_qs = Building.objects.filter(owner=request.user)
 
-    building_id = request.GET.get("building")
-    if building_id:
+    param = building_id if building_id is not None else request.GET.get("building")
+    if param is not None:
         try:
-            b_id = int(building_id)
+            b_id = int(param)
         except (TypeError, ValueError):
             return JsonResponse({"error": "Invalid building id."}, status=400)
 

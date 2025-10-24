@@ -26,6 +26,7 @@ urlpatterns = [
     path("work-orders/<int:pk>/edit/", views.WorkOrderUpdateView.as_view(), name="work_order_update"),
     path("work-orders/<int:pk>/delete/", views.WorkOrderDeleteView.as_view(), name="work_order_delete"),
     path("work-orders/<int:pk>/archive/", views.WorkOrderArchiveView.as_view(), name="work_order_archive"),
+    path("work-orders/archive/", views.ArchivedWorkOrderListView.as_view(), name="work_orders_archive"),
 
     # APIs (optional)
     path("api/buildings/", views.api_buildings, name="api_buildings"),

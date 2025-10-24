@@ -195,7 +195,7 @@
         <button class="btn md:ml-2 md:mt-0" type="submit">Filter</button>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 md:justify-end">
         <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">Page size</label>
         <select id="id_w_per" name="w_per" onchange="this.form.submit()" class="input w-24">
           <option value="10"  {% if w_per|add:0 == 10  %}selected{% endif %}>10</option>
@@ -205,7 +205,7 @@
         </select>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 md:justify-end">
         <label for="id_w_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">Status</label>
         <select id="id_w_status" name="w_status" onchange="this.form.submit()" class="input w-32">
           <option value="" {% if not w_status %}selected{% endif %}>All</option>
@@ -230,7 +230,11 @@
         {% for w in workorders_page.object_list %}
           <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
             <div class="space-y-1">
-              <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">{{ w.title }}</h3>
+              <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
+                <a href="{% url 'work_order_update' w.id %}?building={{ building.id }}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+                  {{ w.title }}
+                </a>
+              </h3>
               <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
                 <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ w.get_status_display }}</span>
                 <span class="priority-badge {% if w.priority == 'HIGH' %}priority-badge--high{% elif w.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">{{ w.get_priority_display }}</span>
@@ -251,6 +255,7 @@
               </div>
             </dl>
             <div class="flex gap-2">
+              <a class="btn btn-secondary btn-sm" href="{% url 'work_order_update' w.id %}?building={{ building.id }}">Edit</a>
               {% if w.status == 'DONE' and not w.archived_at %}
                 <form action="{% url 'work_order_archive' w.id %}?building={{ building.id }}" method="post" class="inline-flex">
                   {% csrf_token %}
@@ -284,7 +289,7 @@
             {% for w in workorders_page.object_list %}
               <tr class="text-sm text-slate-700 dark:text-slate-200">
                 <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
-                  <a class="break-words hyphens-auto" href="{% url 'work_order_update' w.id %}">{{ w.title }}</a>
+                  <a class="break-words hyphens-auto" href="{% url 'work_order_update' w.id %}?building={{ building.id }}">{{ w.title }}</a>
                 </td>
                 <td class="px-4 py-3">{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</td>
                 <td class="px-4 py-3">

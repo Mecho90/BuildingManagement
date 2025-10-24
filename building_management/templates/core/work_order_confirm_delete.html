@@ -11,8 +11,9 @@
     </p>
     <form method="post" class="flex flex-col gap-3 sm:flex-row sm:justify-center">
       {% csrf_token %}
+      {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}"/>{% endif %}
       <button class="btn btn-danger min-w-[160px]" type="submit">Yes, delete</button>
-      <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">Cancel</a>
+      <a class="btn btn-secondary" href="{{ cancel_url }}">Cancel</a>
     </form>
   </div>
 </section>

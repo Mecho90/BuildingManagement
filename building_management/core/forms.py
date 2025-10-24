@@ -183,6 +183,11 @@ class WorkOrderForm(forms.ModelForm):
         self.fields["unit"].queryset = (
             Unit.objects.filter(building_id=b_id).order_by("number") if b_id else Unit.objects.none()
         )
+        if b_id:
+            self.fields["unit"].widget.attrs.pop("disabled", None)
+        else:
+            self.fields["unit"].widget.attrs["disabled"] = "disabled"
+            self.fields["unit"].empty_label = "Select a building first"
 
     # ---------- validation ----------
     def clean(self):
