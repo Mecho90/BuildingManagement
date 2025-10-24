@@ -192,3 +192,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 _csrf_origins = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 if _csrf_origins:
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()]
+
+# --- Sessions ---
+SESSION_COOKIE_AGE = 30 * 60  # expire after 30 minutes of inactivity
+SESSION_SAVE_EVERY_REQUEST = True  # refresh expiry on each request by an authenticated user
