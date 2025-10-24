@@ -875,10 +875,8 @@ msgid "Building"
 msgstr "Сграда"
 
 #: templates/core/work_order_detail.html:45
-#, fuzzy
-#| msgid "Unit updated."
 msgid "Last updated"
-msgstr "Последна промяна"
+msgstr "Последно обновяване"
 
 #: templates/core/work_order_form.html:3 templates/core/work_order_form.html:7
 msgid "Edit Work Order"

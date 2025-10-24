@@ -13,7 +13,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Case, When, IntegerField, Q, Count, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Lower, Trim, Replace
-from django.http import JsonResponse, Http404, HttpResponseForbidden
+from django.http import JsonResponse, Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views import View
@@ -691,8 +691,16 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
 class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = WorkOrder
-    template_name = "core/workorder_detail.html"
-    context_object_name = "workorder"
+    template_name = "core/work_order_detail.html"
+    context_object_name = "order"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        next_url = _safe_next_url(self.request)
+        ctx["next_url"] = next_url
+        if next_url:
+            ctx["cancel_url"] = next_url
+        return ctx
 
     def test_func(self):
         wo = self.get_object()
@@ -828,10 +836,12 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         obj = form.save(commit=False)
         if not _user_can_access_building(self.request.user, obj.building):
             raise Http404()
+        if obj.archived_at and obj.status != WorkOrder.Status.DONE:
+            obj.archived_at = None
         obj.save()
-        response = super().form_valid(form)
+        self.object = obj
         messages.warning(self.request, _( "Work order updated." ))
-        return response
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
         next_url = _safe_next_url(self.request)
