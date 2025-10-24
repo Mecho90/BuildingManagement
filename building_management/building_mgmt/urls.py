@@ -9,6 +9,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     # Admin
     path("admin/", admin.site.urls),
+    path("i18n/", include("django.conf.urls.i18n")),
 
     # Auth
     path(

@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{% if form.instance.pk %}Edit{% else %}New{% endif %} User · Building Management{% endblock %}
+{% load i18n %}
+{% block title %}{% if form.instance.pk %}{% trans "Edit" %}{% else %}{% trans "New" %}{% endif %} {% trans "User" %} · {% trans "Building Management" %}{% endblock %}
 {% block content %}
-<h2>{% if form.instance.pk %}Edit{% else %}New{% endif %} User</h2>
+<h2>{% if form.instance.pk %}{% trans "Edit" %}{% else %}{% trans "New" %}{% endif %} {% trans "User" %}</h2>
 <form method="post">
   {% csrf_token %}
   {{ form.as_p }}
-  <button class="btn" type="submit">Save</button>
-  <a class="btn" href="{% url 'users_list' %}">Cancel</a>
+  <button class="btn" type="submit">{% trans "Save" %}</button>
+  <a class="btn" href="{% url 'users_list' %}">{% trans "Cancel" %}</a>
 </form>
 {% endblock %}

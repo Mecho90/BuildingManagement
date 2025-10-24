@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}{{ building.name }} · Buildings{% endblock %}
+{% block title %}{{ building.name }} · {% trans "Buildings" %}{% endblock %}
 
 {% block content %}
 <section class="space-y-10">
@@ -10,58 +11,58 @@
       <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
         {% if building.address %}
           <div class="space-y-1">
-            <dt class="font-semibold text-slate-500 dark:text-slate-400">Address</dt>
+            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Address" %}</dt>
             <dd>{{ building.address }}</dd>
           </div>
         {% endif %}
         {% if building.owner %}
           <div class="space-y-1">
-            <dt class="font-semibold text-slate-500 dark:text-slate-400">Owner</dt>
+            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
             <dd>{{ building.owner.username }}</dd>
           </div>
         {% endif %}
         <div class="space-y-1">
-          <dt class="font-semibold text-slate-500 dark:text-slate-400">Role</dt>
+          <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Role" %}</dt>
           <dd>{{ building.get_role_display }}</dd>
         </div>
         <div class="space-y-1">
-          <dt class="font-semibold text-slate-500 dark:text-slate-400">Created</dt>
+          <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Created" %}</dt>
           <dd>{{ building.created_at|date:"Y-m-d" }}</dd>
         </div>
       </dl>
     </div>
     <div class="flex flex-wrap items-center gap-3">
-      <a class="btn" href="{% url 'building_update' building.id %}">Edit building</a>
-      <a class="btn btn-danger" href="{% url 'building_delete' building.id %}">Delete</a>
+      <a class="btn" href="{% url 'building_update' building.id %}">{% trans "Edit building" %}</a>
+      <a class="btn btn-danger" href="{% url 'building_delete' building.id %}">{% trans "Delete" %}</a>
     </div>
   </header>
 
   <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-    <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">Description</h2>
+    <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Description" %}</h2>
     <p class="mt-2 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">
       {% if building.description %}
         {{ building.description }}
       {% else %}
-        <em>No description provided.</em>
+        <em>{% trans "No description provided." %}</em>
       {% endif %}
     </p>
   </article>
 
   <section class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-2xl font-semibold text-brand-foreground dark:text-white">Units</h2>
-      <a class="btn" href="{% url 'unit_create' pk=building.id %}">Add unit</a>
+      <h2 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Units" %}</h2>
+      <a class="btn" href="{% url 'unit_create' pk=building.id %}">{% trans "Add unit" %}</a>
     </div>
 
     <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
       <div class="flex flex-col gap-2 md:flex-row md:items-center">
-        <label for="id_u_q" class="sr-only">Search units</label>
-        <input id="id_u_q" class="input" type="text" name="u_q" value="{{ u_q }}" placeholder="Number, floor, owner or contact"/>
-        <button class="btn md:ml-2 md:mt-0" type="submit">Filter</button>
+        <label for="id_u_q" class="sr-only">{% trans "Search units" %}</label>
+        <input id="id_u_q" class="input" type="text" name="u_q" value="{{ u_q }}" placeholder="{% trans "Number, floor, owner or contact" %}"/>
+        <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
       </div>
 
       <div class="flex items-center gap-2">
-        <label for="id_u_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">Page size</label>
+        <label for="id_u_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
         <select id="id_u_per" name="u_per" onchange="this.form.submit()" class="input w-24">
           <option value="10"  {% if u_per == 10  %}selected{% endif %}>10</option>
           <option value="20"  {% if u_per == 20  %}selected{% endif %}>20</option>
@@ -77,7 +78,7 @@
         <input type="hidden" name="w_per" value="{{ w_per }}">
         {% if workorders_page %}<input type="hidden" name="w_page" value="{{ workorders_page.number }}">{% endif %}
         {% if u_q or u_per != 10 or u_sort != 'number' %}
-          <a class="btn btn-secondary" href="{% url 'building_detail' building.id %}">Reset</a>
+          <a class="btn btn-secondary" href="{% url 'building_detail' building.id %}">{% trans "Reset" %}</a>
         {% endif %}
       </div>
     </form>
@@ -88,19 +89,21 @@
           <div class="flex items-start justify-between gap-2">
             <div>
               <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">{{ u.number }}</h3>
-              <p class="text-sm text-slate-500 dark:text-slate-400">Floor {{ u.floor|default:"—" }}</p>
+              {% with floor_val=u.floor|default:"—" %}
+                <p class="text-sm text-slate-500 dark:text-slate-400">{% blocktrans with value=floor_val %}Floor {{ value }}{% endblocktrans %}</p>
+              {% endwith %}
             </div>
             <div class="flex gap-2">
-              <a class="btn btn-danger btn-sm" href="{% url 'unit_delete' u.id %}">Delete</a>
+              <a class="btn btn-danger btn-sm" href="{% url 'unit_delete' u.id %}">{% trans "Delete" %}</a>
             </div>
           </div>
           <dl class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
             <div>
-              <dt class="font-semibold text-slate-500 dark:text-slate-400">Owner</dt>
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
               <dd>{{ u.owner_name|default:"—" }}</dd>
             </div>
             <div>
-              <dt class="font-semibold text-slate-500 dark:text-slate-400">Contact</dt>
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Contact" %}</dt>
               <dd>{{ u.contact_phone|default:"—" }}</dd>
             </div>
           </dl>
@@ -117,28 +120,28 @@
             <th class="px-4 py-3">
               {% with field='number' %}
                 {% if u_sort == field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?u_sort=-number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Number ▲</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?u_sort=-number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Number" %} ▲</a>
                 {% elif u_sort == '-'|add:field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Number ▼</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Number" %} ▼</a>
                 {% else %}
-                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Number</a>
+                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Number" %}</a>
                 {% endif %}
               {% endwith %}
             </th>
             <th class="px-4 py-3">
               {% with field='floor' %}
                 {% if u_sort == field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?u_sort=-floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor ▲</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?u_sort=-floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Floor" %} ▲</a>
                 {% elif u_sort == '-'|add:field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor ▼</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Floor" %} ▼</a>
                 {% else %}
-                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Floor</a>
+                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Floor" %}</a>
                 {% endif %}
               {% endwith %}
             </th>
-            <th class="px-4 py-3">Apartment owner</th>
-            <th class="px-4 py-3">Contact</th>
-            <th class="px-4 py-3 text-right">Actions</th>
+            <th class="px-4 py-3">{% trans "Apartment owner" %}</th>
+            <th class="px-4 py-3">{% trans "Contact" %}</th>
+            <th class="px-4 py-3 text-right">{% trans "Actions" %}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -151,12 +154,12 @@
               <td class="px-4 py-3">{{ u.owner_name|default:"—" }}</td>
               <td class="px-4 py-3">{{ u.contact_phone|default:"—" }}</td>
               <td class="px-4 py-3 text-right">
-                <a class="btn btn-danger btn-sm" href="{% url 'unit_delete' u.id %}">Delete</a>
+                <a class="btn btn-danger btn-sm" href="{% url 'unit_delete' u.id %}">{% trans "Delete" %}</a>
               </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="5" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">No units.</td>
+              <td colspan="5" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">{% trans "No units." %}</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -167,36 +170,36 @@
       <nav class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center gap-2">
           {% if units_page.has_previous %}
-            <a class="btn btn-secondary" href="?u_page={{ units_page.previous_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">‹ Prev</a>
+            <a class="btn btn-secondary" href="?u_page={{ units_page.previous_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">‹ {% trans "Prev" %}</a>
           {% else %}
-            <span class="btn is-disabled">‹ Prev</span>
+            <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
           {% endif %}
           {% if units_page.has_next %}
-            <a class="btn btn-secondary" href="?u_page={{ units_page.next_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">Next ›</a>
+            <a class="btn btn-secondary" href="?u_page={{ units_page.next_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Next" %} ›</a>
           {% else %}
-            <span class="btn is-disabled">Next ›</span>
+            <span class="btn is-disabled">{% trans "Next" %} ›</span>
           {% endif %}
         </div>
-        <span class="text-sm text-slate-500 dark:text-slate-300">Page {{ units_page.number }} of {{ units_page.paginator.num_pages }}</span>
+        <span class="text-sm text-slate-500 dark:text-slate-300">{% blocktrans %}Page {{ units_page.number }} of {{ units_page.paginator.num_pages }}{% endblocktrans %}</span>
       </nav>
     {% endif %}
   </section>
 
   <section class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-2xl font-semibold text-brand-foreground dark:text-white">Work orders</h2>
-      <a class="btn" href="{% url 'work_order_create' %}?building={{ building.id }}">Add work order</a>
+      <h2 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Work orders" %}</h2>
+      <a class="btn" href="{% url 'work_order_create' %}?building={{ building.id }}">{% trans "Add work order" %}</a>
     </div>
 
     <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
       <div class="flex flex-col gap-2 md:flex-row md:items-center">
-        <label for="id_w_q" class="sr-only">Search work orders</label>
-        <input id="id_w_q" class="input" type="text" name="w_q" value="{{ w_q }}" placeholder="Title or description"/>
-        <button class="btn md:ml-2 md:mt-0" type="submit">Filter</button>
+        <label for="id_w_q" class="sr-only">{% trans "Search work orders" %}</label>
+        <input id="id_w_q" class="input" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
+        <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
       </div>
 
       <div class="flex items-center gap-2 md:justify-end">
-        <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">Page size</label>
+        <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
         <select id="id_w_per" name="w_per" onchange="this.form.submit()" class="input w-24">
           <option value="10"  {% if w_per|add:0 == 10  %}selected{% endif %}>10</option>
           <option value="20"  {% if w_per|add:0 == 20  %}selected{% endif %}>20</option>
@@ -206,9 +209,9 @@
       </div>
 
       <div class="flex items-center gap-2 md:justify-end">
-        <label for="id_w_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">Status</label>
+        <label for="id_w_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
         <select id="id_w_status" name="w_status" onchange="this.form.submit()" class="input w-32">
-          <option value="" {% if not w_status %}selected{% endif %}>All</option>
+          <option value="" {% if not w_status %}selected{% endif %}>{% trans "All" %}</option>
           {% if w_status_choices %}
             {% for v, label in w_status_choices %}
               <option value="{{ v }}" {% if w_status == v %}selected{% endif %}>{{ label }}</option>
@@ -242,32 +245,32 @@
             </div>
             <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
               <div>
-                <dt class="font-semibold text-slate-500 dark:text-slate-400">Unit</dt>
+                <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Unit" %}</dt>
                 <dd>{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</dd>
               </div>
               <div>
-                <dt class="font-semibold text-slate-500 dark:text-slate-400">Deadline</dt>
+                <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Deadline" %}</dt>
                 <dd>{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</dd>
               </div>
               <div>
-                <dt class="font-semibold text-slate-500 dark:text-slate-400">Created</dt>
+                <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Created" %}</dt>
                 <dd>{{ w.created_at|date:"Y-m-d" }}</dd>
               </div>
             </dl>
             <div class="flex gap-2">
-              <a class="btn btn-secondary btn-sm" href="{% url 'work_order_update' w.id %}?building={{ building.id }}">Edit</a>
+              <a class="btn btn-secondary btn-sm" href="{% url 'work_order_update' w.id %}?building={{ building.id }}">{% trans "Edit" %}</a>
               {% if w.status == 'DONE' and not w.archived_at %}
                 <form action="{% url 'work_order_archive' w.id %}?building={{ building.id }}" method="post" class="inline-flex">
                   {% csrf_token %}
-                  <button class="btn btn-secondary btn-sm">Archive</button>
+                  <button class="btn btn-secondary btn-sm">{% trans "Archive" %}</button>
                 </form>
               {% endif %}
-              <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}?building={{ building.id }}">Delete</a>
+              <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}?building={{ building.id }}">{% trans "Delete" %}</a>
             </div>
           </article>
         {% endfor %}
       {% else %}
-        <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">No work orders for this building.</p>
+        <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">{% trans "No work orders for this building." %}</p>
       {% endif %}
     </div>
 
@@ -275,13 +278,13 @@
       <table class="min-w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900">
         <thead class="bg-slate-50 dark:bg-slate-800">
           <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-            <th class="px-4 py-3">Title</th>
-            <th class="px-4 py-3">Unit</th>
-            <th class="px-4 py-3">Priority</th>
-            <th class="px-4 py-3">Status</th>
-            <th class="px-4 py-3">Deadline</th>
-            <th class="px-4 py-3">Created</th>
-            <th class="px-4 py-3 text-right">Actions</th>
+            <th class="px-4 py-3">{% trans "Title" %}</th>
+            <th class="px-4 py-3">{% trans "Unit" %}</th>
+            <th class="px-4 py-3">{% trans "Priority" %}</th>
+            <th class="px-4 py-3">{% trans "Status" %}</th>
+            <th class="px-4 py-3">{% trans "Deadline" %}</th>
+            <th class="px-4 py-3">{% trans "Created" %}</th>
+            <th class="px-4 py-3 text-right">{% trans "Actions" %}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -304,16 +307,16 @@
                   {% if w.status == 'DONE' and not w.archived_at %}
                     <form action="{% url 'work_order_archive' w.id %}?building={{ building.id }}" method="post" class="inline-flex">
                       {% csrf_token %}
-                      <button class="btn btn-secondary btn-sm">Archive</button>
+                  <button class="btn btn-secondary btn-sm">{% trans "Archive" %}</button>
                     </form>
                   {% endif %}
-                  <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}?building={{ building.id }}">Delete</a>
+                  <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}?building={{ building.id }}">{% trans "Delete" %}</a>
                 </td>
               </tr>
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="7" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">No work orders for this building.</td>
+              <td colspan="7" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">{% trans "No work orders for this building." %}</td>
             </tr>
           {% endif %}
         </tbody>
@@ -324,17 +327,17 @@
       <nav class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center gap-2">
           {% if workorders_page.has_previous %}
-            <a class="btn btn-secondary" href="?w_page={{ workorders_page.previous_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">‹ Prev</a>
+            <a class="btn btn-secondary" href="?w_page={{ workorders_page.previous_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">‹ {% trans "Prev" %}</a>
           {% else %}
-            <span class="btn is-disabled">‹ Prev</span>
+            <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
           {% endif %}
           {% if workorders_page.has_next %}
-            <a class="btn btn-secondary" href="?w_page={{ workorders_page.next_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">Next ›</a>
+            <a class="btn btn-secondary" href="?w_page={{ workorders_page.next_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">{% trans "Next" %} ›</a>
           {% else %}
-            <span class="btn is-disabled">Next ›</span>
+            <span class="btn is-disabled">{% trans "Next" %} ›</span>
           {% endif %}
         </div>
-        <span class="text-sm text-slate-500 dark:text-slate-300">Page {{ workorders_page.number }} of {{ workorders_page.paginator.num_pages }}</span>
+        <span class="text-sm text-slate-500 dark:text-slate-300">{% blocktrans %}Page {{ workorders_page.number }} of {{ workorders_page.paginator.num_pages }}{% endblocktrans %}</span>
       </nav>
     {% endif %}
   </section>

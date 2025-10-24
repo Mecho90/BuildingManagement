@@ -1,16 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Login · Building Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Login" %} · {% trans "Building Management" %}{% endblock %}
 
 {# Hide topbar content only on this page #}
 {% block topbar_left %}{% endblock %}
-{% block topbar_right %}{% endblock %}
+{% block topbar_right %}
+  {% get_current_language as LANGUAGE_CODE %}
+  {% get_available_languages as AVAILABLE_LANGUAGES %}
+  <form action="{% url 'set_language' %}" method="post" class="inline-flex items-center">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}"/>
+    <label for="id_language_login" class="sr-only">{% trans "Language" %}</label>
+    <select id="id_language_login" name="language" class="btn btn-secondary btn-sm appearance-none pr-8" onchange="this.form.submit()">
+      {% for code, name in AVAILABLE_LANGUAGES %}
+        <option value="{{ code }}" {% if code == LANGUAGE_CODE %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+{% endblock %}
 
 {% block content %}
 <section class="flex min-h-[60vh] w-full items-center justify-center px-4">
   <div class="w-full max-w-md space-y-6 rounded-2xl bg-white p-6 shadow-card ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
     <header class="space-y-2 text-center">
-      <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">Sign in</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400">Enter your credentials to access Building Management.</p>
+      <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Sign in" %}</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Enter your credentials to access Building Management." %}</p>
     </header>
 
     {% if form.non_field_errors %}
@@ -25,7 +39,7 @@
       {% csrf_token %}
 
       <div class="space-y-1">
-        <label for="{{ form.username.id_for_label }}">Username</label>
+        <label for="{{ form.username.id_for_label }}">{% trans "Username" %}</label>
         {{ form.username }}
         {% if form.username.errors %}
           <div class="errors">
@@ -35,7 +49,7 @@
       </div>
 
       <div class="space-y-1">
-        <label for="{{ form.password.id_for_label }}">Password</label>
+        <label for="{{ form.password.id_for_label }}">{% trans "Password" %}</label>
         {{ form.password }}
         {% if form.password.errors %}
           <div class="errors">
@@ -44,7 +58,7 @@
         {% endif %}
       </div>
 
-      <button class="btn w-full justify-center" type="submit">Sign in</button>
+      <button class="btn w-full justify-center" type="submit">{% trans "Sign in" %}</button>
     </form>
   </div>
 </section>

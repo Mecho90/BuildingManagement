@@ -20,6 +20,31 @@ Responsive Django/Tailwind UI for managing buildings, units, and work orders.
 
 Tailwind is configured with purge-aware `content` globs so unused utilities are removed in the production bundle.
 
+## Internationalization
+
+Django’s translation tooling is enabled for English (`en`) and Bulgarian (`bg`).
+
+1. Add/refresh message catalogs:
+   ```bash
+   export DATABASE_URL=postgres://building_mgmt:building_mgmt@localhost:5432/building_mgmt  # required for settings import
+   python manage.py makemessages -l en -l bg
+   ```
+2. Edit the generated `locale/<lang>/LC_MESSAGES/django.po` files.
+3. Compile compiled catalogs:
+   ```bash
+   python manage.py compilemessages
+   ```
+
+The language switcher can use Django’s built-in `set_language` view (POST to `/i18n/setlang/` with `language=en` or `language=bg`).
+
+For in-browser translation editing, install [django-rosetta](https://github.com/mbi/django-rosetta) and point staff users to `/rosetta/` (see “i18n Tooling” below).
+
+### CI/Automation
+
+- Lint `.po` files with `python manage.py makemessages --check` (fails on syntax errors)
+- Ensure compiled catalogs are up-to-date before deployment (`python manage.py compilemessages --check`)
+Add these commands to your CI job after installing dependencies.
+
 ## Database Configuration
 
 The application now requires PostgreSQL. For local development:

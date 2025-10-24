@@ -1,17 +1,18 @@
 {% extends "base.html" %}
+{% load i18n %}
 
-{% block title %}Delete {{ object_verbose_name|default:'item'|capfirst }} · Building Management{% endblock %}
+{% block title %}{% blocktrans with name=object_verbose_name|default:_('item')|capfirst %}Delete {{ name }}{% endblocktrans %} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
   <section>
-    <h2 class="mb-2">Delete {{ object_verbose_name|default:'item'|capfirst }}</h2>
+    <h2 class="mb-2">{% blocktrans with name=object_verbose_name|default:_('item')|capfirst %}Delete {{ name }}{% endblocktrans %}</h2>
 
     <p class="mb-2">
-      Are you sure you want to delete
+      {% trans "Are you sure you want to delete" %}
       <strong>
         {# Prefer a readable identifier if present #}
         {% if object_model_name == 'unit' %}
-          Unit {{ object.number }}
+          {% blocktrans with number=object.number %}Unit {{ number }}{% endblocktrans %}
         {% elif object_model_name == 'building' %}
           {{ object.name }}
         {% else %}
@@ -19,24 +20,24 @@
         {% endif %}
       </strong>
       {% if object_model_name == 'unit' and object.building %}
-        in <strong>{{ object.building.name }}</strong>
+        {% blocktrans with name=object.building.name %}in <strong>{{ name }}</strong>{% endblocktrans %}
       {% endif %}
       ?
-      This action cannot be undone.
+      {% trans "This action cannot be undone." %}
     </p>
 
     <form method="post" class="mt-2">
       {% csrf_token %}
-      <button class="btn btn-danger" type="submit">Yes, delete</button>
+      <button class="btn btn-danger" type="submit">{% trans "Yes, delete" %}</button>
 
       {% if cancel_url %}
-        <a class="btn btn-secondary" href="{{ cancel_url }}">Cancel</a>
+        <a class="btn btn-secondary" href="{{ cancel_url }}">{% trans "Cancel" %}</a>
       {% else %}
         {# Sensible defaults if the view didn't pass cancel_url #}
         {% if object_model_name == 'unit' and object.building_id %}
-          <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">Cancel</a>
+          <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">{% trans "Cancel" %}</a>
         {% else %}
-          <a class="btn btn-secondary" href="{% url 'buildings_list' %}">Cancel</a>
+          <a class="btn btn-secondary" href="{% url 'buildings_list' %}">{% trans "Cancel" %}</a>
         {% endif %}
       {% endif %}
     </form>

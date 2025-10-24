@@ -1,10 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{% if form.instance.pk %}Edit Work Order{% else %}New Work Order{% endif %} · Building Management{% endblock %}
+{% load i18n %}
+{% block title %}{% if form.instance.pk %}{% trans "Edit Work Order" %}{% else %}{% trans "New Work Order" %}{% endif %} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
-  {% with t=form.instance.pk|yesno:"Edit Work Order,New Work Order" %}
-    {% include "core/_form_layout.html" with form=form title=t subtitle="" cancel_url=cancel_url %}
-  {% endwith %}
+  {% if form.instance.pk %}
+    {% include "core/_form_layout.html" with form=form title=_('Edit Work Order') subtitle="" cancel_url=cancel_url %}
+  {% else %}
+    {% include "core/_form_layout.html" with form=form title=_('New Work Order') subtitle="" cancel_url=cancel_url %}
+  {% endif %}
 {% endblock %}
 
 {% block extra_js %}

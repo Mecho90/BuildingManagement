@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -30,6 +31,7 @@ AUTO_FIX_CORE_SCHEMA = True  # dev helper
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     # dev-only middleware below is added when DEBUG is True
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -161,9 +163,15 @@ LOGIN_REDIRECT_URL = "buildings_list"
 LOGOUT_REDIRECT_URL = "login"
 
 # --- i18n/time ---
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en"
+LANGUAGES = [
+    ("en", _("English")),
+    ("bg", _("Bulgarian")),
+]
+LOCALE_PATHS = [BASE_DIR / "locale"]
 TIME_ZONE = "Europe/Sofia"
 USE_I18N = True
+USE_L10N = True
 USE_TZ = True
 
 # --- Static files (CSS/JS/images) ---

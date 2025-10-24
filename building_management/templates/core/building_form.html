@@ -1,11 +1,14 @@
 {% extends "base.html" %}
+{% load i18n %}
 
 {% block title %}
-  {% if form.instance.pk %}Edit Building{% else %}New Building{% endif %} · Building Management
+  {% if form.instance.pk %}{% trans "Edit Building" %}{% else %}{% trans "New Building" %}{% endif %} · {% trans "Building Management" %}
 {% endblock %}
 
 {% block content %}
-  {% with page_title=form.instance.pk|yesno:"Edit Building,New Building" %}
-    {% include "core/_form_layout.html" with form=form title=page_title subtitle="" cancel_url=cancel_url %}
-  {% endwith %}
+  {% if form.instance.pk %}
+    {% include "core/_form_layout.html" with form=form title=_('Edit Building') subtitle="" cancel_url=cancel_url %}
+  {% else %}
+    {% include "core/_form_layout.html" with form=form title=_('New Building') subtitle="" cancel_url=cancel_url %}
+  {% endif %}
 {% endblock %}

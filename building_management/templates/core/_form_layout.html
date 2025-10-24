@@ -1,3 +1,4 @@
+{% load i18n %}
 {# Generic form layout used by all create/update pages #}
 <section class="space-y-6">
   <header class="space-y-1">
@@ -51,8 +52,8 @@
     </div>
 
     <div class="flex flex-wrap gap-3">
-      <button class="btn" type="submit">Save</button>
-      <a class="btn" href="{{ cancel_url|default:'javascript:history.back()' }}">Cancel</a>
+      <button class="btn" type="submit">{% trans "Save" %}</button>
+      <a class="btn" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>
     </div>
   </form>
 </section>

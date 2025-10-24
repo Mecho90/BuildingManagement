@@ -1,38 +1,40 @@
 {% extends "base.html" %}
-{% block title %}Users · Building Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Users" %} · {% trans "Building Management" %}{% endblock %}
 {% block content %}
-<h2>Users</h2>
+<h2>{% trans "Users" %}</h2>
 <form method="get" style="margin:.5rem 0 1rem;">
-  <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search username, email, name" />
-  <button class="btn" type="submit">Search</button>
-  {% if request.GET.q %}<a class="btn" href="{% url 'users_list' %}">Clear</a>{% endif %}
+  <input type="text" name="q" value="{{ request.GET.q }}" placeholder="{% trans "Search username, email, name" %}" />
+  <button class="btn" type="submit">{% trans "Search" %}</button>
+  {% if request.GET.q %}<a class="btn" href="{% url 'users_list' %}">{% trans "Clear" %}</a>{% endif %}
 </form>
 <table>
-  <thead><tr><th>Username</th><th>Name</th><th>Email</th><th>Active</th><th>Staff</th><th>Superuser</th><th>Last Login</th></tr></thead>
+  <thead><tr><th>{% trans "Username" %}</th><th>{% trans "Name" %}</th><th>{% trans "Email" %}</th><th>{% trans "Active" %}</th><th>{% trans "Staff" %}</th><th>{% trans "Superuser" %}</th><th>{% trans "Last Login" %}</th></tr></thead>
   <tbody>
   {% for u in users %}
     <tr>
       <td>{{ u.username }}</td>
       <td>{{ u.first_name }} {{ u.last_name }}</td>
       <td>{{ u.email }}</td>
-      <td>{{ u.is_active }}</td>
-      <td>{{ u.is_staff }}</td>
-      <td>{{ u.is_superuser }}</td>
+      {% trans "Yes,No" as yesno_choices %}
+      <td>{{ u.is_active|yesno:yesno_choices }}</td>
+      <td>{{ u.is_staff|yesno:yesno_choices }}</td>
+      <td>{{ u.is_superuser|yesno:yesno_choices }}</td>
       <td>{{ u.last_login|default:"—" }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="7">No users found.</td></tr>
+    <tr><td colspan="7">{% trans "No users found." %}</td></tr>
   {% endfor %}
   </tbody>
 </table>
 {% if is_paginated %}
   <div style="margin-top:1rem;">
     {% if page_obj.has_previous %}
-      <a class="btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}page={{ page_obj.previous_page_number }}">Prev</a>
+      <a class="btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Prev" %}</a>
     {% endif %}
-    <span>Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+    <span>{% blocktrans %}Page {{ page_obj.number }} of {{ paginator.num_pages }}{% endblocktrans %}</span>
     {% if page_obj.has_next %}
-      <a class="btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+      <a class="btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
     {% endif %}
   </div>
 {% endif %}

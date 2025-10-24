@@ -1,21 +1,23 @@
 {% extends "base.html" %}
-{% block title %}User: {{ user_obj.username }} · Building Management{% endblock %}
+{% load i18n %}
+{% block title %}{% blocktrans with username=user_obj.username %}User: {{ username }}{% endblocktrans %} · {% trans "Building Management" %}{% endblock %}
 {% block content %}
-<p><a class="btn" href="{% url 'users_list' %}">← Back to Users</a></p>
-<h2>User: {{ user_obj.username }}</h2>
+{% trans "Yes,No" as yesno_choices %}
+<p><a class="btn" href="{% url 'users_list' %}">← {% trans "Back to Users" %}</a></p>
+<h2>{% blocktrans with username=user_obj.username %}User: {{ username }}{% endblocktrans %}</h2>
 <ul>
-  <li><strong>Full name:</strong> {{ user_obj.first_name }} {{ user_obj.last_name }}</li>
-  <li><strong>Email:</strong> {{ user_obj.email }}</li>
-  <li><strong>Active:</strong> {{ user_obj.is_active }}</li>
-  <li><strong>Staff:</strong> {{ user_obj.is_staff }}</li>
-  <li><strong>Superuser:</strong> {{ user_obj.is_superuser }}</li>
-  <li><strong>Joined:</strong> {{ user_obj.date_joined }}</li>
-  <li><strong>Last login:</strong> {{ user_obj.last_login|default:"—" }}</li>
+  <li><strong>{% trans "Full name" %}:</strong> {{ user_obj.first_name }} {{ user_obj.last_name }}</li>
+  <li><strong>{% trans "Email" %}:</strong> {{ user_obj.email }}</li>
+  <li><strong>{% trans "Active" %}:</strong> {{ user_obj.is_active|yesno:yesno_choices }}</li>
+  <li><strong>{% trans "Staff" %}:</strong> {{ user_obj.is_staff|yesno:yesno_choices }}</li>
+  <li><strong>{% trans "Superuser" %}:</strong> {{ user_obj.is_superuser|yesno:yesno_choices }}</li>
+  <li><strong>{% trans "Joined" %}:</strong> {{ user_obj.date_joined }}</li>
+  <li><strong>{% trans "Last login" %}:</strong> {{ user_obj.last_login|default:"—" }}</li>
 </ul>
 <p>
-  <a class="btn" href="{% url 'user_password_reset' user_obj.id %}">Reset Password</a>
+  <a class="btn" href="{% url 'user_password_reset' user_obj.id %}">{% trans "Reset Password" %}</a>
   {% if request.user.id != user_obj.id %}
-    <a class="btn" href="{% url 'user_delete' user_obj.id %}">Delete</a>
+    <a class="btn" href="{% url 'user_delete' user_obj.id %}">{% trans "Delete" %}</a>
   {% endif %}
 </p>
 {% endblock %}

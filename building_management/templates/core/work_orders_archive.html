@@ -1,13 +1,14 @@
 {# path: templates/core/work_orders_archive.html #}
 {% extends "base.html" %}
-{% block title %}Archived Work Orders · Building Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Archived Work Orders" %} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
 <section class="space-y-8">
   <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
-      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">Archived Work Orders</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400">Review completed and archived work orders grouped by building.</p>
+      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{% trans "Archived Work Orders" %}</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Review completed and archived work orders grouped by building." %}</p>
     </div>
   </div>
 
@@ -21,20 +22,20 @@
           type="text"
           name="q"
           value="{{ q }}"
-          placeholder="Title, description, or building"
+          placeholder="{% trans "Title, description, or building" %}"
         />
-        <button class="btn md:ml-2 md:mt-0" type="submit">Filter</button>
+        <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
         {% if q or owner or sort != 'archived_desc' %}
-          <a class="btn btn-secondary md:mt-0" href="{% url 'work_orders_archive' %}">Reset</a>
+          <a class="btn btn-secondary md:mt-0" href="{% url 'work_orders_archive' %}">{% trans "Reset" %}</a>
         {% endif %}
       </div>
     </div>
 
     {% if owner_choices %}
       <div class="flex flex-col gap-2">
-        <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">Owner</label>
+        <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
         <select id="id_owner" name="owner" onchange="this.form.submit()" class="input">
-          <option value="" {% if not owner %}selected{% endif %}>All</option>
+          <option value="" {% if not owner %}selected{% endif %}>{% trans "All" %}</option>
           {% for opt in owner_choices %}
             <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
           {% endfor %}
@@ -45,7 +46,7 @@
     {% endif %}
 
     <div class="flex flex-col gap-2">
-      <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">Sort</label>
+      <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
       <select id="id_sort" name="sort" onchange="this.form.submit()" class="input">
         {% for value, label in sort_choices %}
           <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
@@ -69,7 +70,7 @@
                 {% endif %}
               </div>
               <div class="text-sm text-slate-500 dark:text-slate-300 md:text-right">
-                <span class="font-semibold text-slate-600 dark:text-slate-200">Owner:</span>
+                <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Owner" %}:</span>
                 {% with owner=building.owner %}
                   {% if owner %}
                     {{ owner.get_full_name|default:owner.username }}
@@ -84,13 +85,13 @@
               <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                 <thead class="bg-slate-50 dark:bg-slate-800">
                   <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                    <th class="px-4 py-3">Title</th>
-                    <th class="px-4 py-3">Unit</th>
-                    <th class="px-4 py-3">Priority</th>
-                    <th class="px-4 py-3">Status</th>
-                    <th class="px-4 py-3">Created</th>
-                    <th class="px-4 py-3">Archived</th>
-                    <th class="px-4 py-3">Owner</th>
+                    <th class="px-4 py-3">{% trans "Title" %}</th>
+                    <th class="px-4 py-3">{% trans "Unit" %}</th>
+                    <th class="px-4 py-3">{% trans "Priority" %}</th>
+                    <th class="px-4 py-3">{% trans "Status" %}</th>
+                    <th class="px-4 py-3">{% trans "Created" %}</th>
+                    <th class="px-4 py-3">{% trans "Archived" %}</th>
+                    <th class="px-4 py-3">{% trans "Owner" %}</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -138,7 +139,7 @@
     </div>
   {% else %}
     <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-      No archived work orders yet.
+      {% trans "No archived work orders yet." %}
     </p>
   {% endif %}
 </section>

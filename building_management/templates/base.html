@@ -1,11 +1,12 @@
 {% load static %}
+{% load i18n %}
 <!doctype html>
-<html lang="en" class="h-full {% if theme == 'dark' %}dark{% endif %}">
+<html lang="{{ LANGUAGE_CODE|default:'en' }}" class="h-full {% if theme == 'dark' %}dark{% endif %}">
   <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
-    <title>{% block title %}Building Management{% endblock %}</title>
+    <title>{% block title %}{% trans "Building Management" %}{% endblock %}</title>
 
     <link rel="stylesheet" href="{% static 'css/dist.css' %}?v={% now 'U' %}"/>
     {% block extra_css %}{% endblock %}
@@ -17,15 +18,15 @@
         <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <nav class="flex flex-1 flex-wrap items-center gap-4" aria-label="Primary">
             {% block topbar_left %}
-              <a href="{% url 'buildings_list' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">Buildings</a>
+              <a href="{% url 'buildings_list' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Buildings" %}</a>
               {% if work_orders_enabled and work_orders_url %}
-                <a href="{{ work_orders_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">Work Orders</a>
+                <a href="{{ work_orders_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Work Orders" %}</a>
               {% endif %}
               {% if work_orders_archive_enabled and work_orders_archive_url %}
-                <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">Archive</a>
+                <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Archive" %}</a>
               {% endif %}
               {% if user.is_staff %}
-                <a href="{% url 'admin:index' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">Admin Panel</a>
+                <a href="{% url 'admin:index' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Admin Panel" %}</a>
               {% endif %}
             {% endblock %}
           </nav>
@@ -34,19 +35,19 @@
             {% block topbar_right %}
               {% if user.is_authenticated %}
                 <time datetime="{% now 'c' %}" class="font-medium">{% now 'D, M j, Y' %}</time>
-                <span class="hidden sm:inline-flex">Welcome, {{ user.get_full_name|default:user.username }}</span>
+                <span class="hidden sm:inline-flex">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>
                 <form action="{% url 'logout' %}" method="post" class="inline-flex">
                   {% csrf_token %}
-                  <button type="submit" class="btn btn-secondary btn-sm">Logout</button>
+                  <button type="submit" class="btn btn-secondary btn-sm">{% trans "Logout" %}</button>
                 </form>
                 <a class="btn btn-secondary btn-sm" href="{% url 'toggle_theme' %}">
-                  {% if theme == 'dark' %}Light mode{% else %}Dark mode{% endif %}
+                  {% if theme == 'dark' %}{% trans "Light mode" %}{% else %}{% trans "Dark mode" %}{% endif %}
                 </a>
               {% else %}
                 <a class="btn btn-secondary btn-sm" href="{% url 'toggle_theme' %}">
-                  {% if theme == 'dark' %}Light mode{% else %}Dark mode{% endif %}
+                  {% if theme == 'dark' %}{% trans "Light mode" %}{% else %}{% trans "Dark mode" %}{% endif %}
                 </a>
-                <a class="btn" href="{% url 'login' %}">Login</a>
+                <a class="btn" href="{% url 'login' %}">{% trans "Login" %}</a>
               {% endif %}
             {% endblock %}
           </div>

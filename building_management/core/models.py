@@ -8,6 +8,7 @@ from django.db import models
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 
 # ---------------------------------------------------------------------------
@@ -74,18 +75,18 @@ class TimeStampedModel(models.Model):
 
 class Building(TimeStampedModel):
     class Role(models.TextChoices):
-        TECH_SUPPORT = "TECH_SUPPORT", "Technical Support"
-        PROPERTY_MANAGER = "PROPERTY_MANAGER", "Property Manager"
-        EXTERNAL_CONTRACTOR = "EXTERNAL_CONTRACTOR", "External Contractor"
+        TECH_SUPPORT = "TECH_SUPPORT", _( "Technical Support" )
+        PROPERTY_MANAGER = "PROPERTY_MANAGER", _( "Property Manager" )
+        EXTERNAL_CONTRACTOR = "EXTERNAL_CONTRACTOR", _( "External Contractor" )
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="buildings",
     )
-    name = models.CharField(max_length=255, db_index=True)
-    address = models.CharField(max_length=512, blank=True)
-    description = models.TextField(blank=True)
+    name = models.CharField(max_length=255, db_index=True, verbose_name=_("Name"))
+    address = models.CharField(max_length=512, blank=True, verbose_name=_("Address"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
     role = models.CharField(
         max_length=32,
         choices=Role.choices,
@@ -125,7 +126,7 @@ class Building(TimeStampedModel):
 
 phone_validator = RegexValidator(
     r"^\+?\d{7,15}$",
-    "Enter a valid phone number (digits with optional leading +, 7–15 digits).",
+    _( "Enter a valid phone number (digits with optional leading +, 7–15 digits)." ),
 )
 
 
@@ -143,16 +144,16 @@ class Unit(TimeStampedModel):
     )
 
     # Apartment/Unit number (unique within the building)
-    number = models.CharField("Apartment number", max_length=32)
+    number = models.CharField(_("Apartment number"), max_length=32)
 
     floor = models.IntegerField(null=True, blank=True)
 
     # The person who owns the apartment
-    owner_name = models.CharField("Apartment owner", max_length=255, blank=True)
+    owner_name = models.CharField(_("Apartment owner"), max_length=255, blank=True)
 
     # Private contact field (not shown in list)
     contact_phone = models.CharField(
-        "Contact phone",
+        _("Contact phone"),
         max_length=32,
         blank=True,
         validators=[phone_validator]
@@ -161,7 +162,7 @@ class Unit(TimeStampedModel):
     is_occupied = models.BooleanField(default=False)
 
     # Optional description of the unit
-    description = models.TextField(blank=True)
+    description = models.TextField(blank=True, verbose_name=_("Description"))
 
     objects = UnitQuerySet.as_manager()
 
@@ -198,7 +199,7 @@ class Unit(TimeStampedModel):
             qs = qs.exclude(pk=self.pk)
         if qs.exists():
             raise ValidationError(
-                {"number": "Apartment number must be unique within this building."}
+                {"number": _( "Apartment number must be unique within this building." )}
             )
 
     def save(self, *args, **kwargs):
@@ -212,14 +213,14 @@ class Unit(TimeStampedModel):
 
 class WorkOrder(TimeStampedModel):
     class Status(models.TextChoices):
-        OPEN = "OPEN", "Open"
-        IN_PROGRESS = "IN_PROGRESS", "In progress"
-        DONE = "DONE", "Done"
+        OPEN = "OPEN", _( "Open" )
+        IN_PROGRESS = "IN_PROGRESS", _( "In progress" )
+        DONE = "DONE", _( "Done" )
 
     class Priority(models.TextChoices):
-        LOW = "LOW", "Low"
-        MEDIUM = "MEDIUM", "Medium"
-        HIGH = "HIGH", "High"
+        LOW = "LOW", _( "Low" )
+        MEDIUM = "MEDIUM", _( "Medium" )
+        HIGH = "HIGH", _( "High" )
 
     building = models.ForeignKey(
         Building,
@@ -234,8 +235,8 @@ class WorkOrder(TimeStampedModel):
         related_name="work_orders",
     )
 
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
+    title = models.CharField(max_length=255, verbose_name=_("Title"))
+    description = models.TextField(blank=True, verbose_name=_("Description"))
 
     status = models.CharField(
         max_length=20,
@@ -275,7 +276,7 @@ class WorkOrder(TimeStampedModel):
         # If a unit is set but building is missing/mismatched, align it
         if self.unit_id and self.building_id and self.unit.building_id != self.building_id:
             raise ValidationError(
-                {"unit": "Selected unit does not belong to the selected building."}
+                {"unit": _( "Selected unit does not belong to the selected building." )}
             )
 
     def save(self, *args, **kwargs):

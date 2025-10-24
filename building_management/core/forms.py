@@ -5,6 +5,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from .models import Building, Unit, WorkOrder
 
@@ -93,7 +94,7 @@ class UnitForm(forms.ModelForm):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise forms.ValidationError(
-                    "Apartment number must be unique within this building."
+                    _( "Apartment number must be unique within this building." )
                 )
         return number
 
@@ -107,7 +108,7 @@ class UnitForm(forms.ModelForm):
         # Optional permission safety: only owners/staff can save
         if self._user and not (self._user.is_staff or self._user.is_superuser):
             if obj.building and obj.building.owner_id != self._user.id:
-                raise forms.ValidationError("You don't have permission to edit this unit.")
+                raise forms.ValidationError(_("You don't have permission to edit this unit."))
 
         if commit:
             obj.save()
@@ -187,7 +188,7 @@ class WorkOrderForm(forms.ModelForm):
             self.fields["unit"].widget.attrs.pop("disabled", None)
         else:
             self.fields["unit"].widget.attrs["disabled"] = "disabled"
-            self.fields["unit"].empty_label = "Select a building first"
+            self.fields["unit"].empty_label = _( "Select a building first" )
 
     # ---------- validation ----------
     def clean(self):
@@ -203,16 +204,16 @@ class WorkOrderForm(forms.ModelForm):
 
         # Unit must belong to building
         if building and unit and unit.building_id != building.id:
-            self.add_error("unit", "Selected unit does not belong to the chosen building.")
+                self.add_error("unit", _( "Selected unit does not belong to the chosen building." ))
 
         # Non-staff must own the building
         if self._user and not (self._user.is_staff or self._user.is_superuser) and building:
             if building.owner_id != self._user.id:
-                self.add_error("building", "You cannot create work orders for buildings you do not own.")
+                self.add_error("building", _("You cannot create work orders for buildings you do not own."))
 
         deadline = cleaned.get("deadline")
         if deadline and deadline < timezone.localdate():
-            self.add_error("deadline", "Deadline cannot be in the past.")
+            self.add_error("deadline", _("Deadline cannot be in the past."))
 
         return cleaned
 
@@ -229,7 +230,7 @@ class WorkOrderForm(forms.ModelForm):
         # Extra safety: enforce ownership
         if self._user and not (self._user.is_staff or self._user.is_superuser):
             if obj.building_id and not Building.objects.filter(pk=obj.building_id, owner=self._user).exists():
-                raise ValidationError("You cannot assign work orders to this building.")
+                raise ValidationError(_("You cannot assign work orders to this building."))
 
         if commit:
             obj.save()

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load i18n static %}
 
 {# ------------------ <title> ------------------ #}
 {% block title %}
@@ -7,18 +7,18 @@
      when a building_id exists to avoid RelatedObjectDoesNotExist. #}
   {% if building %}
     {% if form.instance.pk %}
-      Edit Unit · {{ building.name }}
+      {% blocktrans with name=building.name %}Edit Unit · {{ name }}{% endblocktrans %}
     {% else %}
-      New Unit · {{ building.name }}
+      {% blocktrans with name=building.name %}New Unit · {{ name }}{% endblocktrans %}
     {% endif %}
   {% elif form.instance.building_id %}
     {% if form.instance.pk %}
-      Edit Unit · {{ form.instance.building.name }}
+      {% blocktrans with name=form.instance.building.name %}Edit Unit · {{ name }}{% endblocktrans %}
     {% else %}
-      New Unit · {{ form.instance.building.name }}
+      {% blocktrans with name=form.instance.building.name %}New Unit · {{ name }}{% endblocktrans %}
     {% endif %}
   {% else %}
-    {% if form.instance.pk %}Edit Unit{% else %}New Unit{% endif %}
+    {% if form.instance.pk %}{% trans "Edit Unit" %}{% else %}{% trans "New Unit" %}{% endif %}
   {% endif %}
 {% endblock %}
 
@@ -26,30 +26,28 @@
 {% block content %}
   {% if building %}
     {% if form.instance.pk %}
-      {% with page_title="Edit Unit in "|add:building.name %}
-        {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
-      {% endwith %}
+      {% blocktrans with name=building.name asvar page_title %}Edit Unit in {{ name }}{% endblocktrans %}
+      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% else %}
-      {% with page_title="New Unit in "|add:building.name %}
-        {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
-      {% endwith %}
+      {% blocktrans with name=building.name asvar page_title %}New Unit in {{ name }}{% endblocktrans %}
+      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% endif %}
 
   {% elif form.instance.building_id %}
     {% if form.instance.pk %}
-      {% with page_title="Edit Unit in "|add:form.instance.building.name %}
-        {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
-      {% endwith %}
+      {% blocktrans with name=form.instance.building.name asvar page_title %}Edit Unit in {{ name }}{% endblocktrans %}
+      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% else %}
-      {% with page_title="New Unit in "|add:form.instance.building.name %}
-        {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
-      {% endwith %}
+      {% blocktrans with name=form.instance.building.name asvar page_title %}New Unit in {{ name }}{% endblocktrans %}
+      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% endif %}
 
   {% else %}
     {# Robust fallback if no building is available yet #}
-    {% with page_title=form.instance.pk|yesno:"Edit Unit,New Unit" %}
-      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
-    {% endwith %}
+    {% if form.instance.pk %}
+      {% include "core/_form_layout.html" with form=form title=_('Edit Unit') cancel_url=cancel_url %}
+    {% else %}
+      {% include "core/_form_layout.html" with form=form title=_('New Unit') cancel_url=cancel_url %}
+    {% endif %}
   {% endif %}
 {% endblock %}

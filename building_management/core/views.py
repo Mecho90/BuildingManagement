@@ -27,6 +27,7 @@ from django.views.generic import (
 
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.translation import gettext as _
 from .forms import BuildingForm, UnitForm, WorkOrderForm
 from .models import Building, Unit, WorkOrder
 from .views_theme import toggle_theme
@@ -337,7 +338,7 @@ class BuildingCreateView(LoginRequiredMixin, CreateView):
         if not self.request.user.is_staff:
             obj.owner = self.request.user
         obj.save()
-        messages.success(self.request, "Building created.")
+        messages.success(self.request, _( "Building created." ))
         return super().form_valid(form)
 
 
@@ -361,7 +362,7 @@ class BuildingUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             # Safety: prevent tampering with owner
             obj.owner = self.request.user
         obj.save()
-        messages.warning(self.request, "Building updated.")
+        messages.warning(self.request, _( "Building updated." ))
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -378,7 +379,7 @@ class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return _user_can_access_building(self.request.user, building)
 
     def post(self, request, *args, **kwargs):
-        messages.error(request, "Building deleted.")
+        messages.error(request, _( "Building deleted." ))
         return super().post(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -442,7 +443,7 @@ class UnitCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         # form.save() already sets the building; no need to reassign
         form.save()
-        messages.success(self.request, "Unit created.")
+        messages.success(self.request, _( "Unit created." ))
         return redirect("building_detail", pk=self.building.pk)
 
     def get_success_url(self):
@@ -477,7 +478,7 @@ class UnitUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        messages.warning(self.request, "Unit updated.")
+        messages.warning(self.request, _( "Unit updated." ))
         return response
 
     def get_success_url(self):
@@ -501,7 +502,7 @@ class UnitDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return reverse("building_detail", args=[self.building.pk])
 
     def post(self, request, *args, **kwargs):
-        messages.error(request, "Unit deleted.")
+        messages.error(request, _( "Unit deleted." ))
         return super().post(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -652,14 +653,16 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 "owner_choices": getattr(self, "_owner_choices", []),
                 "sort": getattr(self, "_sort", "priority"),
                 "sort_choices": [
-                    ("priority", "Priority (High → Low)"),
-                    ("priority_desc", "Priority (Low → High)"),
-                    ("deadline", "Deadline (Soon → Late)"),
-                    ("deadline_desc", "Deadline (Late → Soon)"),
-                    ("created", "Created (Newest first)"),
-                    ("created_asc", "Created (Oldest first)"),
-                    ("building", "Building (A → Z)"),
-                    ("building_desc", "Building (Z → A)"),
+                    ("priority", _("Priority (High → Low)")),
+                    ("priority_desc", _("Priority (Low → High)")),
+                    ("deadline", _("Deadline (Soon → Late)")),
+                    ("deadline_desc", _("Deadline (Late → Soon)")),
+                    ("created", _("Created (Newest first)")),
+                    ("created_asc", _("Created (Oldest first)")),
+                    ("building", _("Building (A → Z)")),
+                    ("building_desc", _("Building (Z → A)")),
+                    ("owner", _("Owner (A → Z)")),
+                    ("owner_desc", _("Owner (Z → A)")),
                 ],
                 "show_owner_info": self.request.user.is_staff or self.request.user.is_superuser,
             }
@@ -743,7 +746,7 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
         if not _user_can_access_building(self.request.user, obj.building):
             raise Http404()
         obj.save()
-        messages.success(self.request, "Work order created.")
+        messages.success(self.request, _( "Work order created." ))
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -812,7 +815,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             raise Http404()
         obj.save()
         response = super().form_valid(form)
-        messages.warning(self.request, "Work order updated.")
+        messages.warning(self.request, _( "Work order updated." ))
         return response
 
     def get_success_url(self):
@@ -837,7 +840,7 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return reverse_lazy("building_detail", args=[self.object.building_id])
 
     def post(self, request, *args, **kwargs):
-        messages.error(request, "Work order deleted.")
+        messages.error(request, _( "Work order deleted." ))
         return super().post(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
@@ -877,11 +880,11 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
         wo = self.get_object()
 
         if wo.status != WorkOrder.Status.DONE:
-            raise Http404("Only completed work orders can be archived.")
+            raise Http404(_("Only completed work orders can be archived."))
 
         if not wo.is_archived:
             wo.archive()
-            messages.success(request, "Work order archived.")
+            messages.success(request, _( "Work order archived." ))
 
         next_url = _safe_next_url(request)
         if next_url:
@@ -904,14 +907,14 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
     raise_exception = True
 
     _sort_choices = [
-        ("archived_desc", "Archived (Newest first)"),
-        ("archived_asc", "Archived (Oldest first)"),
-        ("created_desc", "Created (Newest first)"),
-        ("created_asc", "Created (Oldest first)"),
-        ("priority", "Priority (High → Low)"),
-        ("priority_desc", "Priority (Low → High)"),
-        ("building_asc", "Building (A → Z)"),
-        ("building_desc", "Building (Z → A)"),
+        ("archived_desc", _("Archived (Newest first)")),
+        ("archived_asc", _("Archived (Oldest first)")),
+        ("created_desc", _("Created (Newest first)")),
+        ("created_asc", _("Created (Oldest first)")),
+        ("priority", _("Priority (High → Low)")),
+        ("priority_desc", _("Priority (Low → High)")),
+        ("building_asc", _("Building (A → Z)")),
+        ("building_desc", _("Building (Z → A)")),
     ]
 
     def test_func(self):

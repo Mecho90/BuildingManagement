@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Delete User · Building Management{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Delete User" %} · {% trans "Building Management" %}{% endblock %}
 {% block content %}
-<h2>Delete User</h2>
-<p>Are you sure you want to delete user <strong>{{ object.username }}</strong>?</p>
+<h2>{% trans "Delete User" %}</h2>
+<p>{% blocktrans with username=object.username %}Are you sure you want to delete user <strong>{{ username }}</strong>?{% endblocktrans %}</p>
 <form method="post">
   {% csrf_token %}
-  <button class="btn" type="submit">Yes, delete</button>
-  <a class="btn" href="{% url 'users_list' %}">Cancel</a>
+  <button class="btn" type="submit">{% trans "Yes, delete" %}</button>
+  <a class="btn" href="{% url 'users_list' %}">{% trans "Cancel" %}</a>
 </form>
 {% endblock %}
