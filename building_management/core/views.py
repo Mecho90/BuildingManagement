@@ -7,6 +7,7 @@ import json
 from itertools import groupby
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -29,6 +30,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from .forms import BuildingForm, UnitForm, WorkOrderForm
 from .models import Building, Unit, WorkOrder
 from .views_theme import toggle_theme
+
+User = get_user_model()
 
 
 # ----------------------------------------------------------------------
@@ -543,8 +546,27 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         qs = (
             WorkOrder.objects.visible_to(user)
             .filter(archived_at__isnull=True)
-            .select_related("building", "unit")
+            .select_related("building__owner", "unit")
         )
+
+        # Build owner choices for staff (before additional filters)
+        self._owner_choices: list[dict[str, str]] = []
+        if user.is_staff or user.is_superuser:
+            owner_ids = list(
+                qs.values_list("building__owner_id", flat=True)
+                  .distinct()
+            )
+            owner_ids = [oid for oid in owner_ids if oid]
+            if owner_ids:
+                owner_qs = (
+                    User.objects.filter(id__in=owner_ids)
+                    .order_by("first_name", "last_name", "username")
+                )
+                for owner in owner_qs:
+                    label = owner.get_full_name() or owner.username
+                    self._owner_choices.append(
+                        {"id": str(owner.id), "label": label}
+                    )
 
         # Priority ordering: High > Medium > Low, then by deadline asc, then newest
         qs = qs.annotate(
@@ -565,10 +587,49 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         if status:
             qs = qs.filter(status=status)
 
-        qs = qs.order_by("priority_order", "deadline", "-pk")
+        owner_param = (request.GET.get("owner") or "").strip()
+        owner_filter = None
+        if owner_param:
+            try:
+                owner_filter = int(owner_param)
+            except (TypeError, ValueError):
+                owner_param = ""
+                owner_filter = None
+
+        if owner_filter:
+            if user.is_staff or user.is_superuser:
+                qs = qs.filter(building__owner_id=owner_filter)
+            elif owner_filter == user.id:
+                qs = qs.filter(building__owner_id=owner_filter)
+            else:
+                owner_param = ""
+                owner_filter = None
+
+        sort_param = (request.GET.get("sort") or "priority").strip()
+        sort_map = {
+            "priority": ("priority_order", "deadline", "-pk"),
+            "priority_desc": ("-priority_order", "-deadline", "-pk"),
+            "deadline": ("deadline", "priority_order", "-pk"),
+            "deadline_desc": ("-deadline", "priority_order", "-pk"),
+            "created": ("-created_at",),
+            "created_asc": ("created_at",),
+            "building": ("building__name", "priority_order", "deadline", "-pk"),
+            "building_desc": ("-building__name", "priority_order", "deadline", "-pk"),
+            "owner": ("building__owner__username", "priority_order", "deadline", "-pk"),
+            "owner_desc": ("-building__owner__username", "priority_order", "deadline", "-pk"),
+        }
+        if sort_param not in sort_map:
+            sort_param = "priority"
+
+        if sort_param in {"owner", "owner_desc"} and not (user.is_staff or user.is_superuser):
+            sort_param = "priority"
+
+        qs = qs.order_by(*sort_map[sort_param])
 
         self._search = search
         self._status = status
+        self._owner = owner_param
+        self._sort = sort_param
 
         return qs
 
@@ -587,8 +648,27 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 "status_choices": WorkOrder.Status.choices,
                 "per": self.get_paginate_by(self.object_list),
                 "per_choices": self._per_choices,
+                "owner": getattr(self, "_owner", ""),
+                "owner_choices": getattr(self, "_owner_choices", []),
+                "sort": getattr(self, "_sort", "priority"),
+                "sort_choices": [
+                    ("priority", "Priority (High → Low)"),
+                    ("priority_desc", "Priority (Low → High)"),
+                    ("deadline", "Deadline (Soon → Late)"),
+                    ("deadline_desc", "Deadline (Late → Soon)"),
+                    ("created", "Created (Newest first)"),
+                    ("created_asc", "Created (Oldest first)"),
+                    ("building", "Building (A → Z)"),
+                    ("building_desc", "Building (Z → A)"),
+                ],
+                "show_owner_info": self.request.user.is_staff or self.request.user.is_superuser,
             }
         )
+        if not (self.request.user.is_staff or self.request.user.is_superuser):
+            ctx["sort_choices"] = [
+                choice for choice in ctx["sort_choices"]
+                if not choice[0].startswith("owner")
+            ]
         return ctx
 
 class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
@@ -823,17 +903,98 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
     context_object_name = "orders"
     raise_exception = True
 
+    _sort_choices = [
+        ("archived_desc", "Archived (Newest first)"),
+        ("archived_asc", "Archived (Oldest first)"),
+        ("created_desc", "Created (Newest first)"),
+        ("created_asc", "Created (Oldest first)"),
+        ("priority", "Priority (High → Low)"),
+        ("priority_desc", "Priority (Low → High)"),
+        ("building_asc", "Building (A → Z)"),
+        ("building_desc", "Building (Z → A)"),
+    ]
+
     def test_func(self):
         user = self.request.user
         return user.is_staff or user.is_superuser
 
     def get_queryset(self):
-        return (
-            WorkOrder.objects.visible_to(self.request.user)
+        request = self.request
+        qs = (
+            WorkOrder.objects.visible_to(request.user)
             .filter(archived_at__isnull=False)
             .select_related("building__owner", "unit")
-            .order_by("building__name", "building_id", "-archived_at", "-id")
         )
+
+        # Annotate priority for sorting
+        qs = qs.annotate(
+            priority_order=Case(
+                When(priority__iexact="high", then=0),
+                When(priority__iexact="medium", then=1),
+                When(priority__iexact="low", then=2),
+                default=3,
+                output_field=IntegerField(),
+            )
+        )
+
+        # Free-text search across title/description/building
+        search = (request.GET.get("q") or "").strip()
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search)
+                | Q(description__icontains=search)
+                | Q(building__name__icontains=search)
+            )
+        self._search = search
+
+        # Owner filter (staff only)
+        owner_ids = list(
+            qs.values_list("building__owner_id", flat=True).distinct()
+        )
+        owner_ids = [oid for oid in owner_ids if oid]
+        owner_qs = (
+            User.objects.filter(id__in=owner_ids)
+            .order_by("first_name", "last_name", "username")
+        )
+        self._owner_choices = [
+            {"id": str(owner.id), "label": owner.get_full_name() or owner.username}
+            for owner in owner_qs
+        ]
+
+        owner_param = (request.GET.get("owner") or "").strip()
+        owner_filter = None
+        if owner_param:
+            try:
+                owner_filter = int(owner_param)
+            except (TypeError, ValueError):
+                owner_param = ""
+                owner_filter = None
+
+        if owner_filter and any(choice["id"] == str(owner_filter) for choice in self._owner_choices):
+            qs = qs.filter(building__owner_id=owner_filter)
+        else:
+            owner_param = ""
+            owner_filter = None
+        self._owner = owner_param
+
+        # Sorting options (always include building so groupby works)
+        sort_param = (request.GET.get("sort") or "archived_desc").strip()
+        sort_map = {
+            "archived_desc": ("building__name", "building_id", "-archived_at", "-id"),
+            "archived_asc": ("building__name", "building_id", "archived_at", "-id"),
+            "created_desc": ("building__name", "building_id", "-created_at", "-id"),
+            "created_asc": ("building__name", "building_id", "created_at", "-id"),
+            "priority": ("building__name", "building_id", "priority_order", "-archived_at", "-id"),
+            "priority_desc": ("building__name", "building_id", "-priority_order", "-archived_at", "-id"),
+            "building_asc": ("building__name", "building_id", "-archived_at", "-id"),
+            "building_desc": ("-building__name", "-building_id", "-archived_at", "-id"),
+        }
+        if sort_param not in sort_map:
+            sort_param = "archived_desc"
+        self._sort = sort_param
+        qs = qs.order_by(*sort_map[sort_param])
+
+        return qs
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -853,6 +1014,11 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
             )
 
         ctx["grouped_orders"] = grouped
+        ctx["q"] = getattr(self, "_search", "")
+        ctx["owner"] = getattr(self, "_owner", "")
+        ctx["owner_choices"] = getattr(self, "_owner_choices", [])
+        ctx["sort"] = getattr(self, "_sort", "archived_desc")
+        ctx["sort_choices"] = self._sort_choices
         return ctx
     
 # ----------------------------------------------------------------------

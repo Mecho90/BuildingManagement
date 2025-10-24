@@ -11,6 +11,49 @@
     </div>
   </div>
 
+  <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-4 md:items-end">
+    <div class="md:col-span-2 flex flex-col gap-2">
+      <label class="sr-only" for="id_q">Search archived work orders</label>
+      <div class="flex flex-col gap-2 md:flex-row md:items-center">
+        <input
+          id="id_q"
+          class="input flex-1"
+          type="text"
+          name="q"
+          value="{{ q }}"
+          placeholder="Title, description, or building"
+        />
+        <button class="btn md:ml-2 md:mt-0" type="submit">Filter</button>
+        {% if q or owner or sort != 'archived_desc' %}
+          <a class="btn btn-secondary md:mt-0" href="{% url 'work_orders_archive' %}">Reset</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if owner_choices %}
+      <div class="flex flex-col gap-2">
+        <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">Owner</label>
+        <select id="id_owner" name="owner" onchange="this.form.submit()" class="input">
+          <option value="" {% if not owner %}selected{% endif %}>All</option>
+          {% for opt in owner_choices %}
+            <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% else %}
+      <div class="hidden md:block"></div>
+    {% endif %}
+
+    <div class="flex flex-col gap-2">
+      <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">Sort</label>
+      <select id="id_sort" name="sort" onchange="this.form.submit()" class="input">
+        {% for value, label in sort_choices %}
+          <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
   {% if grouped_orders %}
     <div class="space-y-6">
       {% for group in grouped_orders %}

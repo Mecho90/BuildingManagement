@@ -12,41 +12,66 @@
     <a class="btn self-start md:self-center" href="{% url 'work_order_create' %}?next={{ request.get_full_path|urlencode }}">Add work order</a>
   </div>
 
-  <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
-    <div class="flex flex-col gap-2 md:flex-row md:items-center">
+  <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-5 md:items-end">
+    <div class="md:col-span-2 flex flex-col gap-2">
       <label class="sr-only" for="id_q">Search work orders</label>
-      <input
-        id="id_q"
-        class="input"
-        type="text"
-        name="q"
-        value="{{ q }}"
-        placeholder="Title or description"
-      />
-      <button class="btn md:ml-2 md:mt-0" type="submit">Filter</button>
+      <div class="flex flex-col gap-2 md:flex-row md:items-center">
+        <input
+          id="id_q"
+          class="input flex-1"
+          type="text"
+          name="q"
+          value="{{ q }}"
+          placeholder="Title or description"
+        />
+        <button class="btn md:ml-2 md:mt-0" type="submit">Filter</button>
+      </div>
     </div>
 
-    <div class="flex items-center gap-2 md:justify-end">
+    <div class="flex flex-col gap-2 md:col-span-1">
       <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">Page size</label>
-      <select id="id_per" name="per" onchange="this.form.submit()" class="input w-24">
+      <select id="id_per" name="per" onchange="this.form.submit()" class="input">
         {% for opt in per_choices %}
           <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
         {% endfor %}
       </select>
     </div>
 
-    <div class="flex items-center gap-2 md:justify-end">
+    <div class="flex flex-col gap-2 md:col-span-1">
       <label for="id_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">Status</label>
-      <select id="id_status" name="status" onchange="this.form.submit()" class="input w-32">
+      <select id="id_status" name="status" onchange="this.form.submit()" class="input">
         <option value="" {% if not status %}selected{% endif %}>All</option>
         {% for val, label in status_choices %}
           <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </div>
+
+    {% if owner_choices %}
+      <div class="flex flex-col gap-2 md:col-span-1">
+        <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">Owner</label>
+        <select id="id_owner" name="owner" onchange="this.form.submit()" class="input">
+          <option value="" {% if not owner %}selected{% endif %}>All</option>
+          {% for opt in owner_choices %}
+            <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% else %}
+      <div class="hidden md:col-span-1 md:block"></div>
+    {% endif %}
+
+    <div class="flex flex-col gap-2 md:col-span-1">
+      <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">Sort</label>
+      <select id="id_sort" name="sort" onchange="this.form.submit()" class="input">
+        {% for value, label in sort_choices %}
+          <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </form>
 
-  <div class="grid gap-4 md:hidden">
+    <div class="grid gap-4 md:hidden">
     {% for w in orders %}
       <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
         <div class="flex items-start justify-between gap-2">
@@ -62,6 +87,22 @@
                 {{ w.building.name }}
               </a>
             </p>
+            {% if show_owner_info %}
+              <p class="text-sm text-slate-500 dark:text-slate-400">
+                <span class="font-semibold text-slate-600 dark:text-slate-200">Owner:</span>
+                {% with owner=w.building.owner %}
+                  {% if owner %}
+                    {{ owner.get_full_name|default:owner.username }}
+                  {% else %}
+                    —
+                  {% endif %}
+                {% endwith %}
+              </p>
+              <p class="text-sm text-slate-500 dark:text-slate-400">
+                <span class="font-semibold text-slate-600 dark:text-slate-200">Role:</span>
+                {{ w.building.get_role_display|default:"—" }}
+              </p>
+            {% endif %}
             <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
               <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ w.get_status_display }}</span>
               <span class="priority-badge {% if w.priority == 'HIGH' %}priority-badge--high{% elif w.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">{{ w.get_priority_display }}</span>
@@ -107,6 +148,10 @@
         <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
           <th class="px-4 py-3">Title</th>
           <th class="px-4 py-3">Building</th>
+          {% if show_owner_info %}
+            <th class="px-4 py-3">Owner</th>
+            <th class="px-4 py-3">Role</th>
+          {% endif %}
           <th class="px-4 py-3">Unit</th>
           <th class="px-4 py-3">Priority</th>
           <th class="px-4 py-3">Status</th>
@@ -126,6 +171,18 @@
                 {{ w.building.name }}
               </a>
             </td>
+            {% if show_owner_info %}
+              <td class="px-4 py-3">
+                {% with owner=w.building.owner %}
+                  {% if owner %}
+                    {{ owner.get_full_name|default:owner.username }}
+                  {% else %}
+                    —
+                  {% endif %}
+                {% endwith %}
+              </td>
+              <td class="px-4 py-3">{{ w.building.get_role_display|default:"—" }}</td>
+            {% endif %}
             <td class="px-4 py-3">
               {% if w.unit_id %}
                 #{{ w.unit.number }}
@@ -157,7 +214,7 @@
           </tr>
         {% empty %}
           <tr>
-            <td colspan="8" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">No work orders.</td>
+            <td colspan="{% if show_owner_info %}10{% else %}8{% endif %}" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">No work orders.</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -168,15 +225,15 @@
     <nav class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div class="flex flex-wrap items-center gap-2">
         {% if page_obj.has_previous %}
-          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page=1">« First</a>
-          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ page_obj.previous_page_number }}">‹ Prev</a>
+          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&owner={{ owner }}&sort={{ sort }}&per={{ per }}&page=1">« First</a>
+          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&owner={{ owner }}&sort={{ sort }}&per={{ per }}&page={{ page_obj.previous_page_number }}">‹ Prev</a>
         {% else %}
           <span class="btn is-disabled">« First</span>
           <span class="btn is-disabled">‹ Prev</span>
         {% endif %}
         {% if page_obj.has_next %}
-          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ page_obj.next_page_number }}">Next ›</a>
-          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&per={{ per }}&page={{ paginator.num_pages }}">Last »</a>
+          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&owner={{ owner }}&sort={{ sort }}&per={{ per }}&page={{ page_obj.next_page_number }}">Next ›</a>
+          <a class="btn btn-secondary" href="?q={{ q|urlencode }}&status={{ status }}&owner={{ owner }}&sort={{ sort }}&per={{ per }}&page={{ paginator.num_pages }}">Last »</a>
         {% else %}
           <span class="btn is-disabled">Next ›</span>
           <span class="btn is-disabled">Last »</span>
