@@ -27,7 +27,7 @@ from django.views.generic import (
 
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, ngettext, gettext_lazy as _lazy
 from .forms import BuildingForm, UnitForm, WorkOrderForm
 from .models import Building, Unit, WorkOrder
 from .views_theme import toggle_theme
@@ -183,7 +183,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
             for wo in upcoming:
                 building = wo.building
                 building_id = wo.building_id
-                building_name = building.name if building_id else "your building"
+                building_name = building.name if building_id else _("your building")
                 owner_label = None
                 if is_admin and building_id:
                     owner = getattr(building, "owner", None)
@@ -191,19 +191,34 @@ class BuildingListView(LoginRequiredMixin, ListView):
                         owner_label = owner.get_full_name() or owner.username
                 days_left = (wo.deadline - today).days
                 if days_left < 0:
-                    due_text = f"overdue by {abs(days_left)} days"
+                    overdue_days = abs(days_left)
+                    due_text = ngettext(
+                        "overdue by %(count)s day",
+                        "overdue by %(count)s days",
+                        overdue_days,
+                    ) % {"count": overdue_days}
                 elif days_left == 0:
-                    due_text = "due today"
+                    due_text = _("due today")
                 elif days_left == 1:
-                    due_text = "due tomorrow"
+                    due_text = _("due tomorrow")
                 else:
-                    due_text = f"due in {days_left} days"
-                message = (
-                    f"{wo.get_priority_display()} priority work order \"{wo.title}\" "
-                    f"in {building_name} is {due_text} (deadline {wo.deadline})"
-                )
+                    due_text = ngettext(
+                        "due in %(count)s day",
+                        "due in %(count)s days",
+                        days_left,
+                    ) % {"count": days_left}
+                message = _(
+                    '%(priority)s priority work order "%(title)s" in %(building)s is %(due)s '
+                    "(deadline %(deadline)s)"
+                ) % {
+                    "priority": wo.get_priority_display(),
+                    "title": wo.title,
+                    "building": building_name,
+                    "due": due_text,
+                    "deadline": wo.deadline,
+                }
                 if owner_label:
-                    message += f" (owner: {owner_label})"
+                    message += _(" (owner: %(owner)s)") % {"owner": owner_label}
                 notifications.append(
                     {
                         "id": f"wo-deadline-{wo.id}",
@@ -907,14 +922,14 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
     raise_exception = True
 
     _sort_choices = [
-        ("archived_desc", _("Archived (Newest first)")),
-        ("archived_asc", _("Archived (Oldest first)")),
-        ("created_desc", _("Created (Newest first)")),
-        ("created_asc", _("Created (Oldest first)")),
-        ("priority", _("Priority (High → Low)")),
-        ("priority_desc", _("Priority (Low → High)")),
-        ("building_asc", _("Building (A → Z)")),
-        ("building_desc", _("Building (Z → A)")),
+        ("archived_desc", _lazy("Archived (Newest first)")),
+        ("archived_asc", _lazy("Archived (Oldest first)")),
+        ("created_desc", _lazy("Created (Newest first)")),
+        ("created_asc", _lazy("Created (Oldest first)")),
+        ("priority", _lazy("Priority (High → Low)")),
+        ("priority_desc", _lazy("Priority (Low → High)")),
+        ("building_asc", _lazy("Building (A → Z)")),
+        ("building_desc", _lazy("Building (Z → A)")),
     ]
 
     def test_func(self):

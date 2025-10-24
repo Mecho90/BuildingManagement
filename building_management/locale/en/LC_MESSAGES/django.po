@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-24 17:18+0300\n"
+"POT-Creation-Date: 2025-10-24 21:36+0300\n"
 "PO-Revision-Date: 2025-10-24 13:00+0000\n"
 "Last-Translator: Codex Translator <noreply@example.com>\n"
 "Language-Team: English <en@example.com>\n"
@@ -25,31 +25,72 @@ msgstr "English"
 msgid "Bulgarian"
 msgstr "Bulgarian"
 
-#: core/forms.py:97 core/models.py:202
+#: core/forms.py:79 templates/core/building_detail.html:134
+#: templates/core/building_detail.html:136
+#: templates/core/building_detail.html:138 templates/core/unit_detail.html:24
+msgid "Floor"
+msgstr "Floor"
+
+#: core/forms.py:80
+msgid "Is occupied"
+msgstr "Is occupied"
+
+#: core/forms.py:100 core/models.py:204
 msgid "Apartment number must be unique within this building."
 msgstr "Apartment number must be unique within this building."
 
-#: core/forms.py:111
+#: core/forms.py:114
 msgid "You don't have permission to edit this unit."
 msgstr "You don't have permission to edit this unit."
 
-#: core/forms.py:191
+#: core/forms.py:194
 msgid "Select a building first"
 msgstr "Select a building first"
 
-#: core/forms.py:207
+#: core/forms.py:196 templates/core/building_detail.html:248
+#: templates/core/building_detail.html:282
+#: templates/core/work_order_detail.html:33
+#: templates/core/work_orders_archive.html:89
+#: templates/core/work_orders_list.html:156
+#, fuzzy
+#| msgid "Units"
+msgid "Unit"
+msgstr "Units"
+
+#: core/forms.py:197 templates/core/building_detail.html:283
+#: templates/core/work_orders_archive.html:90
+#: templates/core/work_orders_list.html:157
+msgid "Priority"
+msgstr "Priority"
+
+#: core/forms.py:198 templates/core/building_detail.html:212
+#: templates/core/building_detail.html:284
+#: templates/core/work_orders_archive.html:91
+#: templates/core/work_orders_list.html:42
+#: templates/core/work_orders_list.html:158
+msgid "Status"
+msgstr "Status"
+
+#: core/forms.py:199 templates/core/building_detail.html:252
+#: templates/core/building_detail.html:285
+#: templates/core/work_order_detail.html:37
+#: templates/core/work_orders_list.html:159
+msgid "Deadline"
+msgstr "Deadline"
+
+#: core/forms.py:215
 msgid "Selected unit does not belong to the chosen building."
 msgstr "Selected unit does not belong to the chosen building."
 
-#: core/forms.py:212
+#: core/forms.py:220
 msgid "You cannot create work orders for buildings you do not own."
 msgstr "You cannot create work orders for buildings you do not own."
 
-#: core/forms.py:216
+#: core/forms.py:224
 msgid "Deadline cannot be in the past."
 msgstr "Deadline cannot be in the past."
 
-#: core/forms.py:233
+#: core/forms.py:241
 msgid "You cannot assign work orders to this building."
 msgstr "You cannot assign work orders to this building."
 
@@ -65,165 +106,228 @@ msgstr "Property Manager"
 msgid "External Contractor"
 msgstr "External Contractor"
 
-#: core/models.py:87 templates/core/buildings_list.html:84
+#: core/models.py:86 templates/core/building_detail.html:20
+#: templates/core/building_detail.html:102
+#: templates/core/buildings_list.html:52 templates/core/buildings_list.html:96
+#: templates/core/buildings_list.html:98 templates/core/buildings_list.html:100
+#: templates/core/unit_detail.html:33
+#: templates/core/work_orders_archive.html:36
+#: templates/core/work_orders_archive.html:73
+#: templates/core/work_orders_archive.html:94
+#: templates/core/work_orders_list.html:53
+#: templates/core/work_orders_list.html:93
+#: templates/core/work_orders_list.html:153
+msgid "Owner"
+msgstr "Owner"
+
+#: core/models.py:88 templates/core/buildings_list.html:84
 #: templates/core/buildings_list.html:86 templates/core/buildings_list.html:88
 #: templates/core/users_list.html:12
 msgid "Name"
 msgstr "Name"
 
-#: core/models.py:88 templates/core/building_detail.html:14
+#: core/models.py:89 templates/core/building_detail.html:14
 #: templates/core/buildings_list.html:119
 #: templates/core/buildings_list.html:121
 #: templates/core/buildings_list.html:123
 msgid "Address"
 msgstr "Address"
 
-#: core/models.py:89 core/models.py:165 core/models.py:239
+#: core/models.py:90 core/models.py:167 core/models.py:241
 #: templates/core/building_detail.html:41 templates/core/unit_detail.html:43
 #: templates/core/work_order_detail.html:51
 msgid "Description"
 msgstr "Description"
 
-#: core/models.py:129
+#: core/models.py:95 templates/core/building_detail.html:25
+#: templates/core/buildings_list.html:108
+#: templates/core/buildings_list.html:110
+#: templates/core/buildings_list.html:112
+#: templates/core/work_orders_list.html:103
+#: templates/core/work_orders_list.html:154
+msgid "Role"
+msgstr "Role"
+
+#: core/models.py:131
 msgid ""
 "Enter a valid phone number (digits with optional leading +, 7–15 digits)."
 msgstr ""
 
-#: core/models.py:147
+#: core/models.py:149
 msgid "Apartment number"
 msgstr "Apartment number"
 
-#: core/models.py:152 templates/core/building_detail.html:142
+#: core/models.py:154 templates/core/building_detail.html:142
 msgid "Apartment owner"
 msgstr "Apartment owner"
 
-#: core/models.py:156 templates/core/unit_detail.html:37
+#: core/models.py:158 templates/core/unit_detail.html:37
 msgid "Contact phone"
 msgstr "Contact phone"
 
-#: core/models.py:216
+#: core/models.py:218
 msgid "Open"
 msgstr "Open"
 
-#: core/models.py:217
+#: core/models.py:219
 msgid "In progress"
 msgstr "In progress"
 
-#: core/models.py:218
+#: core/models.py:220
 msgid "Done"
 msgstr "Done"
 
-#: core/models.py:221
+#: core/models.py:223
 msgid "Low"
 msgstr "Low"
 
-#: core/models.py:222
+#: core/models.py:224
 msgid "Medium"
 msgstr "Medium"
 
-#: core/models.py:223
+#: core/models.py:225
 msgid "High"
 msgstr "High"
 
-#: core/models.py:238 templates/core/building_detail.html:281
+#: core/models.py:240 templates/core/building_detail.html:281
 #: templates/core/work_orders_archive.html:88
 #: templates/core/work_orders_list.html:150
 msgid "Title"
 msgstr "Title"
 
-#: core/models.py:279
+#: core/models.py:281
 msgid "Selected unit does not belong to the selected building."
 msgstr "Selected unit does not belong to the selected building."
 
-#: core/views.py:341
+#: core/views.py:186
+msgid "your building"
+msgstr "your building"
+
+#: core/views.py:196
+#, python-format
+msgid "overdue by %(count)s day"
+msgid_plural "overdue by %(count)s days"
+msgstr[0] "overdue by %(count)s day"
+msgstr[1] "overdue by %(count)s days"
+
+#: core/views.py:201
+msgid "due today"
+msgstr "due today"
+
+#: core/views.py:203
+msgid "due tomorrow"
+msgstr "due tomorrow"
+
+#: core/views.py:206
+#, python-format
+msgid "due in %(count)s day"
+msgid_plural "due in %(count)s days"
+msgstr[0] "due in %(count)s day"
+msgstr[1] "due in %(count)s days"
+
+#: core/views.py:211
+#, python-format
+msgid ""
+"%(priority)s priority work order \"%(title)s\" in %(building)s is %(due)s "
+"(deadline %(deadline)s)"
+msgstr ""
+"%(priority)s priority work order \"%(title)s\" in %(building)s is %(due)s "
+"(deadline %(deadline)s)"
+
+#: core/views.py:221
+#, python-format
+msgid " (owner: %(owner)s)"
+msgstr " (owner: %(owner)s)"
+
+#: core/views.py:356
 msgid "Building created."
 msgstr "Building created."
 
-#: core/views.py:365
+#: core/views.py:380
 msgid "Building updated."
 msgstr "Building updated."
 
-#: core/views.py:382
+#: core/views.py:397
 msgid "Building deleted."
 msgstr "Building deleted."
 
-#: core/views.py:446
+#: core/views.py:461
 msgid "Unit created."
 msgstr "Unit created."
 
-#: core/views.py:481
+#: core/views.py:496
 msgid "Unit updated."
 msgstr "Unit updated."
 
-#: core/views.py:505
+#: core/views.py:520
 msgid "Unit deleted."
 msgstr "Unit deleted."
 
-#: core/views.py:656 core/views.py:914
+#: core/views.py:671 core/views.py:929
 msgid "Priority (High → Low)"
 msgstr "Priority (High → Low)"
 
-#: core/views.py:657 core/views.py:915
+#: core/views.py:672 core/views.py:930
 msgid "Priority (Low → High)"
 msgstr "Priority (Low → High)"
 
-#: core/views.py:658
+#: core/views.py:673
 msgid "Deadline (Soon → Late)"
 msgstr "Deadline (Soon → Late)"
 
-#: core/views.py:659
+#: core/views.py:674
 msgid "Deadline (Late → Soon)"
 msgstr "Deadline (Late → Soon)"
 
-#: core/views.py:660 core/views.py:912
+#: core/views.py:675 core/views.py:927
 msgid "Created (Newest first)"
 msgstr "Created (Newest first)"
 
-#: core/views.py:661 core/views.py:913
+#: core/views.py:676 core/views.py:928
 msgid "Created (Oldest first)"
 msgstr "Created (Oldest first)"
 
-#: core/views.py:662 core/views.py:916
+#: core/views.py:677 core/views.py:931
 msgid "Building (A → Z)"
 msgstr "Building (A → Z)"
 
-#: core/views.py:663 core/views.py:917
+#: core/views.py:678 core/views.py:932
 msgid "Building (Z → A)"
 msgstr "Building (Z → A)"
 
-#: core/views.py:664
+#: core/views.py:679
 msgid "Owner (A → Z)"
 msgstr "Owner (A → Z)"
 
-#: core/views.py:665
+#: core/views.py:680
 msgid "Owner (Z → A)"
 msgstr "Owner (Z → A)"
 
-#: core/views.py:749
+#: core/views.py:764
 msgid "Work order created."
 msgstr "Work order created."
 
-#: core/views.py:818
+#: core/views.py:833
 msgid "Work order updated."
 msgstr "Work order updated."
 
-#: core/views.py:843
+#: core/views.py:858
 msgid "Work order deleted."
 msgstr "Work order deleted."
 
-#: core/views.py:883
+#: core/views.py:898
 msgid "Only completed work orders can be archived."
 msgstr "Only completed work orders can be archived."
 
-#: core/views.py:887
+#: core/views.py:902
 msgid "Work order archived."
 msgstr "Work order archived."
 
-#: core/views.py:910
+#: core/views.py:925
 msgid "Archived (Newest first)"
 msgstr "Archived (Newest first)"
 
-#: core/views.py:911
+#: core/views.py:926
 msgid "Archived (Oldest first)"
 msgstr "Archived (Oldest first)"
 
@@ -339,29 +443,6 @@ msgstr "This action cannot be undone."
 msgid "Yes, delete"
 msgstr "Yes, delete"
 
-#: templates/core/building_detail.html:20
-#: templates/core/building_detail.html:102
-#: templates/core/buildings_list.html:52 templates/core/buildings_list.html:96
-#: templates/core/buildings_list.html:98 templates/core/buildings_list.html:100
-#: templates/core/unit_detail.html:33
-#: templates/core/work_orders_archive.html:36
-#: templates/core/work_orders_archive.html:73
-#: templates/core/work_orders_archive.html:94
-#: templates/core/work_orders_list.html:53
-#: templates/core/work_orders_list.html:93
-#: templates/core/work_orders_list.html:153
-msgid "Owner"
-msgstr "Owner"
-
-#: templates/core/building_detail.html:25
-#: templates/core/buildings_list.html:108
-#: templates/core/buildings_list.html:110
-#: templates/core/buildings_list.html:112
-#: templates/core/work_orders_list.html:103
-#: templates/core/work_orders_list.html:154
-msgid "Role"
-msgstr "Role"
-
 #: templates/core/building_detail.html:29
 #: templates/core/building_detail.html:256
 #: templates/core/building_detail.html:286
@@ -448,17 +529,16 @@ msgstr "Floor %(value)s"
 msgid "Contact"
 msgstr "Contact phone"
 
+#: templates/core/building_detail.html:112
+#: templates/core/building_detail.html:162
+msgid "No units."
+msgstr "No units."
+
 #: templates/core/building_detail.html:123
 #: templates/core/building_detail.html:125
 #: templates/core/building_detail.html:127
 msgid "Number"
 msgstr "Number"
-
-#: templates/core/building_detail.html:134
-#: templates/core/building_detail.html:136
-#: templates/core/building_detail.html:138 templates/core/unit_detail.html:24
-msgid "Floor"
-msgstr "Floor"
 
 #: templates/core/building_detail.html:144
 #: templates/core/building_detail.html:287
@@ -466,14 +546,12 @@ msgstr "Floor"
 msgid "Actions"
 msgstr "Actions"
 
-#: templates/core/building_detail.html:162
-msgid "No units."
-msgstr "No units."
-
 #: templates/core/building_detail.html:173
 #: templates/core/building_detail.html:175
 #: templates/core/building_detail.html:330
-#: templates/core/building_detail.html:332 templates/core/users_list.html:33
+#: templates/core/building_detail.html:332
+#: templates/core/buildings_list.html:180
+#: templates/core/buildings_list.html:182 templates/core/users_list.html:33
 #: templates/core/work_orders_list.html:230
 #: templates/core/work_orders_list.html:233
 msgid "Prev"
@@ -482,7 +560,9 @@ msgstr "Prev"
 #: templates/core/building_detail.html:178
 #: templates/core/building_detail.html:180
 #: templates/core/building_detail.html:335
-#: templates/core/building_detail.html:337 templates/core/users_list.html:37
+#: templates/core/building_detail.html:337
+#: templates/core/buildings_list.html:185
+#: templates/core/buildings_list.html:187 templates/core/users_list.html:37
 #: templates/core/work_orders_list.html:236
 #: templates/core/work_orders_list.html:239
 msgid "Next"
@@ -519,37 +599,12 @@ msgstr "Work orders"
 msgid "Title or description"
 msgstr "Description"
 
-#: templates/core/building_detail.html:212
-#: templates/core/building_detail.html:284
-#: templates/core/work_orders_archive.html:91
-#: templates/core/work_orders_list.html:42
-#: templates/core/work_orders_list.html:158
-msgid "Status"
-msgstr "Status"
-
 #: templates/core/building_detail.html:214
 #: templates/core/work_orders_archive.html:38
 #: templates/core/work_orders_list.html:44
 #: templates/core/work_orders_list.html:55
 msgid "All"
 msgstr "All"
-
-#: templates/core/building_detail.html:248
-#: templates/core/building_detail.html:282
-#: templates/core/work_order_detail.html:33
-#: templates/core/work_orders_archive.html:89
-#: templates/core/work_orders_list.html:156
-#, fuzzy
-#| msgid "Units"
-msgid "Unit"
-msgstr "Units"
-
-#: templates/core/building_detail.html:252
-#: templates/core/building_detail.html:285
-#: templates/core/work_order_detail.html:37
-#: templates/core/work_orders_list.html:159
-msgid "Deadline"
-msgstr "Deadline"
 
 #: templates/core/building_detail.html:261 templates/core/unit_detail.html:11
 #: templates/core/user_form.html:3 templates/core/user_form.html:5
@@ -563,12 +618,6 @@ msgstr "Edit"
 #| msgid "You cannot assign work orders to this building."
 msgid "No work orders for this building."
 msgstr "You cannot assign work orders to this building."
-
-#: templates/core/building_detail.html:283
-#: templates/core/work_orders_archive.html:90
-#: templates/core/work_orders_list.html:157
-msgid "Priority"
-msgstr "Priority"
 
 #: templates/core/building_detail.html:340
 #, python-format
@@ -604,9 +653,30 @@ msgstr "Search"
 msgid "Search by name, address, owner"
 msgstr "Search by name, address, owner"
 
-#: templates/core/buildings_list.html:73
+#: templates/core/buildings_list.html:73 templates/core/buildings_list.html:168
 msgid "No buildings found."
 msgstr "No buildings found."
+
+#: templates/core/buildings_list.html:190 templates/core/users_list.html:35
+#: templates/core/work_orders_list.html:243
+#, python-format
+msgid "Page %(page_obj.number)s of %(paginator.num_pages)s"
+msgstr "Page %(page_obj.number)s of %(paginator.num_pages)s"
+
+#: templates/core/buildings_list.html:196
+msgid "Notifications"
+msgstr "Notifications"
+
+#: templates/core/buildings_list.html:199
+#, python-format
+msgid "%(total)s alert"
+msgid_plural "%(total)s alerts"
+msgstr[0] "%(total)s alert"
+msgstr[1] "%(total)s alerts"
+
+#: templates/core/buildings_list.html:210
+msgid "No notifications right now."
+msgstr "No notifications right now."
 
 #: templates/core/unit_confirm_delete.html:4
 #, fuzzy
@@ -778,15 +848,8 @@ msgid "Last Login"
 msgstr "Login"
 
 #: templates/core/users_list.html:26
-#, fuzzy
-#| msgid "No buildings found."
 msgid "No users found."
-msgstr "No buildings found."
-
-#: templates/core/users_list.html:35 templates/core/work_orders_list.html:243
-#, python-format
-msgid "Page %(page_obj.number)s of %(paginator.num_pages)s"
-msgstr "Page %(page_obj.number)s of %(paginator.num_pages)s"
+msgstr "No users found."
 
 #: templates/core/work_order_confirm_delete.html:3
 #, fuzzy
@@ -858,6 +921,10 @@ msgstr "Work Orders"
 msgid "Review completed and archived work orders grouped by building."
 msgstr "Review completed and archived work orders grouped by building."
 
+#: templates/core/work_orders_archive.html:17
+msgid "Search archived work orders"
+msgstr "Search archived work orders"
+
 #: templates/core/work_orders_archive.html:25
 msgid "Title, description, or building"
 msgstr "Title, description, or building"
@@ -882,10 +949,9 @@ msgid "Track maintenance and tasks across your portfolio."
 msgstr "Track maintenance and tasks across your portfolio."
 
 #: templates/core/work_orders_list.html:142
-#, fuzzy
-#| msgid "Work orders"
+#: templates/core/work_orders_list.html:218
 msgid "No work orders."
-msgstr "Work orders"
+msgstr "No work orders."
 
 #: templates/core/work_orders_list.html:229
 #: templates/core/work_orders_list.html:232

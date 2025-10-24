@@ -75,8 +75,11 @@ class UnitForm(forms.ModelForm):
             if self._building is not None:
                 self.fields["building"].initial = self._building
                 self.fields["building"].disabled = True
-                
-                # show an inline hint in the input
+
+        self.fields["floor"].label = _("Floor")
+        self.fields["is_occupied"].label = _("Is occupied")
+
+        # show an inline hint in the input
         self.fields["contact_phone"].widget.attrs.setdefault(
             "placeholder", "+359..."
         )
@@ -172,6 +175,8 @@ class WorkOrderForm(forms.ModelForm):
                     bqs = bqs.filter(owner=user)
             self.fields["building"].queryset = bqs
 
+        self.fields["building"].label = _("Building")
+
         # 2) Units: filter by effective building (kwarg > POST > initial > instance)
         effective_b = (
             self._building
@@ -189,6 +194,11 @@ class WorkOrderForm(forms.ModelForm):
         else:
             self.fields["unit"].widget.attrs["disabled"] = "disabled"
             self.fields["unit"].empty_label = _( "Select a building first" )
+
+        self.fields["unit"].label = _("Unit")
+        self.fields["priority"].label = _("Priority")
+        self.fields["status"].label = _("Status")
+        self.fields["deadline"].label = _("Deadline")
 
     # ---------- validation ----------
     def clean(self):
