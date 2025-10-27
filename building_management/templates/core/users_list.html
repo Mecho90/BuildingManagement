@@ -1,41 +1,108 @@
 {% extends "base.html" %}
 {% load i18n %}
-{% block title %}{% trans "Users" %} · {% trans "Building Management" %}{% endblock %}
+{% block title %}{% trans "User Management" %} · {% trans "Building Management" %}{% endblock %}
 {% block content %}
-<h2>{% trans "Users" %}</h2>
-<form method="get" style="margin:.5rem 0 1rem;">
-  <input type="text" name="q" value="{{ request.GET.q }}" placeholder="{% trans "Search username, email, name" %}" />
-  <button class="btn" type="submit">{% trans "Search" %}</button>
-  {% if request.GET.q %}<a class="btn" href="{% url 'users_list' %}">{% trans "Clear" %}</a>{% endif %}
-</form>
-<table>
-  <thead><tr><th>{% trans "Username" %}</th><th>{% trans "Name" %}</th><th>{% trans "Email" %}</th><th>{% trans "Active" %}</th><th>{% trans "Staff" %}</th><th>{% trans "Superuser" %}</th><th>{% trans "Last Login" %}</th></tr></thead>
-  <tbody>
-  {% for u in users %}
-    <tr>
-      <td>{{ u.username }}</td>
-      <td>{{ u.first_name }} {{ u.last_name }}</td>
-      <td>{{ u.email }}</td>
-      {% trans "Yes,No" as yesno_choices %}
-      <td>{{ u.is_active|yesno:yesno_choices }}</td>
-      <td>{{ u.is_staff|yesno:yesno_choices }}</td>
-      <td>{{ u.is_superuser|yesno:yesno_choices }}</td>
-      <td>{{ u.last_login|default:"—" }}</td>
-    </tr>
-  {% empty %}
-    <tr><td colspan="7">{% trans "No users found." %}</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% if is_paginated %}
-  <div style="margin-top:1rem;">
-    {% if page_obj.has_previous %}
-      <a class="btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Prev" %}</a>
-    {% endif %}
-    <span>{% blocktrans %}Page {{ page_obj.number }} of {{ paginator.num_pages }}{% endblocktrans %}</span>
-    {% if page_obj.has_next %}
-      <a class="btn" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
-    {% endif %}
+<section class="space-y-8">
+  <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">{% trans "User Management" %}</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        {% trans "Administrators can create, edit, remove users or reset passwords from here." %}
+      </p>
+    </div>
+    <div class="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
+      <a class="btn" href="{% url 'user_create' %}">+ {% trans "Add user" %}</a>
+    </div>
+  </header>
+
+  <form method="get" class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center">
+    <label class="sr-only" for="id_search">{% trans "Search users" %}</label>
+    <input
+      id="id_search"
+      class="input flex-1"
+      type="text"
+      name="q"
+      value="{{ q }}"
+      placeholder="{% trans "Search username, email, or name" %}"
+    />
+    <div class="flex items-center gap-2">
+      <button class="btn" type="submit">{% trans "Search" %}</button>
+      {% if q %}
+        <a class="btn btn-secondary" href="{% url 'users_list' %}">{% trans "Clear" %}</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="space-y-3 rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-900">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+        <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+          <tr>
+            <th class="px-4 py-3">{% trans "Username" %}</th>
+            <th class="px-4 py-3">{% trans "Name" %}</th>
+            <th class="px-4 py-3">{% trans "Email" %}</th>
+            <th class="px-4 py-3">{% trans "Active" %}</th>
+            <th class="px-4 py-3">{% trans "Administrator" %}</th>
+            <th class="px-4 py-3">{% trans "Roles" %}</th>
+            <th class="px-4 py-3">{% trans "Last login" %}</th>
+            <th class="px-4 py-3 text-right">{% trans "Actions" %}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+          {% for u in users %}
+            <tr class="text-slate-700 dark:text-slate-100">
+              <td class="px-4 py-3 font-medium">{{ u.username }}</td>
+              <td class="px-4 py-3">{{ u.get_full_name|default:"—" }}</td>
+              <td class="px-4 py-3">
+                {% if u.email %}
+                  <a href="mailto:{{ u.email }}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{{ u.email }}</a>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              {% trans "Yes,No" as yesno_choices %}
+              <td class="px-4 py-3">{{ u.is_active|yesno:yesno_choices }}</td>
+              <td class="px-4 py-3">{{ u.is_superuser|yesno:yesno_choices }}</td>
+              <td class="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
+                {% trans "Coming soon" %}
+              </td>
+              <td class="px-4 py-3">{{ u.last_login|date:"Y-m-d H:i"|default:"—" }}</td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex justify-end gap-2">
+                  <a class="btn btn-secondary btn-sm" href="{% url 'user_update' u.pk %}">{% trans "Edit" %}</a>
+                  <a class="btn btn-secondary btn-sm" href="{% url 'user_password' u.pk %}">{% trans "Reset password" %}</a>
+                  <a class="btn btn-danger btn-sm" href="{% url 'user_delete' u.pk %}">{% trans "Delete" %}</a>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td class="px-4 py-6 text-center text-slate-500 dark:text-slate-400" colspan="9">
+                {% trans "No users found." %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-{% endif %}
+
+  {% if is_paginated %}
+    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-700 dark:bg-slate-900">
+      <div>
+        {% if page_obj.has_previous %}
+          <a class="btn btn-secondary btn-sm" href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
+        {% endif %}
+      </div>
+      <div class="font-medium text-slate-600 dark:text-slate-300">
+        {% blocktrans %}Page {{ page_obj.number }} of {{ paginator.num_pages }}{% endblocktrans %}
+      </div>
+      <div>
+        {% if page_obj.has_next %}
+          <a class="btn btn-secondary btn-sm" href="?{% if q %}q={{ q }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</section>
 {% endblock %}

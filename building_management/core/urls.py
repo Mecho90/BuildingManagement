@@ -28,6 +28,13 @@ urlpatterns = [
     path("work-orders/<int:pk>/archive/", views.WorkOrderArchiveView.as_view(), name="work_order_archive"),
     path("work-orders/archive/", views.ArchivedWorkOrderListView.as_view(), name="work_orders_archive"),
 
+    # Admin user management (superuser-only dashboard)
+    path("manage/users/", views.AdminUserListView.as_view(), name="users_list"),
+    path("manage/users/new/", views.AdminUserCreateView.as_view(), name="user_create"),
+    path("manage/users/<int:pk>/edit/", views.AdminUserUpdateView.as_view(), name="user_update"),
+    path("manage/users/<int:pk>/password/", views.AdminUserPasswordView.as_view(), name="user_password"),
+    path("manage/users/<int:pk>/delete/", views.AdminUserDeleteView.as_view(), name="user_delete"),
+
     # APIs (optional)
     path("api/buildings/", views.api_buildings, name="api_buildings"),
     path("api/buildings/<int:building_id>/units/", views.api_units, name="api_units"),

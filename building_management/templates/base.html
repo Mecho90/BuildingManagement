@@ -25,7 +25,9 @@
               {% if work_orders_archive_enabled and work_orders_archive_url %}
                 <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Archive" %}</a>
               {% endif %}
-              {% if user.is_staff %}
+              {% if user.is_superuser %}
+                <a href="{% url 'users_list' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "User Management" %}</a>
+              {% elif user.is_staff %}
                 <a href="{% url 'admin:index' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Admin Panel" %}</a>
               {% endif %}
             {% endblock %}

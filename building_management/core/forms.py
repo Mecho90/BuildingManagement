@@ -3,8 +3,10 @@ from __future__ import annotations
 import re
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm, SetPasswordForm
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 
 from .models import Building, Unit, WorkOrder
@@ -245,3 +247,95 @@ class WorkOrderForm(forms.ModelForm):
         if commit:
             obj.save()
         return obj
+
+
+# -----------------------------
+# Users (admin area)
+# -----------------------------
+
+_USER_IS_ACTIVE_FIELD = User._meta.get_field("is_active")
+_USER_SUPERUSER_FIELD = User._meta.get_field("is_superuser")
+
+
+class AdminUserCreateForm(UserCreationForm):
+    email = forms.EmailField(required=False, label=_("Email"))
+    first_name = forms.CharField(required=False, label=_("First name"))
+    last_name = forms.CharField(required=False, label=_("Last name"))
+    is_active = forms.BooleanField(required=False, initial=True)
+    is_superuser = forms.BooleanField(required=False)
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = (
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "is_active",
+            "is_superuser",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            widget = field.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs.setdefault("class", "checkbox")
+            else:
+                widget.attrs.setdefault("class", "input")
+        self.fields["is_active"].label = capfirst(_USER_IS_ACTIVE_FIELD.verbose_name)
+        self.fields["is_active"].help_text = _USER_IS_ACTIVE_FIELD.help_text
+        self.fields["is_superuser"].label = capfirst(_USER_SUPERUSER_FIELD.verbose_name)
+        self.fields["is_superuser"].help_text = _USER_SUPERUSER_FIELD.help_text
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data.get("email", "")
+        user.first_name = self.cleaned_data.get("first_name", "")
+        user.last_name = self.cleaned_data.get("last_name", "")
+        user.is_active = self.cleaned_data.get("is_active", False)
+        user.is_superuser = self.cleaned_data.get("is_superuser", False)
+        user.is_staff = user.is_superuser
+        if commit:
+            user.save()
+            self.save_m2m()
+        return user
+
+
+class AdminUserUpdateForm(UserChangeForm):
+    password = None  # hide the unusable password hash field
+
+    class Meta(UserChangeForm.Meta):
+        model = User
+        fields = (
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "is_active",
+            "is_superuser",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            widget = field.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs.setdefault("class", "checkbox")
+            else:
+                widget.attrs.setdefault("class", "input")
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.is_staff = user.is_superuser
+        if commit:
+            user.save()
+            self.save_m2m()
+        return user
+
+
+class AdminUserPasswordForm(SetPasswordForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.setdefault("class", "input")
