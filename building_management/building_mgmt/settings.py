@@ -13,7 +13,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # --- Core ---
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-change-me")
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") not in {"0", "false", "False"}
-ALLOWED_HOSTS: list[str] = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
+_hosts_raw = os.environ.get("DJANGO_ALLOWED_HOSTS", "*")
+ALLOWED_HOSTS: list[str] = [host.strip() for host in _hosts_raw.split(",") if host.strip()]
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -26,7 +29,7 @@ INSTALLED_APPS = [
     "markdownify",
 ]
 
-AUTO_FIX_CORE_SCHEMA = True  # dev helper
+AUTO_FIX_CORE_SCHEMA = os.environ.get("DJANGO_AUTO_FIX_CORE_SCHEMA", "").lower() in {"1", "true", "yes"}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -39,7 +42,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
-if DEBUG:
+if DEBUG and AUTO_FIX_CORE_SCHEMA:
     # why: avoid loading EnsureCoreSchemaMiddleware in production
     MIDDLEWARE.insert(3, "core.middleware.EnsureCoreSchemaMiddleware")
 
@@ -67,17 +70,18 @@ TEMPLATES = [
 
 def _database_config_from_env() -> dict[str, object]:
     """
-    Parse DATABASE_URL and produce a PostgreSQL Django DATABASES entry.
+    Parse DATABASE_URL and produce a Django DATABASES entry.
 
     Supported schemes: postgres:// or postgresql://
     Query parameters (e.g. sslmode) are passed through to OPTIONS.
+    Falls back to SQLite when DATABASE_URL is not provided.
     """
     url = os.environ.get("DATABASE_URL")
     if not url:
-        raise ImproperlyConfigured(
-            "DATABASE_URL environment variable is required and must point to your "
-            "PostgreSQL instance."
-        )
+        return {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
 
     parsed = urlparse(url)
     scheme = parsed.scheme.lower()
@@ -203,4 +207,4 @@ if _csrf_origins:
 
 # --- Sessions ---
 SESSION_COOKIE_AGE = 30 * 60  # expire after 30 minutes of inactivity
-SESSION_SAVE_EVERY_REQUEST = True  # refresh expiry on each request by an authenticated user
+SESSION_SAVE_EVERY_REQUEST = os.environ.get("DJANGO_SESSION_SAVE_EVERY_REQUEST", "").lower() in {"1", "true", "yes"}  # opt-in sliding sessions

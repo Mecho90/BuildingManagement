@@ -1,10 +1,11 @@
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: building_mgmt
-      POSTGRES_PASSWORD: building_mgmt
-      POSTGRES_DB: building_mgmt
+      POSTGRES_USER: ${POSTGRES_USER:-building_mgmt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-building_mgmt}
+      POSTGRES_DB: ${POSTGRES_DB:-building_mgmt}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:

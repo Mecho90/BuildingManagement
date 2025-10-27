@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from datetime import timedelta
-import json
 from itertools import groupby
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Case, When, IntegerField, Q, Count, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Lower, Trim, Replace
@@ -63,6 +61,66 @@ def _safe_next_url(request):
         return next_url
     return None
 
+
+class CachedObjectMixin:
+    """Cache get_object() results within the request lifecycle to avoid duplicate queries."""
+
+    _object_cache_attr = "_cached_object"
+
+    def get_object(self, queryset=None):
+        if hasattr(self, self._object_cache_attr):
+            return getattr(self, self._object_cache_attr)
+        obj = super().get_object(queryset)
+        setattr(self, self._object_cache_attr, obj)
+        return obj
+
+
+class UnitsWidgetMixin:
+    """Utility mixin to augment the WorkOrder unit field with data attributes for JS widgets."""
+
+    def _prepare_units_widget(self, ctx):
+        form = ctx.get("form")
+        if not form or "unit" not in form.fields:
+            return
+
+        widget = form.fields["unit"].widget
+        api_template = ctx.get("units_api_template")
+        if api_template:
+            widget.attrs.setdefault("data-units-api-template", api_template)
+
+        # Determine the effective building for initial population.
+        building_obj = getattr(self, "building", None)
+        building_id = None
+        if building_obj is not None:
+            building_id = building_obj.pk
+        elif form.data.get("building"):
+            building_id = form.data.get("building")
+        elif form.initial.get("building"):
+            initial_building = form.initial.get("building")
+            if hasattr(initial_building, "pk"):
+                building_id = initial_building.pk
+            else:
+                building_id = initial_building
+        elif getattr(form.instance, "building_id", None):
+            building_id = form.instance.building_id
+        if building_id:
+            widget.attrs.setdefault("data-initial-building", str(building_id))
+
+        # Preserve the currently selected unit so JS can re-select it after refresh.
+        selected_unit = (
+            form.data.get("unit")
+            or form.initial.get("unit")
+            or getattr(form.instance, "unit_id", "")
+        )
+        if selected_unit:
+            widget.attrs.setdefault("data-selected-unit", str(selected_unit))
+
+        empty_label = getattr(form.fields["unit"], "empty_label", None)
+        if empty_label:
+            widget.attrs.setdefault("data-empty-label", str(empty_label))
+
+        widget.attrs.setdefault("aria-live", "polite")
+        widget.attrs.setdefault("data-loading-text", str(_("Loading units…")))
 
 class AdminRequiredMixin(UserPassesTestMixin):
     """Limit access to superusers (primary administrator role)."""
@@ -159,28 +217,12 @@ class BuildingListView(LoginRequiredMixin, ListView):
         if not user.is_authenticated:
             return []
 
-        visible_buildings = (
-            Building.objects.visible_to(user).values_list("id", flat=True)
-        )
-        visible_ids = list(visible_buildings)
-        if not visible_ids:
-            return []
-
         is_admin = user.is_staff or user.is_superuser
         today = timezone.localdate()
 
         notifications: list[dict[str, str]] = []
 
         # ---- Upcoming deadlines ----
-        base_open = (
-            WorkOrder.objects.filter(
-                building_id__in=visible_ids,
-                archived_at__isnull=True,
-                status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
-            )
-            .select_related("building__owner", "unit")
-        )
-
         thresholds = {
             WorkOrder.Priority.HIGH: 7,
             WorkOrder.Priority.MEDIUM: 7,
@@ -192,59 +234,81 @@ class BuildingListView(LoginRequiredMixin, ListView):
             WorkOrder.Priority.LOW: "info",
         }
 
-        for priority, window in thresholds.items():
-            window_end = today + timedelta(days=window)
-            upcoming = (
-                base_open.filter(priority=priority, deadline__gte=today, deadline__lte=window_end)
-                .order_by("deadline")[:10]
+        max_window = max(thresholds.values())
+        priority_window = Case(
+            When(priority=WorkOrder.Priority.HIGH, then=Value(thresholds[WorkOrder.Priority.HIGH])),
+            When(priority=WorkOrder.Priority.MEDIUM, then=Value(thresholds[WorkOrder.Priority.MEDIUM])),
+            When(priority=WorkOrder.Priority.LOW, then=Value(thresholds[WorkOrder.Priority.LOW])),
+            default=Value(max_window),
+            output_field=IntegerField(),
+        )
+
+        upcoming = (
+            WorkOrder.objects.visible_to(user)
+            .filter(
+                archived_at__isnull=True,
+                status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
+                deadline__gte=today,
+                deadline__lte=today + timedelta(days=max_window),
             )
-            for wo in upcoming:
-                building = wo.building
-                building_id = wo.building_id
-                building_name = building.name if building_id else _("your building")
-                owner_label = None
-                if is_admin and building_id:
-                    owner = getattr(building, "owner", None)
-                    if owner:
-                        owner_label = owner.get_full_name() or owner.username
-                days_left = (wo.deadline - today).days
-                if days_left < 0:
-                    overdue_days = abs(days_left)
-                    due_text = ngettext(
-                        "overdue by %(count)s day",
-                        "overdue by %(count)s days",
-                        overdue_days,
-                    ) % {"count": overdue_days}
-                elif days_left == 0:
-                    due_text = _("due today")
-                elif days_left == 1:
-                    due_text = _("due tomorrow")
-                else:
-                    due_text = ngettext(
-                        "due in %(count)s day",
-                        "due in %(count)s days",
-                        days_left,
-                    ) % {"count": days_left}
-                message = _(
-                    '%(priority)s priority work order "%(title)s" in %(building)s is %(due)s '
-                    "(deadline %(deadline)s)"
-                ) % {
-                    "priority": wo.get_priority_display(),
-                    "title": wo.title,
-                    "building": building_name,
-                    "due": due_text,
-                    "deadline": wo.deadline,
+            .annotate(priority_window=priority_window)
+            .select_related("building__owner", "unit")
+            .order_by("deadline", "-pk")
+        )
+
+        per_priority_counts = {key: 0 for key in thresholds}
+
+        for wo in upcoming:
+            if wo.priority not in per_priority_counts:
+                continue
+            window = thresholds.get(wo.priority, max_window)
+            days_left = (wo.deadline - today).days
+            if days_left > window or per_priority_counts[wo.priority] >= 10:
+                continue
+
+            per_priority_counts[wo.priority] += 1
+
+            building = wo.building
+            building_id = wo.building_id
+            building_name = building.name if building_id else _("your building")
+            owner_label = None
+            if is_admin and building_id:
+                owner = getattr(building, "owner", None)
+                if owner:
+                    owner_label = owner.get_full_name() or owner.username
+
+            if days_left == 0:
+                due_text = _("due today")
+            elif days_left == 1:
+                due_text = _("due tomorrow")
+            else:
+                due_text = ngettext(
+                    "due in %(count)s day",
+                    "due in %(count)s days",
+                    days_left,
+                ) % {"count": days_left}
+
+            message = _(
+                '%(priority)s priority work order "%(title)s" in %(building)s is %(due)s '
+                "(deadline %(deadline)s)"
+            ) % {
+                "priority": wo.get_priority_display(),
+                "title": wo.title,
+                "building": building_name,
+                "due": due_text,
+                "deadline": wo.deadline,
+            }
+            if owner_label:
+                message += _(" (owner: %(owner)s)") % {"owner": owner_label}
+            notifications.append(
+                {
+                    "id": f"wo-deadline-{wo.id}",
+                    "level": priority_levels[wo.priority],
+                    "message": message + ".",
+                    "category": "deadline",
+                    "_priority_weight": 0 if wo.priority == WorkOrder.Priority.HIGH else 1 if wo.priority == WorkOrder.Priority.MEDIUM else 2,
                 }
-                if owner_label:
-                    message += _(" (owner: %(owner)s)") % {"owner": owner_label}
-                notifications.append(
-                    {
-                        "id": f"wo-deadline-{wo.id}",
-                        "level": priority_levels[priority],
-                        "message": message + ".",
-                        "category": "deadline",
-                    }
-                )
+            )
 
         if is_admin:
             locked_accounts = (
@@ -277,9 +341,12 @@ class BuildingListView(LoginRequiredMixin, ListView):
                     }
                 )
 
+        notifications.sort(key=lambda item: (item.get("_priority_weight", 99), item.get("id")))
+        for item in notifications:
+            item.pop("_priority_weight", None)
         return notifications
 
-class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DetailView):
     model = Building
     template_name = "core/building_detail.html"
     context_object_name = "building"
@@ -406,7 +473,7 @@ class BuildingCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class BuildingUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class BuildingUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, UpdateView):
     model = Building
     form_class = BuildingForm
     template_name = "core/building_form.html"
@@ -433,7 +500,7 @@ class BuildingUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return reverse("building_detail", args=[self.object.pk])
 
 
-class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
     model = Building
     template_name = "core/building_confirm_delete.html"
     success_url = reverse_lazy("buildings_list")
@@ -460,7 +527,7 @@ class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 # Units
 # ----------------------------------------------------------------------
 
-class UnitDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+class UnitDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DetailView):
     model = Unit
     template_name = "core/unit_detail.html"
     context_object_name = "unit"
@@ -520,7 +587,7 @@ class UnitCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class UnitUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class UnitUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, UpdateView):
     model = Unit
     form_class = UnitForm
     template_name = "core/unit_form.html"
@@ -549,7 +616,7 @@ class UnitUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return reverse("building_detail", args=[self.building.pk])
 
 
-class UnitDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class UnitDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
     model = Unit
     template_name = "core/unit_confirm_delete.html"
 
@@ -738,7 +805,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
             ]
         return ctx
 
-class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DetailView):
     model = WorkOrder
     template_name = "core/work_order_detail.html"
     context_object_name = "order"
@@ -756,7 +823,7 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         return _user_can_access_building(self.request.user, wo.building)
 
 
-class WorkOrderCreateView(LoginRequiredMixin, CreateView):
+class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
     model = WorkOrder
     form_class = WorkOrderForm
     template_name = "core/work_order_form.html"
@@ -790,27 +857,7 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
                 else reverse("work_orders_list")
             )
         ctx["units_api_template"] = reverse("api_units", args=[0]).replace("/0/", "/{id}/")
-
-        units_qs = (
-            Unit.objects.visible_to(self.request.user)
-            .select_related("building")
-            .order_by("building__name", "number")
-        )
-        if getattr(self, "building", None):
-            units_qs = units_qs.filter(building=self.building)
-
-        ctx["units_dataset"] = json.dumps(
-            [
-                {
-                    "id": u.id,
-                    "number": u.number,
-                    "label": f"{u.building.name} — #{u.number}" if u.building_id else (u.number or ""),
-                    "building_id": u.building_id,
-                }
-                for u in units_qs
-            ],
-            cls=DjangoJSONEncoder,
-        )
+        self._prepare_units_widget(ctx)
         return ctx
 
     def form_valid(self, form):
@@ -828,7 +875,7 @@ class WorkOrderCreateView(LoginRequiredMixin, CreateView):
         return reverse("building_detail", args=[self.object.building_id])
 
 
-class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, UnitsWidgetMixin, UpdateView):
     model = WorkOrder
     form_class = WorkOrderForm
     template_name = "core/work_order_form.html"
@@ -855,26 +902,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         elif building is not None:
             ctx["cancel_url"] = reverse("building_detail", args=[building.pk])
         ctx["units_api_template"] = reverse("api_units", args=[0]).replace("/0/", "/{id}/")
-        units_qs = (
-            Unit.objects.visible_to(self.request.user)
-            .select_related("building")
-            .order_by("building__name", "number")
-        )
-        if building is not None:
-            units_qs = units_qs.filter(building=building)
-
-        ctx["units_dataset"] = json.dumps(
-            [
-                {
-                    "id": u.id,
-                    "number": u.number,
-                    "label": f"{u.building.name} — #{u.number}" if building is None else f"#{u.number}",
-                    "building_id": u.building_id,
-                }
-                for u in units_qs
-            ],
-            cls=DjangoJSONEncoder,
-        )
+        self._prepare_units_widget(ctx)
         return ctx
 
     def test_func(self):
@@ -899,7 +927,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return reverse("building_detail", args=[self.object.building_id])
 
 
-class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
     model = WorkOrder
     template_name = "core/work_order_confirm_delete.html"   # <- new specific template
 
@@ -938,13 +966,16 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
     - Only staff/owner of the building can archive.
     - Only allowed when the work order status is DONE.
     """
+    http_method_names = ["post"]
 
     def get_queryset(self):
         # Respect per-user visibility
         return WorkOrder.objects.visible_to(self.request.user)
 
     def get_object(self):
-        return get_object_or_404(self.get_queryset(), pk=self.kwargs["pk"])
+        if not hasattr(self, "_object_cache"):
+            self._object_cache = get_object_or_404(self.get_queryset(), pk=self.kwargs["pk"])
+        return self._object_cache
 
     def test_func(self):
         wo = self.get_object()
@@ -964,10 +995,6 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
         if next_url:
             return redirect(next_url)
         return redirect("building_detail", wo.building_id)
-
-    # Optional: allow GET-triggered archive links; remove to enforce POST-only.
-    def get(self, request, *args, **kwargs):
-        return self.post(request, *args, **kwargs)
 
 
 class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListView):

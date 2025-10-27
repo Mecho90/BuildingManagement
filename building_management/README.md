@@ -2,18 +2,28 @@
 
 Responsive Django/Tailwind UI for managing buildings, units, and work orders.
 
+## Dependencies
+
+The Python stack is deliberately lean – only Django and `psycopg[binary]` are required.  
+PostgreSQL is recommended for production, but the project now falls back to SQLite when
+`DATABASE_URL` is not provided so you can run management commands out of the box.
+
 ## Development Workflow
 
 1. **Install tooling**
    ```bash
+   pip install -r requirements.txt
    npm install
    npm run build:css  # generates static/css/dist.css
    ```
-2. **Tailwind watch mode** (during template work)
+2. **Database / environment**
+   - Copy `.env.example` to `.env` and adjust as needed.
+   - Optional: run `docker compose up -d postgres` to start PostgreSQL (credentials come from the env file or defaults).
+3. **Tailwind watch mode** (during template work)
    ```bash
    npm run watch:css
    ```
-3. **Run Django**
+4. **Run Django**
    ```bash
    python manage.py runserver
    ```
@@ -47,7 +57,7 @@ Add these commands to your CI job after installing dependencies.
 
 ## Database Configuration
 
-The application now requires PostgreSQL. For local development:
+PostgreSQL is recommended for production deployments. For local development:
 
 1. Launch the database (uses `docker-compose.yml`):
    ```bash
@@ -61,6 +71,9 @@ The application now requires PostgreSQL. For local development:
    python manage.py migrate
    ```
    Stop the container with `docker compose down` when you're done.
+
+If `DATABASE_URL` is omitted the app will automatically use a local SQLite database located at
+`./db.sqlite3`, which is handy for quick experiments and automated test environments.
 
 Prefer a one-off container instead of compose? Run `docker run` with the same env vars/port mapping.
 
@@ -96,6 +109,17 @@ Lightweight responsive smoke tests live in `tests/playwright/`.
 ```bash
 npx playwright install  # downloads browsers
 npm run test:ui         # runs smoke tests against http://localhost:8000
+```
+
+If authentication is required, provide credentials via environment variables or a `.env.playwright`
+file (uses the same key names). The Playwright seed command creates a default user
+`playwright/playwright123`; the tests will automatically use those credentials if no overrides
+are supplied.
+
+```bash
+export PLAYWRIGHT_USERNAME=your_admin
+export PLAYWRIGHT_PASSWORD=secret
+npm run test:ui
 ```
 
 Set `BASE_URL` to point at non-default environments (e.g., `BASE_URL=https://staging.example.com npm run test:ui`).

@@ -26,7 +26,7 @@
       </div>
     {% endif %}
 
-    <div class="grid gap-4 md:grid-cols-2">
+    <div class="grid gap-4 md:grid-cols-2 md:items-start">
       {% for field in form %}
         {% if field.field.widget.input_type == "checkbox" %}
           <div class="md:col-span-2">
@@ -44,14 +44,18 @@
             {% endif %}
           </div>
         {% else %}
-          <div class="space-y-1">
+          <div class="space-y-2">
             <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-600 dark:text-slate-300">
               {{ field.label }}
             </label>
-            {% if field.help_text %}
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ field.help_text }}</p>
-            {% endif %}
             {{ field }}
+            {% if field.help_text %}
+              <div class="text-xs text-slate-500 dark:text-slate-400 [&>ul]:list-disc [&>ul]:list-inside [&>ul]:space-y-1 [&>ul]:pl-4">
+                {{ field.help_text|safe }}
+              </div>
+            {% elif field.name == "email" %}
+              <p class="text-xs text-slate-500 dark:text-slate-400">{% trans "Optional, used for contact and password resets." %}</p>
+            {% endif %}
             {% if field.errors %}
               <p class="text-sm text-rose-600 dark:text-rose-400">{{ field.errors|striptags }}</p>
             {% endif %}

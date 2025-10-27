@@ -1,0 +1,35 @@
+{% load i18n %}
+{# Shared search + action row for filter forms. Expects:
+   - input_id (required)
+   - input_value (string)
+   - placeholder (string)
+   - label (accessible label text)
+   - name (defaults to "q")
+   - filter_label/reset_label (optional button text)
+   - show_reset (bool), reset_url (href when show_reset true)
+   - container_class (optional utility overrides)
+ #}
+{% spaceless %}
+<div class="{{ container_class|default:'md:col-span-2 flex flex-col gap-2' }}">
+  <label class="sr-only" for="{{ input_id }}">{{ label }}</label>
+  <div class="flex flex-col gap-2 md:flex-row md:items-center">
+    <input
+      id="{{ input_id }}"
+      class="input flex-1"
+      type="text"
+      name="{{ name|default:'q' }}"
+      value="{{ input_value }}"
+      placeholder="{{ placeholder }}"
+      autocomplete="off"
+    />
+    <button class="btn md:ml-2 md:mt-0" type="submit">
+      {{ filter_label|default:_('Filter') }}
+    </button>
+    {% if show_reset %}
+      <a class="btn btn-secondary md:mt-0" href="{{ reset_url }}">
+        {{ reset_label|default:_('Reset') }}
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endspaceless %}

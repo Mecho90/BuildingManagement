@@ -15,11 +15,17 @@
 
     <div class="md:sticky md:top-4 md:z-10">
       <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
-        <div class="flex flex-col gap-2 md:flex-row md:items-center">
-          <label for="id_q" class="sr-only">{% trans "Search" %}</label>
-          <input id="id_q" class="input" type="text" name="q" value="{{ q }}" placeholder="{% trans "Search by name, address, owner" %}"/>
-          <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
-        </div>
+        {% url 'buildings_list' as buildings_reset_url %}
+        {% with placeholder=_('Search by name, address, owner') %}
+          <div class="flex flex-col gap-2 md:flex-row md:items-center">
+            <label class="sr-only" for="id_q">{% trans "Search buildings" %}</label>
+            <input id="id_q" class="input flex-1" type="text" name="q" value="{{ q }}" placeholder="{{ placeholder }}" autocomplete="off" />
+            <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
+            {% if q or sort != 'name' or per != 10 %}
+              <a class="btn btn-secondary md:mt-0" href="{{ buildings_reset_url }}">{% trans "Reset" %}</a>
+            {% endif %}
+          </div>
+        {% endwith %}
 
         <div class="flex items-center gap-2 md:justify-end">
           <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
@@ -31,11 +37,6 @@
           </select>
         </div>
 
-        {% if q or sort != 'name' or per != 10 %}
-          <div class="flex justify-end">
-            <a class="btn btn-secondary" href="{% url 'buildings_list' %}">{% trans "Reset" %}</a>
-          </div>
-        {% endif %}
       </form>
     </div>
 

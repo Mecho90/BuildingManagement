@@ -9,6 +9,7 @@ Why: You asked for "python code format" only, but views need templates.
 from __future__ import annotations
 
 from pathlib import Path
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 
@@ -143,7 +144,7 @@ class Command(BaseCommand):
     help = "Create HTML templates used by views (kept as Python strings here)."
 
     def handle(self, *args, **options):
-        base_dir = Path.cwd() / "templates"
+        base_dir = Path(settings.BASE_DIR) / "templates"
         (base_dir / "core").mkdir(parents=True, exist_ok=True)
 
         files = {
@@ -152,7 +153,7 @@ class Command(BaseCommand):
             base_dir / "core" / "building_detail.html": BUILDING_DETAIL,
             base_dir / "core" / "units_list.html": UNITS_LIST,
             base_dir / "core" / "work_orders_list.html": WORK_ORDERS_LIST,
-            base_dir / "core" / "l": WORK_ORDER_FORM,
+            base_dir / "core" / "work_order_form.html": WORK_ORDER_FORM,
         }
 
         for path, content in files.items():

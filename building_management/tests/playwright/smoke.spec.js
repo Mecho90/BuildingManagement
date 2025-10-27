@@ -1,9 +1,11 @@
 const { test, expect } = require('@playwright/test');
+const { loginIfNeeded } = require('./utils/auth');
 
-const buildingListPath = '/';
+const buildingListPath = '/buildings/';
 
 test.describe('Responsive smoke', () => {
   test('buildings list renders primary components', async ({ page }) => {
+    await loginIfNeeded(page, { destination: buildingListPath });
     await page.goto(buildingListPath);
     await expect(page.getByRole('heading', { name: 'Buildings' })).toBeVisible();
     await expect(page.getByRole('button', { name: /add new building/i })).toBeVisible();
@@ -12,6 +14,7 @@ test.describe('Responsive smoke', () => {
   });
 
   test('building detail cards render when reachable', async ({ page }) => {
+    await loginIfNeeded(page, { destination: buildingListPath });
     await page.goto(buildingListPath);
     const firstRow = page.locator('a:has-text("Building")').first();
     if (await firstRow.count()) {

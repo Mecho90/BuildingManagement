@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% if form.instance.pk %}{% trans "Edit Work Order" %}{% else %}{% trans "New Work Order" %}{% endif %} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
@@ -13,104 +13,6 @@
 {% block extra_js %}
   {{ block.super }}
   {% if units_api_template %}
-    <script>
-      (function () {
-        const initializeUnitsWidget = function () {
-          const buildingField = document.getElementById("id_building");
-          const unitField = document.getElementById("id_unit");
-          if (!buildingField || !unitField) {
-            return;
-          }
-          if (buildingField.tagName === "INPUT") {
-            return;
-          }
-
-          const datasetRaw = "{{ units_dataset|default:'[]'|escapejs }}";
-          let unitsDataset = [];
-          try {
-            unitsDataset = JSON.parse(datasetRaw);
-          } catch (err) {
-            console.warn("Failed to parse units dataset", err);
-            unitsDataset = [];
-          }
-
-          const resetUnits = function () {
-            unitField.innerHTML = "";
-            const blankOption = document.createElement("option");
-            blankOption.value = "";
-            blankOption.textContent = "---------";
-            unitField.appendChild(blankOption);
-            unitField.value = "";
-            unitField.setAttribute("disabled", "disabled");
-            unitField.disabled = true;
-          };
-
-        const populateUnits = function (buildingId, selectedId) {
-          unitField.innerHTML = "";
-          const blankOption = document.createElement("option");
-          blankOption.value = "";
-          blankOption.textContent = "---------";
-          unitField.appendChild(blankOption);
-
-          if (!buildingId) {
-            unitField.value = "";
-            unitField.setAttribute("disabled", "disabled");
-            unitField.disabled = true;
-            return;
-          }
-
-          const options = unitsDataset.filter(function (unit) {
-            return String(unit.building_id) === String(buildingId);
-          });
-
-          options.forEach(function (unit) {
-            const opt = document.createElement("option");
-            opt.value = unit.id;
-            opt.textContent = unit.label || unit.number;
-            if (String(unit.id) === String(selectedId)) {
-              opt.selected = true;
-            }
-            unitField.appendChild(opt);
-          });
-
-          if (options.length) {
-            unitField.removeAttribute("disabled");
-            unitField.disabled = false;
-          } else {
-            unitField.setAttribute("disabled", "disabled");
-            unitField.disabled = true;
-          }
-        };
-
-        const initializeUnits = function () {
-          const selectedUnit = unitField.dataset.selected || unitField.value;
-          const currentBuilding = buildingField.value;
-          if (!currentBuilding) {
-            resetUnits();
-            return;
-          }
-          populateUnits(currentBuilding, selectedUnit);
-        };
-
-        const currentUnit = unitField.value;
-        if (currentUnit) {
-          unitField.dataset.selected = currentUnit;
-        }
-
-        initializeUnits();
-
-        buildingField.addEventListener("change", function () {
-          unitField.dataset.selected = "";
-          populateUnits(buildingField.value, "");
-        });
-        };
-
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", initializeUnitsWidget);
-        } else {
-          initializeUnitsWidget();
-        }
-      })();
-    </script>
+    <script src="{% static 'js/work-order-units.js' %}" defer></script>
   {% endif %}
 {% endblock %}

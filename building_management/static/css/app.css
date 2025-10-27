@@ -26,18 +26,6 @@
 }
 
 @layer components {
-  .row {
-    @apply flex items-center;
-  }
-
-  .space-between {
-    @apply justify-between;
-  }
-
-  .gap {
-    @apply gap-4;
-  }
-
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white
            px-3 py-2 text-sm font-medium text-brand-foreground shadow-sm transition
@@ -61,23 +49,8 @@
     @apply cursor-not-allowed opacity-60 pointer-events-none;
   }
 
-  .btn-equal {
-    @apply min-w-[160px];
-  }
-
   .btn-sm {
     @apply px-2.5 py-1.5 text-xs;
-  }
-
-  .form-row {
-    @apply mb-4;
-  }
-
-  .form-row.has-errors .input,
-  .form-row.has-errors input,
-  .form-row.has-errors select,
-  .form-row.has-errors textarea {
-    @apply border-rose-300 ring-2 ring-rose-200/70;
   }
 
   label {
@@ -108,22 +81,6 @@
   input[type='date'],
   select {
     @apply h-11 leading-tight;
-  }
-
-  .input-search {
-    @apply px-3 py-2;
-  }
-
-  .input-group.joined {
-    @apply flex;
-  }
-
-  .input-group.joined > .input-search {
-    @apply flex-1 rounded-r-none;
-  }
-
-  .input-group.joined > .btn {
-    @apply rounded-l-none border-l-0;
   }
 
   .help {

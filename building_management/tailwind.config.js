@@ -7,6 +7,7 @@ module.exports = {
     "./core/**/*.py",
     "./building_mgmt/**/*.py",
   ],
+  safelist: ["alert--success", "alert--warning", "alert--info", "alert--danger", "alert--error"],
   darkMode: "class",
   theme: {
     extend: {

@@ -38,23 +38,30 @@ class Command(BaseCommand):
             )
             return
 
-        checks = []
-        for label, index in [
-            ("unique_unit_number_ci_per_building index", "unique_unit_number_ci_per_building"),
-            ("core_unit_buildin_dc6512_idx index", "core_unit_buildin_dc6512_idx"),
-        ]:
-            checks.append(
-                (
-                    label,
-                    """
-                    SELECT 1
-                    FROM pg_indexes
-                    WHERE tablename = %s
-                      AND indexname = %s
-                    """,
-                    ("core_unit", index),
-                )
-            )
+        checks = [
+            (
+                "unique_unit_number_ci_per_building constraint",
+                """
+                SELECT 1
+                FROM pg_constraint c
+                JOIN pg_namespace n ON n.oid = c.connamespace
+                WHERE c.conname = %s
+                  AND n.nspname = ANY (current_schemas(FALSE))
+                """,
+                ("unique_unit_number_ci_per_building",),
+            ),
+            (
+                "core_unit (building_id, number) index",
+                """
+                SELECT 1
+                FROM pg_indexes
+                WHERE tablename = %s
+                  AND schemaname = ANY (current_schemas(FALSE))
+                  AND indexdef ILIKE '%%(building_id, number)%%'
+                """,
+                ("core_unit",),
+            ),
+        ]
 
         failures: list[str] = []
         with connection.cursor() as cursor:

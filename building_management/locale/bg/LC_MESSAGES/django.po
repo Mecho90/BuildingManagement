@@ -111,6 +111,10 @@ msgstr "Не можете да възлагате поръчки на тази �
 msgid "Email"
 msgstr "Имейл"
 
+#: core/forms.py:316 templates/core/user_form.html:44
+msgid "Optional, used for contact and password resets."
+msgstr "Незадължително, използва се за контакт и възстановяване на парола."
+
 #: core/forms.py:262
 msgid "First name"
 msgstr "Име"
@@ -1049,6 +1053,18 @@ msgstr "Първа"
 msgid "Last"
 msgstr "Последна"
 
+#: core/views.py:958
+msgid "Archived (Newest first)"
+msgstr "Архивирани (най-нови първо)"
+
+#: core/views.py:959
+msgid "Archived (Oldest first)"
+msgstr "Архивирани (най-стари първо)"
+
+#: core/views.py:123
+msgid "Loading units…"
+msgstr "Зареждане на апартаменти…"
+
 #: templates/registration/logged_out.html:3
 msgid "Logged out"
 msgstr "Изход"
@@ -1098,11 +1114,6 @@ msgstr "Парола"
 #~ msgid "Superuser status"
 #~ msgstr "Статут на супер-потребител"
 
-#~ msgid "Archived (Newest first)"
-#~ msgstr "Архивирани (най-нови първо)"
-
-#~ msgid "Archived (Oldest first)"
-#~ msgstr "Архивирани (най-стари първо)"
 
 #~ msgid "New"
 #~ msgstr "Нов"

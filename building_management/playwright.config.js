@@ -11,6 +11,7 @@ module.exports = defineConfig({
     timeout: 10 * 1000,
   },
   reporter: [['list']],
+  globalSetup: require.resolve('./tests/playwright/global-setup.js'),
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:8000',
     screenshot: 'only-on-failure',

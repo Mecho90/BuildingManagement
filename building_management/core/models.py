@@ -5,8 +5,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
-from django.db.models import Count, Q
-from django.db.models.functions import Lower
+from django.db.models import Count, IntegerField, OuterRef, Q, Subquery, Value
+from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -29,17 +29,30 @@ class BuildingQuerySet(models.QuerySet):
           - _units_count: total units
           - _work_orders_count: ACTIVE work orders (OPEN + IN_PROGRESS), non-archived
         """
+        unit_totals = (
+            Unit.objects.filter(building_id=OuterRef("pk"))
+            .order_by()
+            .values("building_id")
+            .annotate(total=Count("pk"))
+            .values("total")
+        )
+        active_workorders = (
+            WorkOrder.objects.filter(
+                building_id=OuterRef("pk"),
+                archived_at__isnull=True,
+                status__in=[
+                    WorkOrder.Status.OPEN,
+                    WorkOrder.Status.IN_PROGRESS,
+                ],
+            )
+            .order_by()
+            .values("building_id")
+            .annotate(total=Count("pk"))
+            .values("total")
+        )
         return self.annotate(
-            _units_count=Count("units", distinct=True),
-            _work_orders_count=Count(
-                "work_orders",
-                filter=Q(work_orders__archived_at__isnull=True)
-                       & Q(work_orders__status__in=[
-                            WorkOrder.Status.OPEN,
-                            WorkOrder.Status.IN_PROGRESS
-                         ]),
-                distinct=True,
-            ),
+            _units_count=Coalesce(Subquery(unit_totals[:1]), Value(0), output_field=IntegerField()),
+            _work_orders_count=Coalesce(Subquery(active_workorders[:1]), Value(0), output_field=IntegerField()),
         )
 
 
@@ -176,6 +189,7 @@ class Unit(TimeStampedModel):
                 Lower("number"),
                 "building",
                 name="unique_unit_number_ci_per_building",
+                violation_error_message=_("Apartment number must be unique within this building."),
             )
         ]
         # Helpful index for lookups and counts
@@ -185,24 +199,6 @@ class Unit(TimeStampedModel):
 
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.number} @ {self.building.name}"
-
-    # ---------- Validation & normalization ---------------------------------
-
-    def clean(self):
-        """Application-level guard to match the DB constraint and give a nice error."""
-        super().clean()
-        # Use the raw FK id so we don't trigger a RelatedObjectDoesNotExist
-        if not self.building_id:
-            return
-
-        normalized = (self.number or "").strip()
-        qs = Unit.objects.filter(building_id=self.building_id, number__iexact=normalized)
-        if self.pk:
-            qs = qs.exclude(pk=self.pk)
-        if qs.exists():
-            raise ValidationError(
-                {"number": _( "Apartment number must be unique within this building." )}
-            )
 
     def save(self, *args, **kwargs):
         # light normalization to avoid surprises
@@ -288,6 +284,7 @@ class WorkOrder(TimeStampedModel):
         - If a unit is provided, force the building to that unit's building
         - Run `full_clean()` to enforce model validation (deadline required, etc.)
         """
+        validate = kwargs.pop("validate", True)
         if self.title:
             self.title = self.title.strip()
 
@@ -296,7 +293,8 @@ class WorkOrder(TimeStampedModel):
             self.building_id = self.unit.building_id
 
         # Always validate
-        self.full_clean()
+        if validate:
+            self.full_clean()
         return super().save(*args, **kwargs)
 
     # ---------------------------- Convenience API ---------------------------
@@ -309,7 +307,7 @@ class WorkOrder(TimeStampedModel):
         """Mark as archived (caller should ensure status is DONE in views/UI)."""
         if not self.is_archived:
             self.archived_at = timezone.now()
-            self.save(update_fields=["archived_at"])
+            self.save(update_fields=["archived_at"], validate=False)
 
 
 class UserSecurityProfile(models.Model):

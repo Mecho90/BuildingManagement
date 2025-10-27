@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import re
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, SetPasswordForm
-from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
@@ -56,7 +54,6 @@ class BuildingForm(forms.ModelForm):
         return obj
 
 
-_PHONE_RE = re.compile(r"^\+?\d{7,15}$")
 # -----------------------------
 # Units
 # -----------------------------
@@ -70,6 +67,7 @@ class UnitForm(forms.ModelForm):
         # ALWAYS set these attributes so save() never fails
         self._user = user
         self._building = building
+        self._resolved_building = None
         super().__init__(*args, **kwargs)
 
         # If your form exposes the building field, lock it to the provided building
@@ -86,11 +84,24 @@ class UnitForm(forms.ModelForm):
             "placeholder", "+359..."
         )
 
+    def _resolve_building(self):
+        if self._resolved_building is not None:
+            return self._resolved_building
+        candidate = self._building or self.cleaned_data.get("building") or getattr(self.instance, "building", None)
+        if candidate and not isinstance(candidate, Building):
+            try:
+                candidate = Building.objects.get(pk=candidate)
+            except (Building.DoesNotExist, TypeError, ValueError):
+                candidate = None
+        self._resolved_building = candidate
+        return self._resolved_building
+
     def clean_number(self):
         number = (self.cleaned_data.get("number") or "").strip()
 
         # Decide which building to validate against without touching a missing relation
-        building_id = getattr(self._building, "pk", None) or self.instance.building_id
+        building = self._resolve_building()
+        building_id = getattr(building, "pk", None)
 
         # Enforce uniqueness only when we know the building
         if building_id and number:
@@ -103,17 +114,25 @@ class UnitForm(forms.ModelForm):
                 )
         return number
 
+    def clean(self):
+        cleaned = super().clean()
+        building = self._resolve_building()
+
+        if self._user and not (self._user.is_staff or self._user.is_superuser):
+            if building and building.owner_id != self._user.id:
+                self.add_error(
+                    None,
+                    _("You don't have permission to edit this unit."),
+                )
+        return cleaned
+
     def save(self, commit=True):
         obj = super().save(commit=False)
 
         # Ensure the unit is bound to the building coming from the view
-        if self._building is not None:
-            obj.building = self._building
-
-        # Optional permission safety: only owners/staff can save
-        if self._user and not (self._user.is_staff or self._user.is_superuser):
-            if obj.building and obj.building.owner_id != self._user.id:
-                raise forms.ValidationError(_("You don't have permission to edit this unit."))
+        resolved_building = self._resolve_building()
+        if resolved_building is not None:
+            obj.building = resolved_building
 
         if commit:
             obj.save()
@@ -155,10 +174,23 @@ class WorkOrderForm(forms.ModelForm):
         except (TypeError, ValueError):
             return None
 
+    @staticmethod
+    def _coerce_building(b) -> Building | None:
+        if isinstance(b, Building):
+            return b
+        if b in (None, ""):
+            return None
+        try:
+            return Building.objects.get(pk=int(b))
+        except (Building.DoesNotExist, TypeError, ValueError):
+            return None
+
     # ---------- init ----------
     def __init__(self, *args, user=None, building=None, **kwargs):
         self._user = user
         self._building = building
+        self._locked_building_obj = self._coerce_building(building)
+        self._effective_building = None
         super().__init__(*args, **kwargs)
 
         # 1) Building choices / lock + hide if provided
@@ -167,6 +199,7 @@ class WorkOrderForm(forms.ModelForm):
             self.fields["building"].queryset = Building.objects.filter(pk=b_id)
             self.fields["building"].initial = b_id
             self.fields["building"].widget = forms.HiddenInput()
+            self.fields["building"].required = False
         else:
             bqs = Building.objects.all()
             if user and not (user.is_staff or user.is_superuser):
@@ -210,13 +243,15 @@ class WorkOrderForm(forms.ModelForm):
         building = cleaned.get("building")
         if building is None and self._building is not None:
             b_id = self._resolve_building_id(self._building)
-            building = Building.objects.filter(pk=b_id).first()
+            building = self._coerce_building(self._building)
+        elif building is None and getattr(self.instance, "building_id", None):
+            building = getattr(self.instance, "building")
 
         unit = cleaned.get("unit")
 
         # Unit must belong to building
         if building and unit and unit.building_id != building.id:
-                self.add_error("unit", _( "Selected unit does not belong to the chosen building." ))
+            self.add_error("unit", _("Selected unit does not belong to the chosen building."))
 
         # Non-staff must own the building
         if self._user and not (self._user.is_staff or self._user.is_superuser) and building:
@@ -227,6 +262,7 @@ class WorkOrderForm(forms.ModelForm):
         if deadline and deadline < timezone.localdate():
             self.add_error("deadline", _("Deadline cannot be in the past."))
 
+        self._effective_building = building
         return cleaned
 
     # ---------- save ----------
@@ -234,15 +270,8 @@ class WorkOrderForm(forms.ModelForm):
         obj: WorkOrder = super().save(commit=False)
 
         # Force building when form initialized with one
-        if self._building is not None:
-            b_id = self._resolve_building_id(self._building)
-            if b_id:
-                obj.building_id = b_id
-
-        # Extra safety: enforce ownership
-        if self._user and not (self._user.is_staff or self._user.is_superuser):
-            if obj.building_id and not Building.objects.filter(pk=obj.building_id, owner=self._user).exists():
-                raise ValidationError(_("You cannot assign work orders to this building."))
+        if self._locked_building_obj is not None:
+            obj.building = self._locked_building_obj
 
         if commit:
             obj.save()
@@ -283,6 +312,8 @@ class AdminUserCreateForm(UserCreationForm):
                 widget.attrs.setdefault("class", "checkbox")
             else:
                 widget.attrs.setdefault("class", "input")
+        if "email" in self.fields:
+            self.fields["email"].help_text = _("Optional, used for contact and password resets.")
         self.fields["is_active"].label = capfirst(_USER_IS_ACTIVE_FIELD.verbose_name)
         self.fields["is_active"].help_text = _USER_IS_ACTIVE_FIELD.help_text
         self.fields["is_superuser"].label = capfirst(_USER_SUPERUSER_FIELD.verbose_name)
