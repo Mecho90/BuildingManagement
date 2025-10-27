@@ -9,6 +9,8 @@ class CoreConfig(AppConfig):
         Dev-only safety net: if ANY tables for models in `core` are missing,
         run `migrate` once to create them.
         """
+        from . import signals  # noqa: F401
+
         import os
         import sys
         from django.conf import settings

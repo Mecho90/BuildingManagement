@@ -26,7 +26,7 @@ from django.views.generic import (
     FormView,
 )
 
-from django.utils import timezone
+from django.utils import formats, timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _, ngettext, gettext_lazy as _lazy
 from .forms import (
@@ -37,7 +37,7 @@ from .forms import (
     AdminUserUpdateForm,
     AdminUserPasswordForm,
 )
-from .models import Building, Unit, WorkOrder
+from .models import Building, Unit, WorkOrder, UserSecurityProfile
 from .views_theme import toggle_theme
 
 User = get_user_model()
@@ -243,6 +243,37 @@ class BuildingListView(LoginRequiredMixin, ListView):
                         "level": priority_levels[priority],
                         "message": message + ".",
                         "category": "deadline",
+                    }
+                )
+
+        if is_admin:
+            locked_accounts = (
+                UserSecurityProfile.objects.select_related("user")
+                .filter(
+                    user__is_active=False,
+                    lock_reason=UserSecurityProfile.LockReason.FAILED_ATTEMPTS,
+                )
+                .order_by("-locked_at")[:20]
+            )
+
+            for profile in locked_accounts:
+                locked_at = profile.locked_at
+                locked_display = (
+                    formats.date_format(timezone.localtime(locked_at), "DATETIME_FORMAT")
+                    if locked_at
+                    else _("an unknown time")
+                )
+                locked_user = profile.user
+                display_name = locked_user.get_full_name() or locked_user.username
+                message = _(
+                    "%(user)s was locked after too many failed login attempts on %(locked)s. Reactivate the account and set a new password to restore access."
+                ) % {"user": display_name, "locked": locked_display}
+                notifications.append(
+                    {
+                        "id": f"user-locked-{locked_user.pk}",
+                        "level": "danger",
+                        "message": message,
+                        "category": "account_lock",
                     }
                 )
 

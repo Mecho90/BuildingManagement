@@ -5,6 +5,7 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from django.conf import settings
 from django.conf.urls.static import static
+from core.auth_views import RoleAwareLoginView
 
 urlpatterns = [
     # Admin
@@ -14,7 +15,7 @@ urlpatterns = [
     # Auth
     path(
         "login/",
-        auth_views.LoginView.as_view(
+        RoleAwareLoginView.as_view(
             template_name="registration/login.html",
             redirect_authenticated_user=True,  # if already logged in, skip to buildings
         ),

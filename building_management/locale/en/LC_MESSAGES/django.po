@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-24 21:36+0300\n"
+"POT-Creation-Date: 2025-10-27 11:58+0200\n"
 "PO-Revision-Date: 2025-10-24 13:00+0000\n"
 "Last-Translator: Codex Translator <noreply@example.com>\n"
 "Language-Team: English <en@example.com>\n"
@@ -25,31 +25,47 @@ msgstr "English"
 msgid "Bulgarian"
 msgstr "Bulgarian"
 
-#: core/forms.py:79 templates/core/building_detail.html:134
+#: core/auth_views.py:50 core/auth_views.py:76
+msgid ""
+"Your account has been locked after too many failed attempts. Contact an "
+"administrator."
+msgstr ""
+"Your account has been locked after too many failed attempts. Contact an "
+"administrator."
+
+#: core/forms.py:81 templates/core/building_detail.html:134
 #: templates/core/building_detail.html:136
 #: templates/core/building_detail.html:138 templates/core/unit_detail.html:24
 msgid "Floor"
 msgstr "Floor"
 
-#: core/forms.py:80
+#: core/forms.py:82
 msgid "Is occupied"
 msgstr "Is occupied"
 
-#: core/forms.py:100 core/models.py:204
+#: core/forms.py:102 core/models.py:204
 msgid "Apartment number must be unique within this building."
 msgstr "Apartment number must be unique within this building."
 
-#: core/forms.py:114
+#: core/forms.py:116
 msgid "You don't have permission to edit this unit."
 msgstr "You don't have permission to edit this unit."
 
-#: core/forms.py:194
+#: core/forms.py:180 templates/core/work_order_detail.html:34
+#: templates/core/work_orders_list.html:86
+#: templates/core/work_orders_list.html:151
+#, fuzzy
+#| msgid "Buildings"
+msgid "Building"
+msgstr "Buildings"
+
+#: core/forms.py:198
 msgid "Select a building first"
 msgstr "Select a building first"
 
-#: core/forms.py:196 templates/core/building_detail.html:248
+#: core/forms.py:200 templates/core/building_detail.html:248
 #: templates/core/building_detail.html:282
-#: templates/core/work_order_detail.html:33
+#: templates/core/work_order_detail.html:38
 #: templates/core/work_orders_archive.html:89
 #: templates/core/work_orders_list.html:156
 #, fuzzy
@@ -57,13 +73,13 @@ msgstr "Select a building first"
 msgid "Unit"
 msgstr "Units"
 
-#: core/forms.py:197 templates/core/building_detail.html:283
+#: core/forms.py:201 templates/core/building_detail.html:283
 #: templates/core/work_orders_archive.html:90
 #: templates/core/work_orders_list.html:157
 msgid "Priority"
 msgstr "Priority"
 
-#: core/forms.py:198 templates/core/building_detail.html:212
+#: core/forms.py:202 templates/core/building_detail.html:212
 #: templates/core/building_detail.html:284
 #: templates/core/work_orders_archive.html:91
 #: templates/core/work_orders_list.html:42
@@ -71,28 +87,45 @@ msgstr "Priority"
 msgid "Status"
 msgstr "Status"
 
-#: core/forms.py:199 templates/core/building_detail.html:252
+#: core/forms.py:203 templates/core/building_detail.html:252
 #: templates/core/building_detail.html:285
-#: templates/core/work_order_detail.html:37
+#: templates/core/work_order_detail.html:42
 #: templates/core/work_orders_list.html:159
 msgid "Deadline"
 msgstr "Deadline"
 
-#: core/forms.py:215
+#: core/forms.py:219
 msgid "Selected unit does not belong to the chosen building."
 msgstr "Selected unit does not belong to the chosen building."
 
-#: core/forms.py:220
+#: core/forms.py:224
 msgid "You cannot create work orders for buildings you do not own."
 msgstr "You cannot create work orders for buildings you do not own."
 
-#: core/forms.py:224
+#: core/forms.py:228
 msgid "Deadline cannot be in the past."
 msgstr "Deadline cannot be in the past."
 
-#: core/forms.py:241
+#: core/forms.py:245
 msgid "You cannot assign work orders to this building."
 msgstr "You cannot assign work orders to this building."
+
+#: core/forms.py:261 templates/core/user_details.html:10
+#: templates/core/users_list.html:43
+msgid "Email"
+msgstr "Email"
+
+#: core/forms.py:262
+#, fuzzy
+#| msgid "First"
+msgid "First name"
+msgstr "First"
+
+#: core/forms.py:263
+#, fuzzy
+#| msgid "Unit updated."
+msgid "Last name"
+msgstr "Unit updated."
 
 #: core/models.py:78
 msgid "Technical Support"
@@ -122,7 +155,7 @@ msgstr "Owner"
 
 #: core/models.py:88 templates/core/buildings_list.html:84
 #: templates/core/buildings_list.html:86 templates/core/buildings_list.html:88
-#: templates/core/users_list.html:12
+#: templates/core/users_list.html:42
 msgid "Name"
 msgstr "Name"
 
@@ -135,7 +168,7 @@ msgstr "Address"
 
 #: core/models.py:90 core/models.py:167 core/models.py:241
 #: templates/core/building_detail.html:41 templates/core/unit_detail.html:43
-#: templates/core/work_order_detail.html:51
+#: templates/core/work_order_detail.html:56
 msgid "Description"
 msgstr "Description"
 
@@ -199,33 +232,49 @@ msgstr "Title"
 msgid "Selected unit does not belong to the selected building."
 msgstr "Selected unit does not belong to the selected building."
 
-#: core/views.py:186
+#: core/models.py:317
+msgid "Too many failed login attempts"
+msgstr "Too many failed login attempts"
+
+#: core/models.py:318
+msgid "Manually locked"
+msgstr "Manually locked"
+
+#: core/models.py:330
+msgid "User security profile"
+msgstr "User security profile"
+
+#: core/models.py:331
+msgid "User security profiles"
+msgstr "User security profiles"
+
+#: core/views.py:204
 msgid "your building"
 msgstr "your building"
 
-#: core/views.py:196
+#: core/views.py:214
 #, python-format
 msgid "overdue by %(count)s day"
 msgid_plural "overdue by %(count)s days"
 msgstr[0] "overdue by %(count)s day"
 msgstr[1] "overdue by %(count)s days"
 
-#: core/views.py:201
+#: core/views.py:219
 msgid "due today"
 msgstr "due today"
 
-#: core/views.py:203
+#: core/views.py:221
 msgid "due tomorrow"
 msgstr "due tomorrow"
 
-#: core/views.py:206
+#: core/views.py:224
 #, python-format
 msgid "due in %(count)s day"
 msgid_plural "due in %(count)s days"
 msgstr[0] "due in %(count)s day"
 msgstr[1] "due in %(count)s days"
 
-#: core/views.py:211
+#: core/views.py:229
 #, python-format
 msgid ""
 "%(priority)s priority work order \"%(title)s\" in %(building)s is %(due)s "
@@ -234,108 +283,139 @@ msgstr ""
 "%(priority)s priority work order \"%(title)s\" in %(building)s is %(due)s "
 "(deadline %(deadline)s)"
 
-#: core/views.py:221
+#: core/views.py:239
 #, python-format
 msgid " (owner: %(owner)s)"
 msgstr " (owner: %(owner)s)"
 
-#: core/views.py:356
+#: core/views.py:264
+msgid "an unknown time"
+msgstr "an unknown time"
+
+#: core/views.py:269
+#, python-format
+msgid ""
+"%(user)s was locked after too many failed login attempts on %(locked)s. "
+"Reactivate the account and set a new password to restore access."
+msgstr ""
+"%(user)s was locked after too many failed login attempts on %(locked)s. "
+"Reactivate the account and set a new password to restore access."
+
+#: core/views.py:405
 msgid "Building created."
 msgstr "Building created."
 
-#: core/views.py:380
+#: core/views.py:429
 msgid "Building updated."
 msgstr "Building updated."
 
-#: core/views.py:397
+#: core/views.py:446
 msgid "Building deleted."
 msgstr "Building deleted."
 
-#: core/views.py:461
+#: core/views.py:510
 msgid "Unit created."
 msgstr "Unit created."
 
-#: core/views.py:496
+#: core/views.py:545
 msgid "Unit updated."
 msgstr "Unit updated."
 
-#: core/views.py:520
+#: core/views.py:569
 msgid "Unit deleted."
 msgstr "Unit deleted."
 
-#: core/views.py:671 core/views.py:929
+#: core/views.py:720
 msgid "Priority (High → Low)"
 msgstr "Priority (High → Low)"
 
-#: core/views.py:672 core/views.py:930
+#: core/views.py:721
 msgid "Priority (Low → High)"
 msgstr "Priority (Low → High)"
 
-#: core/views.py:673
+#: core/views.py:722
 msgid "Deadline (Soon → Late)"
 msgstr "Deadline (Soon → Late)"
 
-#: core/views.py:674
+#: core/views.py:723
 msgid "Deadline (Late → Soon)"
 msgstr "Deadline (Late → Soon)"
 
-#: core/views.py:675 core/views.py:927
+#: core/views.py:724
 msgid "Created (Newest first)"
 msgstr "Created (Newest first)"
 
-#: core/views.py:676 core/views.py:928
+#: core/views.py:725
 msgid "Created (Oldest first)"
 msgstr "Created (Oldest first)"
 
-#: core/views.py:677 core/views.py:931
+#: core/views.py:726
 msgid "Building (A → Z)"
 msgstr "Building (A → Z)"
 
-#: core/views.py:678 core/views.py:932
+#: core/views.py:727
 msgid "Building (Z → A)"
 msgstr "Building (Z → A)"
 
-#: core/views.py:679
+#: core/views.py:728
 msgid "Owner (A → Z)"
 msgstr "Owner (A → Z)"
 
-#: core/views.py:680
+#: core/views.py:729
 msgid "Owner (Z → A)"
 msgstr "Owner (Z → A)"
 
-#: core/views.py:764
+#: core/views.py:821
 msgid "Work order created."
 msgstr "Work order created."
 
-#: core/views.py:833
+#: core/views.py:892
 msgid "Work order updated."
 msgstr "Work order updated."
 
-#: core/views.py:858
+#: core/views.py:917
 msgid "Work order deleted."
 msgstr "Work order deleted."
 
-#: core/views.py:898
+#: core/views.py:957
 msgid "Only completed work orders can be archived."
 msgstr "Only completed work orders can be archived."
 
-#: core/views.py:902
+#: core/views.py:961
 msgid "Work order archived."
 msgstr "Work order archived."
 
-#: core/views.py:925
-msgid "Archived (Newest first)"
-msgstr "Archived (Newest first)"
+#: core/views.py:1139
+#, fuzzy
+#| msgid "Unit created."
+msgid "User created."
+msgstr "Unit created."
 
-#: core/views.py:926
-msgid "Archived (Oldest first)"
-msgstr "Archived (Oldest first)"
+#: core/views.py:1154
+#, fuzzy
+#| msgid "Unit updated."
+msgid "User updated."
+msgstr "Unit updated."
+
+#: core/views.py:1176
+msgid "Password reset successfully."
+msgstr ""
+
+#: core/views.py:1196
+msgid "You cannot delete your own account."
+msgstr ""
+
+#: core/views.py:1198
+#, fuzzy
+#| msgid "Unit deleted."
+msgid "User deleted."
+msgstr "Unit deleted."
 
 #: templates/base.html:9 templates/core/building_confirm_delete.html:4
 #: templates/core/building_form.html:5
 #: templates/core/unit_confirm_delete.html:4
 #: templates/core/user_confirm_delete.html:3 templates/core/user_details.html:3
-#: templates/core/user_form.html:3 templates/core/user_password_form.html:3
+#: templates/core/user_form.html:4 templates/core/user_password_form.html:3
 #: templates/core/users_list.html:3 templates/core/work_order_form.html:3
 #: templates/core/work_orders_archive.html:4
 #: templates/core/work_orders_list.html:4
@@ -363,32 +443,39 @@ msgstr "Work Orders"
 msgid "Archive"
 msgstr "Archive"
 
-#: templates/base.html:29
+#: templates/base.html:29 templates/core/users_list.html:3
+#: templates/core/users_list.html:8
+#, fuzzy
+#| msgid "Username"
+msgid "User Management"
+msgstr "Username"
+
+#: templates/base.html:31
 msgid "Admin Panel"
 msgstr "Admin Panel"
 
-#: templates/base.html:38
+#: templates/base.html:40
 #, python-format
 msgid "Welcome, %(name)s"
 msgstr "Welcome, %(name)s"
 
-#: templates/base.html:41
+#: templates/base.html:43
 msgid "Logout"
 msgstr "Logout"
 
-#: templates/base.html:44 templates/base.html:48
+#: templates/base.html:46 templates/base.html:50
 msgid "Light mode"
 msgstr "Light mode"
 
-#: templates/base.html:44 templates/base.html:48
+#: templates/base.html:46 templates/base.html:50
 msgid "Dark mode"
 msgstr "Dark mode"
 
-#: templates/base.html:50 templates/registration/login.html:3
+#: templates/base.html:52 templates/registration/login.html:3
 msgid "Login"
 msgstr "Login"
 
-#: templates/core/_form_layout.html:55 templates/core/user_form.html:9
+#: templates/core/_form_layout.html:55 templates/core/user_form.html:69
 msgid "Save"
 msgstr "Save"
 
@@ -398,8 +485,8 @@ msgstr "Save"
 #: templates/core/building_confirm_delete.html:40
 #: templates/core/unit_confirm_delete.html:19
 #: templates/core/unit_confirm_delete.html:21
-#: templates/core/user_confirm_delete.html:10 templates/core/user_form.html:10
-#: templates/core/user_password_form.html:10
+#: templates/core/user_confirm_delete.html:19 templates/core/user_form.html:70
+#: templates/core/user_password_form.html:42
 #: templates/core/work_order_confirm_delete.html:17
 msgid "Cancel"
 msgstr "Cancel"
@@ -438,7 +525,7 @@ msgstr "This action cannot be undone."
 
 #: templates/core/building_confirm_delete.html:31
 #: templates/core/unit_confirm_delete.html:17
-#: templates/core/user_confirm_delete.html:9
+#: templates/core/user_confirm_delete.html:18
 #: templates/core/work_order_confirm_delete.html:16
 msgid "Yes, delete"
 msgstr "Yes, delete"
@@ -446,7 +533,7 @@ msgstr "Yes, delete"
 #: templates/core/building_detail.html:29
 #: templates/core/building_detail.html:256
 #: templates/core/building_detail.html:286
-#: templates/core/work_order_detail.html:41
+#: templates/core/work_order_detail.html:46
 #: templates/core/work_orders_archive.html:92
 #: templates/core/work_orders_list.html:160
 #, fuzzy
@@ -465,14 +552,16 @@ msgstr "Buildings"
 #: templates/core/building_detail.html:157
 #: templates/core/building_detail.html:268
 #: templates/core/building_detail.html:313 templates/core/unit_detail.html:12
-#: templates/core/user_details.html:20 templates/core/work_order_detail.html:11
+#: templates/core/user_details.html:20 templates/core/users_list.html:74
+#: templates/core/work_order_detail.html:12
+#: templates/core/work_order_detail.html:15
 #: templates/core/work_orders_list.html:119
 #: templates/core/work_orders_list.html:212
 msgid "Delete"
 msgstr "Delete"
 
 #: templates/core/building_detail.html:46
-#: templates/core/work_order_detail.html:56
+#: templates/core/work_order_detail.html:61
 msgid "No description provided."
 msgstr "No description provided."
 
@@ -541,7 +630,7 @@ msgid "Number"
 msgstr "Number"
 
 #: templates/core/building_detail.html:144
-#: templates/core/building_detail.html:287
+#: templates/core/building_detail.html:287 templates/core/users_list.html:48
 #: templates/core/work_orders_list.html:161
 msgid "Actions"
 msgstr "Actions"
@@ -551,7 +640,7 @@ msgstr "Actions"
 #: templates/core/building_detail.html:330
 #: templates/core/building_detail.html:332
 #: templates/core/buildings_list.html:180
-#: templates/core/buildings_list.html:182 templates/core/users_list.html:33
+#: templates/core/buildings_list.html:182
 #: templates/core/work_orders_list.html:230
 #: templates/core/work_orders_list.html:233
 msgid "Prev"
@@ -562,7 +651,7 @@ msgstr "Prev"
 #: templates/core/building_detail.html:335
 #: templates/core/building_detail.html:337
 #: templates/core/buildings_list.html:185
-#: templates/core/buildings_list.html:187 templates/core/users_list.html:37
+#: templates/core/buildings_list.html:187 templates/core/users_list.html:102
 #: templates/core/work_orders_list.html:236
 #: templates/core/work_orders_list.html:239
 msgid "Next"
@@ -607,8 +696,8 @@ msgid "All"
 msgstr "All"
 
 #: templates/core/building_detail.html:261 templates/core/unit_detail.html:11
-#: templates/core/user_form.html:3 templates/core/user_form.html:5
-#: templates/core/work_order_detail.html:10
+#: templates/core/users_list.html:72 templates/core/work_order_detail.html:11
+#: templates/core/work_order_detail.html:14
 msgid "Edit"
 msgstr "Edit"
 
@@ -645,7 +734,7 @@ msgstr "Browse and manage your properties."
 msgid "Add new building"
 msgstr "Add new building"
 
-#: templates/core/buildings_list.html:19 templates/core/users_list.html:8
+#: templates/core/buildings_list.html:19 templates/core/users_list.html:29
 msgid "Search"
 msgstr "Search"
 
@@ -657,7 +746,7 @@ msgstr "Search by name, address, owner"
 msgid "No buildings found."
 msgstr "No buildings found."
 
-#: templates/core/buildings_list.html:190 templates/core/users_list.html:35
+#: templates/core/buildings_list.html:190 templates/core/users_list.html:98
 #: templates/core/work_orders_list.html:243
 #, python-format
 msgid "Page %(page_obj.number)s of %(paginator.num_pages)s"
@@ -710,7 +799,7 @@ msgid "Occupied"
 msgstr "Occupied"
 
 #: templates/core/unit_detail.html:29 templates/core/user_details.html:5
-#: templates/core/users_list.html:19
+#: templates/core/users_list.html:63
 msgid "Yes,No"
 msgstr "Yes,No"
 
@@ -751,14 +840,25 @@ msgid "New Unit in %(name)s"
 msgstr "New Unit in %(name)s"
 
 #: templates/core/user_confirm_delete.html:3
-#: templates/core/user_confirm_delete.html:5
-msgid "Delete User"
+#: templates/core/user_confirm_delete.html:7
+#, fuzzy
+#| msgid "Delete User"
+msgid "Delete user"
 msgstr "Delete User"
 
-#: templates/core/user_confirm_delete.html:6
-#, python-format
-msgid "Are you sure you want to delete user <strong>%(username)s</strong>?"
+#: templates/core/user_confirm_delete.html:9
+#, fuzzy, python-format
+#| msgid "Are you sure you want to delete user <strong>%(username)s</strong>?"
+msgid ""
+"\n"
+"        Are you sure you want to remove <strong>%(username)s</strong>? This "
+"action cannot be undone.\n"
+"      "
 msgstr "Are you sure you want to delete user <strong>%(username)s</strong>?"
+
+#: templates/core/user_confirm_delete.html:14
+msgid "Warning: deleting a user removes access immediately."
+msgstr ""
 
 #: templates/core/user_details.html:3 templates/core/user_details.html:7
 #, fuzzy, python-format
@@ -774,19 +874,15 @@ msgstr "Back to Users"
 msgid "Full name"
 msgstr "Full name"
 
-#: templates/core/user_details.html:10 templates/core/users_list.html:12
-msgid "Email"
-msgstr "Email"
-
-#: templates/core/user_details.html:11 templates/core/users_list.html:12
+#: templates/core/user_details.html:11 templates/core/users_list.html:44
 msgid "Active"
 msgstr "Active"
 
-#: templates/core/user_details.html:12 templates/core/users_list.html:12
+#: templates/core/user_details.html:12
 msgid "Staff"
 msgstr "Staff"
 
-#: templates/core/user_details.html:13 templates/core/users_list.html:12
+#: templates/core/user_details.html:13
 msgid "Superuser"
 msgstr "Superuser"
 
@@ -794,62 +890,111 @@ msgstr "Superuser"
 msgid "Joined"
 msgstr "Joined"
 
-#: templates/core/user_details.html:15
+#: templates/core/user_details.html:15 templates/core/users_list.html:47
 #, fuzzy
 #| msgid "Login"
 msgid "Last login"
 msgstr "Login"
 
-#: templates/core/user_details.html:18 templates/core/user_password_form.html:3
-#: templates/core/user_password_form.html:5
+#: templates/core/user_details.html:18
 #, fuzzy
 #| msgid "Password"
 msgid "Reset Password"
 msgstr "Password"
 
-#: templates/core/user_form.html:3 templates/core/user_form.html:5
-msgid "New"
-msgstr "New"
-
-#: templates/core/user_form.html:3 templates/core/user_form.html:5
+#: templates/core/user_form.html:4 templates/core/user_form.html:10
 #, fuzzy
-#| msgid "Username"
-msgid "User"
-msgstr "Username"
+#| msgid "Edit"
+msgid "Edit user"
+msgstr "Edit"
+
+#: templates/core/user_form.html:4 templates/core/user_form.html:10
+#: templates/core/users_list.html:14
+#, fuzzy
+#| msgid "Add unit"
+msgid "Add user"
+msgstr "Add unit"
+
+#: templates/core/user_form.html:14
+msgid "Update account details, flags, and contact information."
+msgstr ""
+
+#: templates/core/user_form.html:16
+msgid "Create a new account and assign the right access level."
+msgstr ""
+
+#: templates/core/user_form.html:64 templates/core/users_list.html:46
+#, fuzzy
+#| msgid "Role"
+msgid "Roles"
+msgstr "Role"
+
+#: templates/core/user_form.html:65
+msgid "Role assignment will be available in a future update."
+msgstr ""
+
+#: templates/core/user_password_form.html:3
+#: templates/core/user_password_form.html:7 templates/core/users_list.html:73
+#, fuzzy
+#| msgid "Password"
+msgid "Reset password"
+msgstr "Password"
 
 #: templates/core/user_password_form.html:9
+#, python-format
+msgid ""
+"\n"
+"        Choose a new password for %(username)s. They will be prompted to use "
+"it on next sign in.\n"
+"      "
+msgstr ""
+
+#: templates/core/user_password_form.html:41
 msgid "Save new password"
 msgstr "Save new password"
 
-#: templates/core/users_list.html:3 templates/core/users_list.html:5
-#, fuzzy
-#| msgid "Username"
-msgid "Users"
-msgstr "Username"
+#: templates/core/users_list.html:10
+msgid ""
+"Administrators can create, edit, remove users or reset passwords from here."
+msgstr ""
 
-#: templates/core/users_list.html:7
+#: templates/core/users_list.html:19
+#, fuzzy
+#| msgid "Search"
+msgid "Search users"
+msgstr "Search"
+
+#: templates/core/users_list.html:26
 #, fuzzy
 #| msgid "Search by name, address, owner"
-msgid "Search username, email, name"
+msgid "Search username, email, or name"
 msgstr "Search by name, address, owner"
 
-#: templates/core/users_list.html:9
+#: templates/core/users_list.html:31
 msgid "Clear"
 msgstr "Clear"
 
-#: templates/core/users_list.html:12 templates/registration/login.html:42
+#: templates/core/users_list.html:41 templates/registration/login.html:42
 msgid "Username"
 msgstr "Username"
 
-#: templates/core/users_list.html:12
-#, fuzzy
-#| msgid "Login"
-msgid "Last Login"
-msgstr "Login"
+#: templates/core/users_list.html:45
+msgid "Administrator"
+msgstr ""
 
-#: templates/core/users_list.html:26
+#: templates/core/users_list.html:67
+msgid "Coming soon"
+msgstr ""
+
+#: templates/core/users_list.html:81
 msgid "No users found."
 msgstr "No users found."
+
+#: templates/core/users_list.html:94
+#, fuzzy
+#| msgid "Prev"
+msgid "Previous"
+msgstr "Prev"
 
 #: templates/core/work_order_confirm_delete.html:3
 #, fuzzy
@@ -884,15 +1029,7 @@ msgstr "Work Orders"
 msgid "Back"
 msgstr "Back"
 
-#: templates/core/work_order_detail.html:29
-#: templates/core/work_orders_list.html:86
-#: templates/core/work_orders_list.html:151
-#, fuzzy
-#| msgid "Buildings"
-msgid "Building"
-msgstr "Buildings"
-
-#: templates/core/work_order_detail.html:45
+#: templates/core/work_order_detail.html:50
 #, fuzzy
 #| msgid "Unit updated."
 msgid "Last updated"
@@ -994,3 +1131,27 @@ msgstr "Enter your credentials to access Building Management."
 #: templates/registration/login.html:52
 msgid "Password"
 msgstr "Password"
+
+#~ msgid "Archived (Newest first)"
+#~ msgstr "Archived (Newest first)"
+
+#~ msgid "Archived (Oldest first)"
+#~ msgstr "Archived (Oldest first)"
+
+#~ msgid "New"
+#~ msgstr "New"
+
+#, fuzzy
+#~| msgid "Username"
+#~ msgid "User"
+#~ msgstr "Username"
+
+#, fuzzy
+#~| msgid "Username"
+#~ msgid "Users"
+#~ msgstr "Username"
+
+#, fuzzy
+#~| msgid "Login"
+#~ msgid "Last Login"
+#~ msgstr "Login"

@@ -51,9 +51,9 @@
       {% endfor %}
     </div>
 
-    <div class="flex flex-wrap gap-3">
+    <div class="flex flex-wrap justify-end gap-3">
       <button class="btn" type="submit">{% trans "Save" %}</button>
-      <a class="btn" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>
+      <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>
     </div>
   </form>
 </section>

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 
-from .models import Building, Unit, WorkOrder
+from .models import Building, Unit, WorkOrder, UserSecurityProfile
 
 User = get_user_model()
 
@@ -299,6 +299,8 @@ class AdminUserCreateForm(UserCreationForm):
         if commit:
             user.save()
             self.save_m2m()
+            profile, created = UserSecurityProfile.objects.get_or_create(user=user)
+            profile.reset()
         return user
 
 
@@ -331,6 +333,9 @@ class AdminUserUpdateForm(UserChangeForm):
         if commit:
             user.save()
             self.save_m2m()
+            profile, created = UserSecurityProfile.objects.get_or_create(user=user)
+            if user.is_active:
+                profile.reset()
         return user
 
 

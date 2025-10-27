@@ -310,3 +310,33 @@ class WorkOrder(TimeStampedModel):
         if not self.is_archived:
             self.archived_at = timezone.now()
             self.save(update_fields=["archived_at"])
+
+
+class UserSecurityProfile(models.Model):
+    class LockReason(models.TextChoices):
+        FAILED_ATTEMPTS = "failed_attempts", _( "Too many failed login attempts" )
+        MANUAL = "manual", _( "Manually locked" )
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="security_profile",
+    )
+    failed_login_attempts = models.PositiveIntegerField(default=0)
+    locked_at = models.DateTimeField(null=True, blank=True)
+    lock_reason = models.CharField(max_length=32, choices=LockReason.choices, blank=True)
+
+    class Meta:
+        verbose_name = _("User security profile")
+        verbose_name_plural = _("User security profiles")
+
+    def reset(self, *, commit: bool = True):
+        self.failed_login_attempts = 0
+        self.locked_at = None
+        self.lock_reason = ""
+        if commit:
+            self.save(update_fields=["failed_login_attempts", "locked_at", "lock_reason"])
+
+    @property
+    def is_locked_for_failures(self) -> bool:
+        return self.lock_reason == self.LockReason.FAILED_ATTEMPTS
