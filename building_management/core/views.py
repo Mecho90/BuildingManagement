@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.views import redirect_to_login
 from django.db.models import Case, When, IntegerField, Q, Count, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Lower, Trim, Replace
 from django.http import JsonResponse, Http404, HttpResponseForbidden, HttpResponseRedirect
@@ -125,11 +126,18 @@ class UnitsWidgetMixin:
 class AdminRequiredMixin(UserPassesTestMixin):
     """Limit access to superusers (primary administrator role)."""
 
-    raise_exception = True
-
     def test_func(self):
         user = self.request.user
         return user.is_authenticated and user.is_superuser
+
+    def handle_no_permission(self):
+        # Always bounce users back to the login screen so they can authenticate with
+        # proper credentials instead of exposing a 403 page.
+        return redirect_to_login(
+            self.request.get_full_path(),
+            self.get_login_url(),
+            self.get_redirect_field_name(),
+        )
 
 
 # ----------------------------------------------------------------------
@@ -1005,7 +1013,6 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
     model = WorkOrder
     template_name = "core/work_orders_archive.html"
     context_object_name = "orders"
-    raise_exception = True
 
     _sort_choices = [
         ("archived_desc", _lazy("Archived (Newest first)")),
@@ -1021,6 +1028,14 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
     def test_func(self):
         user = self.request.user
         return user.is_staff or user.is_superuser
+
+    def handle_no_permission(self):
+        # Redirect to login whenever access is denied to avoid serving a 403 page.
+        return redirect_to_login(
+            self.request.get_full_path(),
+            self.get_login_url(),
+            self.get_redirect_field_name(),
+        )
 
     def get_queryset(self):
         request = self.request
