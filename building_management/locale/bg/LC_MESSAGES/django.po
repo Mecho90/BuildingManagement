@@ -374,6 +374,14 @@ msgstr "Създадени (най-нови първо)"
 msgid "Created (Oldest first)"
 msgstr "Създадени (най-стари първо)"
 
+#: core/views.py:1158
+msgid "Archived (Newest first)"
+msgstr "Архивирани (най-нови първо)"
+
+#: core/views.py:1159
+msgid "Archived (Oldest first)"
+msgstr "Архивирани (най-стари първо)"
+
 #: core/views.py:836
 msgid "Building (A → Z)"
 msgstr "Сграда (А → Я)"
@@ -1247,12 +1255,6 @@ msgstr "Парола"
 #~ msgid_plural "overdue by %(count)s days"
 #~ msgstr[0] "просрочена с %(count)s ден"
 #~ msgstr[1] "просрочена с %(count)s дни"
-
-#~ msgid "Archived (Newest first)"
-#~ msgstr "Архивирани (най-нови първо)"
-
-#~ msgid "Archived (Oldest first)"
-#~ msgstr "Архивирани (най-стари първо)"
 
 #~ msgid ""
 #~ "Designates whether this user should be treated as active. Unselect this "

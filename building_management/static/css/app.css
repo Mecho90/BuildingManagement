@@ -8,13 +8,13 @@
   }
 
   body {
-    @apply min-h-screen bg-slate-50 text-brand-foreground antialiased font-sans
-           dark:bg-slate-950 dark:text-slate-100;
+    @apply min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50 text-brand-foreground antialiased font-sans
+           dark:bg-gradient-to-br dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100;
   }
 
   a {
-    @apply text-sky-600 transition-colors hover:text-sky-700 hover:underline
-           dark:text-sky-300 dark:hover:text-sky-200;
+    @apply text-emerald-600 transition-colors hover:text-emerald-700 hover:underline
+           dark:text-emerald-300 dark:hover:text-emerald-200;
   }
 
   img,
@@ -27,20 +27,27 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white
-           px-3 py-2 text-sm font-medium text-brand-foreground shadow-sm transition
-           hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300
-           dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800;
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r
+           from-emerald-500 via-emerald-400 to-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md
+           transition duration-200 ease-out hover:brightness-105 hover:-translate-y-0.5 hover:shadow-lg
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2
+           focus-visible:ring-offset-white active:translate-y-0 dark:from-emerald-500 dark:via-emerald-500
+           dark:to-emerald-600 dark:hover:brightness-110 dark:focus-visible:ring-offset-slate-900;
   }
 
   .btn-secondary {
-    @apply border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100
-           dark:border-sky-700 dark:bg-sky-950 dark:text-sky-200 dark:hover:bg-sky-900;
+    @apply border border-emerald-200 bg-none bg-white/80 text-emerald-700 shadow-sm transition
+           hover:bg-emerald-100 hover:text-emerald-800 hover:shadow-md
+           focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           dark:border-emerald-700 dark:bg-none dark:bg-slate-900/80 dark:text-emerald-200
+           dark:hover:bg-slate-900 dark:focus-visible:ring-emerald-600 dark:focus-visible:ring-offset-slate-900;
   }
 
   .btn-danger {
-    @apply border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100
-           dark:border-rose-700 dark:bg-rose-950 dark:text-rose-200 dark:hover:bg-rose-900;
+    @apply border border-rose-300 bg-none bg-rose-500/90 text-white shadow-md transition
+           hover:bg-rose-500 hover:shadow-lg
+           focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+           dark:border-rose-600 dark:bg-rose-600/80 dark:hover:bg-rose-500 dark:focus-visible:ring-offset-slate-900;
   }
 
   .btn.is-disabled,
@@ -50,11 +57,11 @@
   }
 
   .btn-sm {
-    @apply px-2.5 py-1.5 text-xs;
+    @apply px-3 py-1.5 text-xs;
   }
 
   label {
-    @apply mb-1 block text-sm font-semibold text-slate-800 dark:text-slate-200;
+    @apply mb-1 block text-sm font-semibold tracking-wide text-slate-700 dark:text-emerald-200;
   }
 
   .input,
@@ -66,10 +73,12 @@
   input[type='date'],
   select,
   textarea {
-    @apply box-border block w-full rounded-lg border border-slate-200 bg-white
+    @apply box-border block w-full rounded-xl border border-emerald-100 bg-white/80
            px-3 py-2 text-base text-brand-foreground shadow-sm outline-none transition
-           focus:border-sky-300 focus:ring-2 focus:ring-sky-200
-           dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100;
+           placeholder:text-slate-400 backdrop-blur
+           hover:border-emerald-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200
+           dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500
+           dark:hover:border-emerald-600 dark:focus:border-emerald-500 dark:focus:ring-emerald-700;
   }
 
   .input,
@@ -92,7 +101,8 @@
   }
 
   .alert {
-    @apply rounded-xl border px-3 py-3 font-medium shadow-sm transition-colors;
+    @apply rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 font-medium shadow-lg backdrop-blur transition-all
+           dark:border-slate-700 dark:bg-slate-900/80;
   }
 
   .muted {
@@ -139,6 +149,23 @@
 
   .form-actions {
     @apply mt-2 flex gap-4;
+  }
+
+  table thead th {
+    @apply bg-emerald-50/80 text-slate-600 backdrop-blur
+           dark:bg-slate-900/80 dark:text-slate-200;
+  }
+
+  table tbody tr {
+    @apply transition-colors;
+  }
+
+  table tbody tr:nth-child(even) td {
+    @apply bg-white/60 dark:bg-slate-900/60;
+  }
+
+  table tbody tr:hover td {
+    @apply bg-emerald-50/70 dark:bg-slate-800/70;
   }
 }
 

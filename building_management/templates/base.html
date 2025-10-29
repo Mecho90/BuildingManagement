@@ -12,26 +12,26 @@
     {% block extra_css %}{% endblock %}
   </head>
 
-  <body class="min-h-screen bg-slate-50 text-brand-foreground transition-colors dark:bg-slate-950 dark:text-slate-100">
+  <body class="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50 text-brand-foreground transition-colors dark:bg-gradient-to-br dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100">
     <div class="flex min-h-screen flex-col">
-      <header class="border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+      <header class="border-b border-emerald-100/60 bg-white/80 shadow-md backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/80">
         <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <nav class="flex flex-1 flex-wrap items-center gap-4" aria-label="Primary">
             {% block topbar_left %}
-              <a href="{% url 'buildings_list' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Buildings" %}</a>
+              <a href="{% url 'buildings_list' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">{% trans "Buildings" %}</a>
               {% if work_orders_enabled and work_orders_url %}
-                <a href="{{ work_orders_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Work Orders" %}</a>
+                <a href="{{ work_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">{% trans "Work Orders" %}</a>
               {% endif %}
               {% if work_orders_archive_enabled and work_orders_archive_url %}
-                <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Archive" %}</a>
+                <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">{% trans "Archive" %}</a>
               {% endif %}
               {% if mass_assign_work_orders_enabled and mass_assign_work_orders_url %}
-                <a href="{{ mass_assign_work_orders_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Mass Assign" %}</a>
+                <a href="{{ mass_assign_work_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">{% trans "Mass Assign" %}</a>
               {% endif %}
               {% if user.is_superuser %}
-                <a href="{% url 'users_list' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "User Management" %}</a>
+                <a href="{% url 'users_list' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">{% trans "User Management" %}</a>
               {% elif user.is_staff %}
-                <a href="{% url 'admin:index' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Admin Panel" %}</a>
+                <a href="{% url 'admin:index' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">{% trans "Admin Panel" %}</a>
               {% endif %}
             {% endblock %}
           </nav>
@@ -72,7 +72,7 @@
       </header>
 
       <main class="flex-1">
-        <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="mx-auto my-6 w-full max-w-7xl rounded-3xl border border-emerald-100/70 bg-white/80 px-4 py-8 shadow-card backdrop-blur sm:px-6 lg:px-10 dark:border-slate-800/70 dark:bg-slate-900/70">
           {% block content %}{% endblock %}
         </div>
       </main>

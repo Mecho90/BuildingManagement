@@ -15,7 +15,7 @@ module.exports = {
         brand: {
           DEFAULT: "#0f172a", // slate-900
           foreground: "#0f172a",
-          accent: "#0ea5e9",
+          accent: "#059669",
           surface: "#ffffff",
           muted: colors.slate[500],
           border: colors.slate[200],
