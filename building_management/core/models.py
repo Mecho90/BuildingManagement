@@ -112,6 +112,8 @@ class Building(TimeStampedModel):
 
     class Meta:
         ordering = ["name", "id"]
+        verbose_name = _("Building")
+        verbose_name_plural = _("Buildings")
 
     def __str__(self) -> str:  # pragma: no cover
         return self.name

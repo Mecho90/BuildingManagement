@@ -487,10 +487,9 @@ msgstr "елемент"
 
 #: templates/core/building_confirm_delete.html:4
 #: templates/core/building_confirm_delete.html:8
-#, fuzzy, python-format
-#| msgid "Welcome, %(name)s"
+#, python-format
 msgid "Delete %(name)s"
-msgstr "Добре дошли, %(name)s"
+msgstr "Изтриване на %(name)s"
 
 #: templates/core/building_confirm_delete.html:11
 msgid "Are you sure you want to delete"
@@ -960,16 +959,12 @@ msgid "Previous"
 msgstr "Предишна"
 
 #: templates/core/work_order_confirm_delete.html:3
-#, fuzzy
-#| msgid "Work Orders"
 msgid "Delete Work Order"
-msgstr "Работни поръчки"
+msgstr "Изтриване на работна поръчка"
 
 #: templates/core/work_order_confirm_delete.html:8
-#, fuzzy
-#| msgid "Work orders"
 msgid "Delete work order"
-msgstr "Поръчки"
+msgstr "Изтриване на работна поръчка"
 
 #: templates/core/work_order_confirm_delete.html:10
 #, python-format

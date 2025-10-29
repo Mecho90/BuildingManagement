@@ -4,10 +4,12 @@
 {% block title %}{% blocktrans with name=object_verbose_name|default:_('item')|capfirst %}Delete {{ name }}{% endblocktrans %} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
-  <section>
-    <h2 class="mb-2">{% blocktrans with name=object_verbose_name|default:_('item')|capfirst %}Delete {{ name }}{% endblocktrans %}</h2>
-
-    <p class="mb-2">
+<section class="flex min-h-[50vh] items-center justify-center px-4">
+  <div class="w-full max-w-lg space-y-5 rounded-2xl border border-rose-200/60 bg-white p-6 text-center shadow-card dark:border-rose-700/50 dark:bg-slate-900">
+    <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">
+      {% blocktrans with name=object_verbose_name|default:_('item')|capfirst %}Delete {{ name }}{% endblocktrans %}
+    </h1>
+    <p class="text-sm text-slate-600 dark:text-slate-300">
       {% trans "Are you sure you want to delete" %}
       <strong>
         {# Prefer a readable identifier if present #}
@@ -22,13 +24,12 @@
       {% if object_model_name == 'unit' and object.building %}
         {% blocktrans with name=object.building.name %}in <strong>{{ name }}</strong>{% endblocktrans %}
       {% endif %}
-      ?
+      ?<br>
       {% trans "This action cannot be undone." %}
     </p>
-
-    <form method="post" class="mt-2">
+    <form method="post" class="flex flex-col gap-3 sm:flex-row sm:justify-center">
       {% csrf_token %}
-      <button class="btn btn-danger" type="submit">{% trans "Yes, delete" %}</button>
+      <button class="btn btn-danger min-w-[160px]" type="submit">{% trans "Yes, delete" %}</button>
 
       {% if cancel_url %}
         <a class="btn btn-secondary" href="{{ cancel_url }}">{% trans "Cancel" %}</a>
@@ -41,5 +42,6 @@
         {% endif %}
       {% endif %}
     </form>
-  </section>
+  </div>
+</section>
 {% endblock %}

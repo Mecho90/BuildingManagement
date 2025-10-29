@@ -54,10 +54,8 @@ msgstr "You don't have permission to edit this unit."
 #: core/forms.py:180 templates/core/work_order_detail.html:34
 #: templates/core/work_orders_list.html:86
 #: templates/core/work_orders_list.html:151
-#, fuzzy
-#| msgid "Buildings"
 msgid "Building"
-msgstr "Buildings"
+msgstr "Building"
 
 #: core/forms.py:198
 msgid "Select a building first"
@@ -68,10 +66,8 @@ msgstr "Select a building first"
 #: templates/core/work_order_detail.html:38
 #: templates/core/work_orders_archive.html:89
 #: templates/core/work_orders_list.html:156
-#, fuzzy
-#| msgid "Units"
 msgid "Unit"
-msgstr "Units"
+msgstr "Unit"
 
 #: core/forms.py:201 templates/core/building_detail.html:283
 #: templates/core/work_orders_archive.html:90
@@ -498,10 +494,9 @@ msgstr "item"
 
 #: templates/core/building_confirm_delete.html:4
 #: templates/core/building_confirm_delete.html:8
-#, fuzzy, python-format
-#| msgid "Welcome, %(name)s"
+#, python-format
 msgid "Delete %(name)s"
-msgstr "Welcome, %(name)s"
+msgstr "Delete %(name)s"
 
 #: templates/core/building_confirm_delete.html:11
 msgid "Are you sure you want to delete"
@@ -542,10 +537,8 @@ msgid "Created"
 msgstr "Unit created."
 
 #: templates/core/building_detail.html:35
-#, fuzzy
-#| msgid "Buildings"
 msgid "Edit building"
-msgstr "Buildings"
+msgstr "Edit building"
 
 #: templates/core/building_detail.html:36
 #: templates/core/building_detail.html:97
@@ -997,16 +990,12 @@ msgid "Previous"
 msgstr "Prev"
 
 #: templates/core/work_order_confirm_delete.html:3
-#, fuzzy
-#| msgid "Work Orders"
 msgid "Delete Work Order"
-msgstr "Work Orders"
+msgstr "Delete Work Order"
 
 #: templates/core/work_order_confirm_delete.html:8
-#, fuzzy
-#| msgid "Work orders"
 msgid "Delete work order"
-msgstr "Work orders"
+msgstr "Delete work order"
 
 #: templates/core/work_order_confirm_delete.html:10
 #, python-format
