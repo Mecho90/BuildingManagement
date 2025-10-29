@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-27 11:58+0200\n"
+"POT-Creation-Date: 2025-10-29 11:06+0200\n"
 "PO-Revision-Date: 2025-10-24 13:30+0000\n"
 "Last-Translator: Codex Translator <noreply@example.com>\n"
 "Language-Team: Bulgarian <bg@example.com>\n"
@@ -17,11 +17,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: building_mgmt/settings.py:168
+#: building_mgmt/settings.py:172
 msgid "English"
 msgstr "Английски"
 
-#: building_mgmt/settings.py:169
+#: building_mgmt/settings.py:173
 msgid "Bulgarian"
 msgstr "Български"
 
@@ -33,244 +33,263 @@ msgstr ""
 "Вашият профил беше блокиран след твърде много неуспешни опита. Свържете се с "
 "администратор."
 
-#: core/forms.py:81 templates/core/building_detail.html:134
-#: templates/core/building_detail.html:136
-#: templates/core/building_detail.html:138 templates/core/unit_detail.html:24
+#: core/forms.py:79 templates/core/building_detail.html:136
+#: templates/core/building_detail.html:138
+#: templates/core/building_detail.html:140 templates/core/unit_detail.html:24
 msgid "Floor"
 msgstr "Етаж"
 
-#: core/forms.py:82
+#: core/forms.py:80
 msgid "Is occupied"
 msgstr "Зает ли е"
 
-#: core/forms.py:102 core/models.py:204
+#: core/forms.py:113 core/models.py:194
 msgid "Apartment number must be unique within this building."
 msgstr "Номерът на апартамента трябва да е уникален в тази сграда."
 
-#: core/forms.py:116
+#: core/forms.py:125
 msgid "You don't have permission to edit this unit."
 msgstr "Нямате права да редактирате този апартамент."
 
-#: core/forms.py:180 templates/core/work_order_detail.html:34
+#: core/forms.py:213 core/models.py:115
+#: templates/core/work_order_detail.html:34
 #: templates/core/work_orders_list.html:86
 #: templates/core/work_orders_list.html:151
 msgid "Building"
 msgstr "Сграда"
 
-#: core/forms.py:198
+#: core/forms.py:231
 msgid "Select a building first"
 msgstr "Първо изберете сграда"
 
-#: core/forms.py:200 templates/core/building_detail.html:248
-#: templates/core/building_detail.html:282
+#: core/forms.py:233 templates/core/building_detail.html:250
+#: templates/core/building_detail.html:284
 #: templates/core/work_order_detail.html:38
-#: templates/core/work_orders_archive.html:89
+#: templates/core/work_orders_archive.html:85
 #: templates/core/work_orders_list.html:156
 msgid "Unit"
 msgstr "Апартамент"
 
-#: core/forms.py:201 templates/core/building_detail.html:283
-#: templates/core/work_orders_archive.html:90
+#: core/forms.py:234 templates/core/building_detail.html:285
+#: templates/core/work_orders_archive.html:86
 #: templates/core/work_orders_list.html:157
 msgid "Priority"
 msgstr "Приоритет"
 
-#: core/forms.py:202 templates/core/building_detail.html:212
-#: templates/core/building_detail.html:284
-#: templates/core/work_orders_archive.html:91
+#: core/forms.py:235 templates/core/building_detail.html:214
+#: templates/core/building_detail.html:286
+#: templates/core/work_orders_archive.html:87
 #: templates/core/work_orders_list.html:42
 #: templates/core/work_orders_list.html:158
 msgid "Status"
 msgstr "Статус"
 
-#: core/forms.py:203 templates/core/building_detail.html:252
-#: templates/core/building_detail.html:285
+#: core/forms.py:236 templates/core/building_detail.html:254
+#: templates/core/building_detail.html:287
 #: templates/core/work_order_detail.html:42
 #: templates/core/work_orders_list.html:159
 msgid "Deadline"
 msgstr "Краен срок"
 
-#: core/forms.py:219
+#: core/forms.py:254
 msgid "Selected unit does not belong to the chosen building."
 msgstr "Избраният апартамент не принадлежи на избраната сграда."
 
-#: core/forms.py:224
+#: core/forms.py:259
 msgid "You cannot create work orders for buildings you do not own."
 msgstr "Не можете да създавате поръчки за сгради, които не притежавате."
 
-#: core/forms.py:228
+#: core/forms.py:263
 msgid "Deadline cannot be in the past."
 msgstr "Крайният срок не може да е в миналото."
 
-#: core/forms.py:245
-msgid "You cannot assign work orders to this building."
-msgstr "Не можете да възлагате поръчки на тази сграда."
+#: core/forms.py:284 core/models.py:238 templates/core/building_detail.html:283
+#: templates/core/work_orders_archive.html:84
+#: templates/core/work_orders_list.html:150
+#: templates/core/work_orders_mass_assign.html:53
+msgid "Title"
+msgstr "Заглавие"
 
-#: core/forms.py:261 templates/core/user_details.html:10
+#: core/forms.py:289 core/models.py:103 core/models.py:182 core/models.py:239
+#: templates/core/building_detail.html:43 templates/core/unit_detail.html:43
+#: templates/core/work_order_detail.html:56
+#: templates/core/work_orders_mass_assign.html:60
+msgid "Description"
+msgstr "Описание"
+
+#: core/forms.py:295 templates/core/work_orders_mass_assign.html:33
+msgid "Buildings to include"
+msgstr "Сгради за включване"
+
+#: core/forms.py:317
+#, python-format
+msgid "%(building)s — owner %(owner)s"
+msgstr "%(building)s — собственик %(owner)s"
+
+#: core/forms.py:329
+msgid "Select at least one building."
+msgstr "Изберете поне една сграда."
+
+#: core/forms.py:342 templates/core/user_details.html:10
 #: templates/core/users_list.html:43
 msgid "Email"
 msgstr "Имейл"
 
-#: core/forms.py:316 templates/core/user_form.html:44
-msgid "Optional, used for contact and password resets."
-msgstr "Незадължително, използва се за контакт и възстановяване на парола."
-
-#: core/forms.py:262
+#: core/forms.py:343
 msgid "First name"
 msgstr "Име"
 
-#: core/forms.py:263
+#: core/forms.py:344
 msgid "Last name"
 msgstr "Фамилия"
 
-#: core/models.py:78
+#: core/forms.py:368 templates/core/user_form.html:57
+msgid "Optional, used for contact and password resets."
+msgstr "Незадължително, използва се за контакт и възстановяване на парола."
+
+#: core/models.py:91
 msgid "Technical Support"
 msgstr "Техническа поддръжка"
 
-#: core/models.py:79
+#: core/models.py:92
 msgid "Property Manager"
 msgstr "Управител на имот"
 
-#: core/models.py:80
+#: core/models.py:93
 msgid "External Contractor"
 msgstr "Външен изпълнител"
 
-#: core/models.py:86 templates/core/building_detail.html:20
-#: templates/core/building_detail.html:102
-#: templates/core/buildings_list.html:52 templates/core/buildings_list.html:96
-#: templates/core/buildings_list.html:98 templates/core/buildings_list.html:100
+#: core/models.py:99 templates/core/building_detail.html:20
+#: templates/core/building_detail.html:104
+#: templates/core/buildings_list.html:53 templates/core/buildings_list.html:97
+#: templates/core/buildings_list.html:99 templates/core/buildings_list.html:101
 #: templates/core/unit_detail.html:33
-#: templates/core/work_orders_archive.html:36
-#: templates/core/work_orders_archive.html:73
-#: templates/core/work_orders_archive.html:94
+#: templates/core/work_orders_archive.html:32
+#: templates/core/work_orders_archive.html:69
+#: templates/core/work_orders_archive.html:90
 #: templates/core/work_orders_list.html:53
 #: templates/core/work_orders_list.html:93
 #: templates/core/work_orders_list.html:153
 msgid "Owner"
 msgstr "Собственик"
 
-#: core/models.py:88 templates/core/buildings_list.html:84
-#: templates/core/buildings_list.html:86 templates/core/buildings_list.html:88
+#: core/models.py:101 templates/core/buildings_list.html:85
+#: templates/core/buildings_list.html:87 templates/core/buildings_list.html:89
 #: templates/core/users_list.html:42
 msgid "Name"
 msgstr "Име"
 
-#: core/models.py:89 templates/core/building_detail.html:14
-#: templates/core/buildings_list.html:119
-#: templates/core/buildings_list.html:121
-#: templates/core/buildings_list.html:123
+#: core/models.py:102 templates/core/building_detail.html:14
+#: templates/core/buildings_list.html:120
+#: templates/core/buildings_list.html:122
+#: templates/core/buildings_list.html:124
 msgid "Address"
 msgstr "Адрес"
 
-#: core/models.py:90 core/models.py:167 core/models.py:241
-#: templates/core/building_detail.html:41 templates/core/unit_detail.html:43
-#: templates/core/work_order_detail.html:56
-msgid "Description"
-msgstr "Описание"
-
-#: core/models.py:95 templates/core/building_detail.html:25
-#: templates/core/buildings_list.html:108
-#: templates/core/buildings_list.html:110
-#: templates/core/buildings_list.html:112
+#: core/models.py:108 templates/core/building_detail.html:25
+#: templates/core/buildings_list.html:109
+#: templates/core/buildings_list.html:111
+#: templates/core/buildings_list.html:113
 #: templates/core/work_orders_list.html:103
 #: templates/core/work_orders_list.html:154
 msgid "Role"
 msgstr "Роля"
 
-#: core/models.py:131
+#: core/models.py:116 templates/base.html:21
+#: templates/core/building_detail.html:4 templates/core/buildings_list.html:4
+#: templates/core/buildings_list.html:10
+msgid "Buildings"
+msgstr "Сгради"
+
+#: core/models.py:146
 msgid ""
 "Enter a valid phone number (digits with optional leading +, 7–15 digits)."
 msgstr ""
 
-#: core/models.py:149
+#: core/models.py:164
 msgid "Apartment number"
 msgstr "Номер на апартамент"
 
-#: core/models.py:154 templates/core/building_detail.html:142
+#: core/models.py:169 templates/core/building_detail.html:144
 msgid "Apartment owner"
 msgstr "Собственик на апартамент"
 
-#: core/models.py:158 templates/core/unit_detail.html:37
+#: core/models.py:173 templates/core/unit_detail.html:37
 msgid "Contact phone"
 msgstr "Телефон за контакт"
 
-#: core/models.py:218
+#: core/models.py:216
 msgid "Open"
 msgstr "Отворена"
 
-#: core/models.py:219
+#: core/models.py:217
 msgid "In progress"
 msgstr "В процес на изпълнение"
 
-#: core/models.py:220
+#: core/models.py:218
 msgid "Done"
 msgstr "Приключена"
 
-#: core/models.py:223
+#: core/models.py:221
 msgid "Low"
 msgstr "Нисък"
 
-#: core/models.py:224
+#: core/models.py:222
 msgid "Medium"
 msgstr "Среден"
 
-#: core/models.py:225
+#: core/models.py:223
 msgid "High"
 msgstr "Висок"
 
-#: core/models.py:240 templates/core/building_detail.html:281
-#: templates/core/work_orders_archive.html:88
-#: templates/core/work_orders_list.html:150
-msgid "Title"
-msgstr "Заглавие"
+#: core/models.py:259
+msgid "Mass assigned"
+msgstr ""
 
-#: core/models.py:281
+#: core/models.py:285
 msgid "Selected unit does not belong to the selected building."
 msgstr "Избраният апартамент не принадлежи на избраната сграда."
 
-#: core/models.py:317
+#: core/models.py:323
 msgid "Too many failed login attempts"
 msgstr "Твърде много неуспешни опита за вход"
 
-#: core/models.py:318
+#: core/models.py:324
 msgid "Manually locked"
 msgstr "Блокиран ръчно"
 
-#: core/models.py:330
+#: core/models.py:336
 msgid "User security profile"
 msgstr "Профил за сигурност на потребителя"
 
-#: core/models.py:331
+#: core/models.py:337
 msgid "User security profiles"
 msgstr "Профили за сигурност на потребители"
 
-#: core/views.py:204
+#: core/views.py:126
+msgid "Loading units…"
+msgstr "Зареждане на апартаменти…"
+
+#: core/views.py:283 core/views.py:338
 msgid "your building"
 msgstr "вашата сграда"
 
-#: core/views.py:214
-#, python-format
-msgid "overdue by %(count)s day"
-msgid_plural "overdue by %(count)s days"
-msgstr[0] "просрочена с %(count)s ден"
-msgstr[1] "просрочена с %(count)s дни"
-
-#: core/views.py:219
+#: core/views.py:291
 msgid "due today"
 msgstr "с краен срок днес"
 
-#: core/views.py:221
+#: core/views.py:293
 msgid "due tomorrow"
 msgstr "с краен срок утре"
 
-#: core/views.py:224
+#: core/views.py:296
 #, python-format
 msgid "due in %(count)s day"
 msgid_plural "due in %(count)s days"
 msgstr[0] "с краен срок след %(count)s ден"
 msgstr[1] "с краен срок след %(count)s дни"
 
-#: core/views.py:229
+#: core/views.py:304
 #, python-format
 msgid ""
 "%(priority)s priority work order \"%(title)s\" in %(building)s is %(due)s "
@@ -279,16 +298,25 @@ msgstr ""
 "%(priority)s приоритетна поръчка „%(title)s“ в %(building)s е %(due)s (краен "
 "срок %(deadline)s)"
 
-#: core/views.py:239
+#: core/views.py:314
 #, python-format
 msgid " (owner: %(owner)s)"
 msgstr " (собственик: %(owner)s)"
 
-#: core/views.py:264
+#: core/views.py:344
+#, python-format
+msgid ""
+"A new mass-assigned work order \"%(title)s\" was created for %(building)s "
+"(deadline %(deadline)s)."
+msgstr ""
+"Нова масово възложена работна поръчка „%(title)s“ бе създадена за "
+"%(building)s (краен срок %(deadline)s)."
+
+#: core/views.py:371
 msgid "an unknown time"
 msgstr "неизвестен момент"
 
-#: core/views.py:269
+#: core/views.py:376
 #, python-format
 msgid ""
 "%(user)s was locked after too many failed login attempts on %(locked)s. "
@@ -298,107 +326,135 @@ msgstr ""
 "вход на %(locked)s. Активирайте профила и задайте нова парола, за да "
 "възстановите достъпа."
 
-#: core/views.py:405
+#: core/views.py:515
 msgid "Building created."
 msgstr "Сградата беше създадена."
 
-#: core/views.py:429
+#: core/views.py:539
 msgid "Building updated."
 msgstr "Сградата беше обновена."
 
-#: core/views.py:446
+#: core/views.py:556
 msgid "Building deleted."
 msgstr "Сградата беше изтрита."
 
-#: core/views.py:510
+#: core/views.py:620
 msgid "Unit created."
 msgstr "Апартаментът беше създаден."
 
-#: core/views.py:545
+#: core/views.py:655
 msgid "Unit updated."
 msgstr "Апартаментът беше обновен."
 
-#: core/views.py:569
+#: core/views.py:679
 msgid "Unit deleted."
 msgstr "Апартаментът беше изтрит."
 
-#: core/views.py:720
+#: core/views.py:830
 msgid "Priority (High → Low)"
 msgstr "Приоритет (висок → нисък)"
 
-#: core/views.py:721
+#: core/views.py:831
 msgid "Priority (Low → High)"
 msgstr "Приоритет (нисък → висок)"
 
-#: core/views.py:722
+#: core/views.py:832
 msgid "Deadline (Soon → Late)"
 msgstr "Краен срок (скоро → по-късно)"
 
-#: core/views.py:723
+#: core/views.py:833
 msgid "Deadline (Late → Soon)"
 msgstr "Краен срок (по-късно → скоро)"
 
-#: core/views.py:724
+#: core/views.py:834
 msgid "Created (Newest first)"
 msgstr "Създадени (най-нови първо)"
 
-#: core/views.py:725
+#: core/views.py:835
 msgid "Created (Oldest first)"
 msgstr "Създадени (най-стари първо)"
 
-#: core/views.py:726
+#: core/views.py:836
 msgid "Building (A → Z)"
 msgstr "Сграда (А → Я)"
 
-#: core/views.py:727
+#: core/views.py:837
 msgid "Building (Z → A)"
 msgstr "Сграда (Я → А)"
 
-#: core/views.py:728
+#: core/views.py:838
 msgid "Owner (A → Z)"
 msgstr "Собственик (А → Я)"
 
-#: core/views.py:729
+#: core/views.py:839
 msgid "Owner (Z → A)"
 msgstr "Собственик (Я → А)"
 
-#: core/views.py:821
+#: core/views.py:911
 msgid "Work order created."
 msgstr "Поръчката беше създадена."
 
-#: core/views.py:892
+#: core/views.py:963
 msgid "Work order updated."
 msgstr "Поръчката беше обновена."
 
-#: core/views.py:917
+#: core/views.py:988
 msgid "Work order deleted."
 msgstr "Поръчката беше изтрита."
 
-#: core/views.py:957
+#: core/views.py:1031
 msgid "Only completed work orders can be archived."
 msgstr "Само приключени поръчки могат да бъдат архивирани."
 
-#: core/views.py:961
+#: core/views.py:1035
 msgid "Work order archived."
 msgstr "Поръчката беше архивирана."
 
-#: core/views.py:1139
+#: core/views.py:1072
+msgid "No buildings with the Technical Support role are available."
+msgstr "Няма налични сгради с роля „Техническа поддръжка“."
+
+#: core/views.py:1119
+#, python-format
+msgid "Created %(count)s work order for %(buildings)s."
+msgid_plural "Created %(count)s work orders (first few: %(buildings)s)."
+msgstr[0] "Създадена е %(count)s поръчка за %(buildings)s."
+msgstr[1] "Създадени са %(count)s поръчки (първите няколко: %(buildings)s)."
+
+#: core/views.py:1125
+msgid "selected buildings"
+msgstr "избраните сгради"
+
+#: core/views.py:1133
+#, python-format
+msgid ""
+"%(count)s building already has an open mass-assigned work order with this "
+"title."
+msgid_plural ""
+"%(count)s buildings already have an open mass-assigned work order with this "
+"title."
+msgstr[0] ""
+"%(count)s сграда вече има масово възложена активна поръчка с това заглавие."
+msgstr[1] ""
+"%(count)s сгради вече имат масово възложена активна поръчка с това заглавие."
+
+#: core/views.py:1316
 msgid "User created."
 msgstr "Потребителят беше създаден."
 
-#: core/views.py:1154
+#: core/views.py:1331
 msgid "User updated."
 msgstr "Потребителят беше обновен."
 
-#: core/views.py:1176
+#: core/views.py:1353
 msgid "Password reset successfully."
 msgstr "Паролата беше нулирана успешно."
 
-#: core/views.py:1196
+#: core/views.py:1373
 msgid "You cannot delete your own account."
 msgstr "Не можете да изтриете собствения си профил."
 
-#: core/views.py:1198
+#: core/views.py:1375
 msgid "User deleted."
 msgstr "Потребителят беше изтрит."
 
@@ -410,108 +466,123 @@ msgstr "Потребителят беше изтрит."
 #: templates/core/users_list.html:3 templates/core/work_order_form.html:3
 #: templates/core/work_orders_archive.html:4
 #: templates/core/work_orders_list.html:4
+#: templates/core/work_orders_mass_assign.html:4
 #: templates/registration/logged_out.html:3 templates/registration/login.html:3
 msgid "Building Management"
 msgstr "Управление на сгради"
 
-#: templates/base.html:21 templates/core/building_detail.html:4
-#: templates/core/buildings_list.html:4 templates/core/buildings_list.html:10
-msgid "Buildings"
-msgstr "Сгради"
-
-#: templates/base.html:23 templates/core/buildings_list.html:141
-#: templates/core/buildings_list.html:143
-#: templates/core/buildings_list.html:145
+#: templates/base.html:23 templates/core/buildings_list.html:142
+#: templates/core/buildings_list.html:144
+#: templates/core/buildings_list.html:146
 #: templates/core/work_orders_list.html:4
 #: templates/core/work_orders_list.html:10
 msgid "Work Orders"
 msgstr "Работни поръчки"
 
-#: templates/base.html:26 templates/core/building_detail.html:265
-#: templates/core/building_detail.html:310
+#: templates/base.html:26 templates/core/building_detail.html:267
+#: templates/core/building_detail.html:312
 #: templates/core/work_orders_list.html:116
 #: templates/core/work_orders_list.html:209
 msgid "Archive"
 msgstr "Архив"
 
-#: templates/base.html:29 templates/core/users_list.html:3
+#: templates/base.html:29
+msgid "Mass Assign"
+msgstr "Масово възлагане"
+
+#: templates/base.html:32 templates/core/users_list.html:3
 #: templates/core/users_list.html:8
 msgid "User Management"
 msgstr "Управление на потребители"
 
-#: templates/base.html:31
+#: templates/base.html:34
 msgid "Admin Panel"
 msgstr "Администраторски панел"
 
-#: templates/base.html:40
+#: templates/base.html:43
 #, python-format
 msgid "Welcome, %(name)s"
 msgstr "Добре дошли, %(name)s"
 
-#: templates/base.html:43
+#: templates/base.html:46
 msgid "Logout"
 msgstr "Изход"
 
-#: templates/base.html:46 templates/base.html:50
+#: templates/base.html:49 templates/base.html:53
 msgid "Light mode"
 msgstr "Светъл режим"
 
-#: templates/base.html:46 templates/base.html:50
+#: templates/base.html:49 templates/base.html:53
 msgid "Dark mode"
 msgstr "Тъмен режим"
 
-#: templates/base.html:52 templates/registration/login.html:3
+#: templates/base.html:55 templates/registration/login.html:3
 msgid "Login"
 msgstr "Вход"
 
-#: templates/core/_form_layout.html:55 templates/core/user_form.html:69
+#: templates/core/_filters_search_row.html:26
+#: templates/core/building_detail.html:63
+#: templates/core/building_detail.html:200
+#: templates/core/buildings_list.html:23
+#: templates/core/work_orders_archive.html:22
+#: templates/core/work_orders_list.html:28
+msgid "Filter"
+msgstr "Филтър"
+
+#: templates/core/_filters_search_row.html:30
+#: templates/core/building_detail.html:83 templates/core/buildings_list.html:25
+#: templates/core/work_orders_archive.html:24
+msgid "Reset"
+msgstr "Изчистване"
+
+#: templates/core/_form_layout.html:55 templates/core/user_form.html:73
 msgid "Save"
 msgstr "Запис"
 
 #: templates/core/_form_layout.html:56
-#: templates/core/building_confirm_delete.html:34
-#: templates/core/building_confirm_delete.html:38
-#: templates/core/building_confirm_delete.html:40
+#: templates/core/building_confirm_delete.html:35
+#: templates/core/building_confirm_delete.html:39
+#: templates/core/building_confirm_delete.html:41
 #: templates/core/unit_confirm_delete.html:19
 #: templates/core/unit_confirm_delete.html:21
-#: templates/core/user_confirm_delete.html:19 templates/core/user_form.html:70
-#: templates/core/user_password_form.html:42
+#: templates/core/user_confirm_delete.html:19 templates/core/user_form.html:74
+#: templates/core/user_password_form.html:49
 #: templates/core/work_order_confirm_delete.html:17
 msgid "Cancel"
 msgstr "Отказ"
 
 #: templates/core/building_confirm_delete.html:4
-#: templates/core/building_confirm_delete.html:8
+#: templates/core/building_confirm_delete.html:10
 msgid "item"
 msgstr "елемент"
 
 #: templates/core/building_confirm_delete.html:4
-#: templates/core/building_confirm_delete.html:8
+#: templates/core/building_confirm_delete.html:10
 #, python-format
 msgid "Delete %(name)s"
 msgstr "Изтриване на %(name)s"
 
-#: templates/core/building_confirm_delete.html:11
+#: templates/core/building_confirm_delete.html:13
 msgid "Are you sure you want to delete"
 msgstr "Сигурни ли сте, че искате да изтриете"
 
-#: templates/core/building_confirm_delete.html:15
+#: templates/core/building_confirm_delete.html:17
 #, python-format
 msgid "Unit %(number)s"
 msgstr "Апартамент %(number)s"
 
-#: templates/core/building_confirm_delete.html:23
+#: templates/core/building_confirm_delete.html:25
 #: templates/core/unit_confirm_delete.html:12
 #, python-format
 msgid "in <strong>%(name)s</strong>"
 msgstr "в <strong>%(name)s</strong>"
 
-#: templates/core/building_confirm_delete.html:26
+#: templates/core/building_confirm_delete.html:28
 #: templates/core/unit_confirm_delete.html:13
 msgid "This action cannot be undone."
 msgstr "Това действие не може да бъде отменено."
 
-#: templates/core/building_confirm_delete.html:31
+#: templates/core/building_confirm_delete.html:32
 #: templates/core/unit_confirm_delete.html:17
 #: templates/core/user_confirm_delete.html:18
 #: templates/core/work_order_confirm_delete.html:16
@@ -519,10 +590,10 @@ msgid "Yes, delete"
 msgstr "Да, изтрий"
 
 #: templates/core/building_detail.html:29
-#: templates/core/building_detail.html:256
-#: templates/core/building_detail.html:286
+#: templates/core/building_detail.html:258
+#: templates/core/building_detail.html:288
 #: templates/core/work_order_detail.html:46
-#: templates/core/work_orders_archive.html:92
+#: templates/core/work_orders_archive.html:88
 #: templates/core/work_orders_list.html:160
 msgid "Created"
 msgstr "Създадена"
@@ -531,11 +602,11 @@ msgstr "Създадена"
 msgid "Edit building"
 msgstr "Редакция на сграда"
 
-#: templates/core/building_detail.html:36
-#: templates/core/building_detail.html:97
-#: templates/core/building_detail.html:157
-#: templates/core/building_detail.html:268
-#: templates/core/building_detail.html:313 templates/core/unit_detail.html:12
+#: templates/core/building_detail.html:37
+#: templates/core/building_detail.html:99
+#: templates/core/building_detail.html:159
+#: templates/core/building_detail.html:270
+#: templates/core/building_detail.html:315 templates/core/unit_detail.html:12
 #: templates/core/user_details.html:20 templates/core/users_list.html:74
 #: templates/core/work_order_detail.html:12
 #: templates/core/work_order_detail.html:15
@@ -544,147 +615,134 @@ msgstr "Редакция на сграда"
 msgid "Delete"
 msgstr "Изтрий"
 
-#: templates/core/building_detail.html:46
+#: templates/core/building_detail.html:48
 #: templates/core/work_order_detail.html:61
 msgid "No description provided."
 msgstr "Няма предоставено описание."
 
-#: templates/core/building_detail.html:53 templates/core/buildings_list.html:63
-#: templates/core/buildings_list.html:130
-#: templates/core/buildings_list.html:132
-#: templates/core/buildings_list.html:134
+#: templates/core/building_detail.html:55 templates/core/buildings_list.html:64
+#: templates/core/buildings_list.html:131
+#: templates/core/buildings_list.html:133
+#: templates/core/buildings_list.html:135
 msgid "Units"
 msgstr "Апартаменти"
 
-#: templates/core/building_detail.html:54
+#: templates/core/building_detail.html:56
 msgid "Add unit"
 msgstr "Добавяне на апартамент"
 
-#: templates/core/building_detail.html:59
+#: templates/core/building_detail.html:61
 #, fuzzy
 #| msgid "Search"
 msgid "Search units"
 msgstr "Търсене"
 
-#: templates/core/building_detail.html:60
+#: templates/core/building_detail.html:62
 msgid "Number, floor, owner or contact"
 msgstr "Номер, етаж, собственик или контакт"
 
-#: templates/core/building_detail.html:61
-#: templates/core/building_detail.html:198
-#: templates/core/buildings_list.html:21
-#: templates/core/work_orders_archive.html:27
-#: templates/core/work_orders_list.html:28
-msgid "Filter"
-msgstr "Филтър"
-
-#: templates/core/building_detail.html:65
-#: templates/core/building_detail.html:202
-#: templates/core/buildings_list.html:25
+#: templates/core/building_detail.html:67
+#: templates/core/building_detail.html:204
+#: templates/core/buildings_list.html:31
 #: templates/core/work_orders_list.html:33
 msgid "Page size"
 msgstr "Брой на страница"
 
-#: templates/core/building_detail.html:81 templates/core/buildings_list.html:36
-#: templates/core/work_orders_archive.html:29
-msgid "Reset"
-msgstr "Изчистване"
-
-#: templates/core/building_detail.html:93
+#: templates/core/building_detail.html:95
 #, python-format
 msgid "Floor %(value)s"
 msgstr "Етаж %(value)s"
 
-#: templates/core/building_detail.html:106
-#: templates/core/building_detail.html:143
+#: templates/core/building_detail.html:108
+#: templates/core/building_detail.html:145
 msgid "Contact"
 msgstr "Контакт"
 
-#: templates/core/building_detail.html:112
-#: templates/core/building_detail.html:162
+#: templates/core/building_detail.html:114
+#: templates/core/building_detail.html:164
 msgid "No units."
 msgstr "Няма апартаменти."
 
-#: templates/core/building_detail.html:123
 #: templates/core/building_detail.html:125
 #: templates/core/building_detail.html:127
+#: templates/core/building_detail.html:129
 msgid "Number"
 msgstr "Номер"
 
-#: templates/core/building_detail.html:144
-#: templates/core/building_detail.html:287 templates/core/users_list.html:48
+#: templates/core/building_detail.html:146
+#: templates/core/building_detail.html:289 templates/core/users_list.html:48
 #: templates/core/work_orders_list.html:161
 msgid "Actions"
 msgstr "Действия"
 
-#: templates/core/building_detail.html:173
 #: templates/core/building_detail.html:175
-#: templates/core/building_detail.html:330
+#: templates/core/building_detail.html:177
 #: templates/core/building_detail.html:332
-#: templates/core/buildings_list.html:180
-#: templates/core/buildings_list.html:182
+#: templates/core/building_detail.html:334
+#: templates/core/buildings_list.html:181
+#: templates/core/buildings_list.html:183
 #: templates/core/work_orders_list.html:230
 #: templates/core/work_orders_list.html:233
 msgid "Prev"
 msgstr "Предишна"
 
-#: templates/core/building_detail.html:178
 #: templates/core/building_detail.html:180
-#: templates/core/building_detail.html:335
+#: templates/core/building_detail.html:182
 #: templates/core/building_detail.html:337
-#: templates/core/buildings_list.html:185
-#: templates/core/buildings_list.html:187 templates/core/users_list.html:102
+#: templates/core/building_detail.html:339
+#: templates/core/buildings_list.html:186
+#: templates/core/buildings_list.html:188 templates/core/users_list.html:102
 #: templates/core/work_orders_list.html:236
 #: templates/core/work_orders_list.html:239
 msgid "Next"
 msgstr "Следваща"
 
-#: templates/core/building_detail.html:183
+#: templates/core/building_detail.html:185
 #, python-format
 msgid "Page %(units_page.number)s of %(units_page.paginator.num_pages)s"
 msgstr "Страница %(units_page.number)s от %(units_page.paginator.num_pages)s"
 
-#: templates/core/building_detail.html:190
-#: templates/core/buildings_list.html:67
+#: templates/core/building_detail.html:192
+#: templates/core/buildings_list.html:68
 msgid "Work orders"
 msgstr "Поръчки"
 
-#: templates/core/building_detail.html:191
+#: templates/core/building_detail.html:193
 #: templates/core/work_orders_list.html:13
 msgid "Add work order"
 msgstr "Добави поръчка"
 
-#: templates/core/building_detail.html:196
+#: templates/core/building_detail.html:198
 #: templates/core/work_orders_list.html:18
 #, fuzzy
 #| msgid "Work orders"
 msgid "Search work orders"
 msgstr "Поръчки"
 
-#: templates/core/building_detail.html:197
+#: templates/core/building_detail.html:199
 #: templates/core/work_orders_list.html:26
 msgid "Title or description"
 msgstr "Заглавие или описание"
 
-#: templates/core/building_detail.html:214
-#: templates/core/work_orders_archive.html:38
+#: templates/core/building_detail.html:216
+#: templates/core/work_orders_archive.html:34
 #: templates/core/work_orders_list.html:44
 #: templates/core/work_orders_list.html:55
 msgid "All"
 msgstr "Всички"
 
-#: templates/core/building_detail.html:261 templates/core/unit_detail.html:11
+#: templates/core/building_detail.html:263 templates/core/unit_detail.html:11
 #: templates/core/users_list.html:72 templates/core/work_order_detail.html:11
 #: templates/core/work_order_detail.html:14
 msgid "Edit"
 msgstr "Редакция"
 
-#: templates/core/building_detail.html:273
-#: templates/core/building_detail.html:319
+#: templates/core/building_detail.html:275
+#: templates/core/building_detail.html:321
 msgid "No work orders for this building."
 msgstr "Няма поръчки за тази сграда."
 
-#: templates/core/building_detail.html:340
+#: templates/core/building_detail.html:342
 #, python-format
 msgid ""
 "Page %(workorders_page.number)s of %(workorders_page.paginator.num_pages)s"
@@ -706,36 +764,38 @@ msgstr "Преглеждайте и управлявайте вашите имо
 msgid "Add new building"
 msgstr "Добавяне на нова сграда"
 
-#: templates/core/buildings_list.html:19 templates/core/users_list.html:29
-msgid "Search"
-msgstr "Търсене"
-
-#: templates/core/buildings_list.html:20
+#: templates/core/buildings_list.html:19
 msgid "Search by name, address, owner"
 msgstr "Търсене по име, адрес, собственик"
 
-#: templates/core/buildings_list.html:73 templates/core/buildings_list.html:168
+#: templates/core/buildings_list.html:21
+#, fuzzy
+#| msgid "Search"
+msgid "Search buildings"
+msgstr "Търсене"
+
+#: templates/core/buildings_list.html:74 templates/core/buildings_list.html:169
 msgid "No buildings found."
 msgstr "Няма намерени сгради."
 
-#: templates/core/buildings_list.html:190 templates/core/users_list.html:98
+#: templates/core/buildings_list.html:191 templates/core/users_list.html:98
 #: templates/core/work_orders_list.html:243
 #, python-format
 msgid "Page %(page_obj.number)s of %(paginator.num_pages)s"
 msgstr "Страница %(page_obj.number)s от %(paginator.num_pages)s"
 
-#: templates/core/buildings_list.html:196
+#: templates/core/buildings_list.html:197
 msgid "Notifications"
 msgstr "Известия"
 
-#: templates/core/buildings_list.html:199
+#: templates/core/buildings_list.html:200
 #, python-format
 msgid "%(total)s alert"
 msgid_plural "%(total)s alerts"
 msgstr[0] "%(total)s предупреждение"
 msgstr[1] "%(total)s предупреждения"
 
-#: templates/core/buildings_list.html:210
+#: templates/core/buildings_list.html:211
 msgid "No notifications right now."
 msgstr "В момента няма известия."
 
@@ -889,11 +949,11 @@ msgstr "Актуализирайте данните на акаунта, пра�
 msgid "Create a new account and assign the right access level."
 msgstr "Създайте нов акаунт и задайте подходящото ниво на достъп."
 
-#: templates/core/user_form.html:64 templates/core/users_list.html:46
+#: templates/core/user_form.html:68 templates/core/users_list.html:46
 msgid "Roles"
 msgstr "Роли"
 
-#: templates/core/user_form.html:65
+#: templates/core/user_form.html:69
 msgid "Role assignment will be available in a future update."
 msgstr "Присвояването на роли ще бъде налично в следваща версия."
 
@@ -915,7 +975,23 @@ msgstr ""
 "следващото влизане.\n"
 "      "
 
-#: templates/core/user_password_form.html:41
+#: templates/core/user_password_form.html:32
+msgid "Your password can't be too similar to your other personal information."
+msgstr ""
+
+#: templates/core/user_password_form.html:33
+msgid "Your password must contain at least 8 characters."
+msgstr ""
+
+#: templates/core/user_password_form.html:34
+msgid "Your password can't be a commonly used password."
+msgstr ""
+
+#: templates/core/user_password_form.html:35
+msgid "Your password can't be entirely numeric."
+msgstr ""
+
+#: templates/core/user_password_form.html:48
 msgid "Save new password"
 msgstr "Запазване на новата парола"
 
@@ -933,6 +1009,10 @@ msgstr "Търсене на потребители"
 #: templates/core/users_list.html:26
 msgid "Search username, email, or name"
 msgstr "Търсене по потребителско име, имейл или име"
+
+#: templates/core/users_list.html:29
+msgid "Search"
+msgstr "Търсене"
 
 #: templates/core/users_list.html:31
 msgid "Clear"
@@ -1009,23 +1089,23 @@ msgid "Review completed and archived work orders grouped by building."
 msgstr "Прегледайте приключените и архивирани поръчки, групирани по сграда."
 
 #: templates/core/work_orders_archive.html:17
-msgid "Search archived work orders"
-msgstr "Търсене в архивираните поръчки"
-
-#: templates/core/work_orders_archive.html:25
 msgid "Title, description, or building"
 msgstr "Заглавие, описание или сграда"
 
-#: templates/core/work_orders_archive.html:49
+#: templates/core/work_orders_archive.html:19
+msgid "Search archived work orders"
+msgstr "Търсене в архивираните поръчки"
+
+#: templates/core/work_orders_archive.html:45
 #: templates/core/work_orders_list.html:66
 msgid "Sort"
 msgstr "Сортиране"
 
-#: templates/core/work_orders_archive.html:93
+#: templates/core/work_orders_archive.html:89
 msgid "Archived"
 msgstr "Архивирана"
 
-#: templates/core/work_orders_archive.html:142
+#: templates/core/work_orders_archive.html:138
 msgid "No archived work orders yet."
 msgstr "Все още няма архивирани поръчки."
 
@@ -1048,17 +1128,84 @@ msgstr "Първа"
 msgid "Last"
 msgstr "Последна"
 
-#: core/views.py:958
-msgid "Archived (Newest first)"
-msgstr "Архивирани (най-нови първо)"
+#: templates/core/work_orders_mass_assign.html:4
+#: templates/core/work_orders_mass_assign.html:9
+msgid "Mass Assign Work Orders"
+msgstr "Масово възлагане на поръчки"
 
-#: core/views.py:959
-msgid "Archived (Oldest first)"
-msgstr "Архивирани (най-стари първо)"
+#: templates/core/work_orders_mass_assign.html:11
+#, python-format
+msgid ""
+"\n"
+"        This action will create identical work orders for %(total)s building "
+"that uses the Technical Support role.\n"
+"      "
+msgid_plural ""
+"\n"
+"        This action will create identical work orders for %(total)s "
+"buildings that use the Technical Support role.\n"
+"      "
+msgstr[0] ""
+"\n"
+"        Това действие ще създаде идентични поръчки за %(total)s сграда с "
+"роля „Техническа поддръжка“.\n"
+"      "
+msgstr[1] ""
+"\n"
+"        Това действие ще създаде идентични поръчки за %(total)s сгради с "
+"роля „Техническа поддръжка“.\n"
+"      "
 
-#: core/views.py:123
-msgid "Loading units…"
-msgstr "Зареждане на апартаменти…"
+#: templates/core/work_orders_mass_assign.html:18
+msgid ""
+"No Technical Support buildings found. Create a building with this role first."
+msgstr ""
+"Няма намерени сгради с роля „Техническа поддръжка“. Създайте такава сграда "
+"първо."
+
+#: templates/core/work_orders_mass_assign.html:23
+msgid "Work order details"
+msgstr "Детайли за поръчката"
+
+#: templates/core/work_orders_mass_assign.html:34
+msgid "All buildings are selected by default. Uncheck any building to skip it."
+msgstr ""
+"Всички сгради са избрани по подразбиране. Махнете отметката на сградите, "
+"които искате да пропуснете."
+
+#: templates/core/work_orders_mass_assign.html:36
+msgid "Show building list"
+msgstr "Покажи списъка със сгради"
+
+#: templates/core/work_orders_mass_assign.html:63
+msgid "Markdown formatting"
+msgstr "форматиране с Markdown"
+
+#: templates/core/work_orders_mass_assign.html:63
+#, python-format
+msgid "Optional context for the recipients. %(markup)s not supported."
+msgstr ""
+"Допълнителен контекст по избор за получателите. %(markup)s не се поддържа."
+
+#: templates/core/work_orders_mass_assign.html:73
+msgid "The priority is set to Low."
+msgstr "Приоритетът е зададен на „Нисък“."
+
+#: templates/core/work_orders_mass_assign.html:74
+msgid "The deadline is automatically one month from the creation date."
+msgstr "Крайният срок е автоматично един месец след датата на създаване."
+
+#: templates/core/work_orders_mass_assign.html:75
+msgid "Affected users will see a notification about the new work order."
+msgstr "Засегнатите потребители ще получат известие за новата поръчка."
+
+#: templates/core/work_orders_mass_assign.html:80
+msgid "Create work orders"
+msgstr "Създай поръчки"
+
+#: templates/core/work_orders_mass_assign.html:81
+msgid "Back to Work Orders"
+msgstr "Назад към поръчките"
 
 #: templates/registration/logged_out.html:3
 msgid "Logged out"
@@ -1092,6 +1239,21 @@ msgstr "Въведете вашите данни за достъп до Упра
 msgid "Password"
 msgstr "Парола"
 
+#~ msgid "You cannot assign work orders to this building."
+#~ msgstr "Не можете да възлагате поръчки на тази сграда."
+
+#, python-format
+#~ msgid "overdue by %(count)s day"
+#~ msgid_plural "overdue by %(count)s days"
+#~ msgstr[0] "просрочена с %(count)s ден"
+#~ msgstr[1] "просрочена с %(count)s дни"
+
+#~ msgid "Archived (Newest first)"
+#~ msgstr "Архивирани (най-нови първо)"
+
+#~ msgid "Archived (Oldest first)"
+#~ msgstr "Архивирани (най-стари първо)"
+
 #~ msgid ""
 #~ "Designates whether this user should be treated as active. Unselect this "
 #~ "instead of deleting accounts."
@@ -1108,7 +1270,6 @@ msgstr "Парола"
 
 #~ msgid "Superuser status"
 #~ msgstr "Статут на супер-потребител"
-
 
 #~ msgid "New"
 #~ msgstr "Нов"

@@ -26,6 +26,7 @@ urlpatterns = [
     path("work-orders/<int:pk>/edit/", views.WorkOrderUpdateView.as_view(), name="work_order_update"),
     path("work-orders/<int:pk>/delete/", views.WorkOrderDeleteView.as_view(), name="work_order_delete"),
     path("work-orders/<int:pk>/archive/", views.WorkOrderArchiveView.as_view(), name="work_order_archive"),
+    path("work-orders/mass-assign/", views.MassAssignWorkOrdersView.as_view(), name="work_orders_mass_assign"),
     path("work-orders/archive/", views.ArchivedWorkOrderListView.as_view(), name="work_orders_archive"),
 
     # Admin user management (superuser-only dashboard)

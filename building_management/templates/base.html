@@ -25,6 +25,9 @@
               {% if work_orders_archive_enabled and work_orders_archive_url %}
                 <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Archive" %}</a>
               {% endif %}
+              {% if mass_assign_work_orders_enabled and mass_assign_work_orders_url %}
+                <a href="{{ mass_assign_work_orders_url }}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "Mass Assign" %}</a>
+              {% endif %}
               {% if user.is_superuser %}
                 <a href="{% url 'users_list' %}" class="text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200">{% trans "User Management" %}</a>
               {% elif user.is_staff %}

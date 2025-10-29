@@ -253,6 +253,12 @@ class WorkOrder(TimeStampedModel):
     # Mandatory deadline (non-nullable at DB level)
     deadline = models.DateField(null=False, blank=False)
 
+    mass_assigned = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name=_("Mass assigned"),
+    )
+
     # Archiving toggle (when done and user archives)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
 

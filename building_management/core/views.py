@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import redirect_to_login
+from django.db import transaction
 from django.db.models import Case, When, IntegerField, Q, Count, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Lower, Trim, Replace
 from django.http import JsonResponse, Http404, HttpResponseForbidden, HttpResponseRedirect
@@ -35,6 +36,7 @@ from .forms import (
     AdminUserCreateForm,
     AdminUserUpdateForm,
     AdminUserPasswordForm,
+    MassAssignWorkOrdersForm,
 )
 from .models import Building, Unit, WorkOrder, UserSecurityProfile
 from .views_theme import toggle_theme
@@ -296,6 +298,8 @@ class BuildingListView(LoginRequiredMixin, ListView):
                     days_left,
                 ) % {"count": days_left}
 
+            deadline_display = formats.date_format(wo.deadline, "DATE_FORMAT")
+
             message = _(
                 '%(priority)s priority work order "%(title)s" in %(building)s is %(due)s '
                 "(deadline %(deadline)s)"
@@ -304,7 +308,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
                 "title": wo.title,
                 "building": building_name,
                 "due": due_text,
-                "deadline": wo.deadline,
+                "deadline": deadline_display,
             }
             if owner_label:
                 message += _(" (owner: %(owner)s)") % {"owner": owner_label}
@@ -315,6 +319,37 @@ class BuildingListView(LoginRequiredMixin, ListView):
                     "message": message + ".",
                     "category": "deadline",
                     "_priority_weight": 0 if wo.priority == WorkOrder.Priority.HIGH else 1 if wo.priority == WorkOrder.Priority.MEDIUM else 2,
+                }
+            )
+
+        mass_recent_cutoff = timezone.now() - timedelta(days=7)
+        recent_mass_orders = (
+            WorkOrder.objects.visible_to(user)
+            .filter(
+                mass_assigned=True,
+                created_at__gte=mass_recent_cutoff,
+            )
+            .select_related("building__owner")
+            .order_by("-created_at")[:10]
+        )
+
+        for mass_order in recent_mass_orders:
+            building = mass_order.building
+            building_name = building.name if mass_order.building_id else _("your building")
+            notifications.append(
+                {
+                    "id": f"wo-mass-{mass_order.id}",
+                    "level": "info",
+                    "message": _(
+                        'A new mass-assigned work order "%(title)s" was created for %(building)s (deadline %(deadline)s).'
+                    )
+                    % {
+                        "title": mass_order.title,
+                        "building": building_name,
+                        "deadline": formats.date_format(mass_order.deadline, "DATE_FORMAT"),
+                    },
+                    "category": "mass_assign",
+                    "_priority_weight": 3,
                 }
             )
 
@@ -1003,6 +1038,106 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
         if next_url:
             return redirect(next_url)
         return redirect("building_detail", wo.building_id)
+
+
+class MassAssignWorkOrdersView(LoginRequiredMixin, AdminRequiredMixin, FormView):
+    template_name = "core/work_orders_mass_assign.html"
+    form_class = MassAssignWorkOrdersForm
+    success_url = reverse_lazy("work_orders_mass_assign")
+
+    def get_queryset(self):
+        if not hasattr(self, "_building_queryset"):
+            self._building_queryset = (
+                Building.objects.filter(role=Building.Role.TECH_SUPPORT)
+                .select_related("owner")
+                .order_by("name", "id")
+            )
+        return self._building_queryset
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["buildings_queryset"] = self.get_queryset()
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        buildings = list(self.get_queryset())
+        ctx["technical_support_buildings"] = buildings
+        ctx["technical_support_count"] = len(buildings)
+        return ctx
+
+    def form_valid(self, form):
+        selected_buildings = list(form.cleaned_data.get("buildings") or [])
+        if not selected_buildings:
+            messages.info(self.request, _("No buildings with the Technical Support role are available."))
+            return super().form_valid(form)
+
+        title = form.cleaned_data["title"].strip()
+        description = (form.cleaned_data.get("description") or "").strip()
+        deadline = timezone.localdate() + timedelta(days=30)
+
+        created = 0
+        skipped = 0
+        created_names = []
+
+        with transaction.atomic():
+            for building in selected_buildings:
+                exists = (
+                    WorkOrder.objects.filter(
+                        building=building,
+                        title=title,
+                        mass_assigned=True,
+                        status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
+                        archived_at__isnull=True,
+                    )
+                    .order_by("-created_at")
+                    .exists()
+                )
+                if exists:
+                    skipped += 1
+                    continue
+
+                WorkOrder.objects.create(
+                    building=building,
+                    title=title,
+                    description=description,
+                    status=WorkOrder.Status.OPEN,
+                    priority=WorkOrder.Priority.LOW,
+                    deadline=deadline,
+                    mass_assigned=True,
+                )
+                created += 1
+                created_names.append(building.name)
+
+        if created:
+            building_list = ", ".join(created_names[:5])
+            if created > 5:
+                building_list += ", …"
+            messages.success(
+                self.request,
+                ngettext(
+                    "Created %(count)s work order for %(buildings)s.",
+                    "Created %(count)s work orders (first few: %(buildings)s).",
+                    created,
+                )
+                % {
+                    "count": created,
+                    "buildings": building_list or _("selected buildings"),
+                },
+            )
+
+        if skipped:
+            messages.warning(
+                self.request,
+                ngettext(
+                    "%(count)s building already has an open mass-assigned work order with this title.",
+                    "%(count)s buildings already have an open mass-assigned work order with this title.",
+                    skipped,
+                )
+                % {"count": skipped},
+            )
+
+        return super().form_valid(form)
 
 
 class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListView):

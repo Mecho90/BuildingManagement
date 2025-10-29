@@ -10,6 +10,8 @@ def theme(request):
         "work_orders_url": "",
         "work_orders_archive_enabled": False,
         "work_orders_archive_url": "",
+        "mass_assign_work_orders_enabled": False,
+        "mass_assign_work_orders_url": "",
     }
 
     user = getattr(request, "user", None)
@@ -24,6 +26,12 @@ def theme(request):
             try:
                 data["work_orders_archive_url"] = reverse("work_orders_archive")
                 data["work_orders_archive_enabled"] = True
+            except NoReverseMatch:
+                pass
+        if user.is_superuser:
+            try:
+                data["mass_assign_work_orders_url"] = reverse("work_orders_mass_assign")
+                data["mass_assign_work_orders_enabled"] = True
             except NoReverseMatch:
                 pass
     return data

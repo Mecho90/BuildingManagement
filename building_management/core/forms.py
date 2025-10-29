@@ -278,6 +278,58 @@ class WorkOrderForm(forms.ModelForm):
         return obj
 
 
+class MassAssignWorkOrdersForm(forms.Form):
+    title = forms.CharField(
+        max_length=255,
+        label=_("Title"),
+        widget=forms.TextInput(attrs={"class": "input"}),
+    )
+    description = forms.CharField(
+        required=False,
+        label=_("Description"),
+        widget=forms.Textarea(attrs={"rows": 6, "class": "input"}),
+    )
+    buildings = forms.ModelMultipleChoiceField(
+        queryset=Building.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        label=_("Buildings to include"),
+        required=False,
+    )
+
+    def __init__(self, *args, buildings_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        qs = buildings_queryset or Building.objects.none()
+        field = self.fields["buildings"]
+        field.queryset = qs
+        field.widget.attrs.setdefault("class", "space-y-2")
+
+        if qs.exists():
+            if not self.is_bound:
+                field.initial = list(qs.values_list("pk", flat=True))
+        else:
+            field.disabled = True
+
+        def _label_from_instance(building: Building) -> str:
+            owner = getattr(building, "owner", None)
+            if owner:
+                owner_label = owner.get_full_name() or owner.username
+                return _("%(building)s — owner %(owner)s") % {
+                    "building": building.name,
+                    "owner": owner_label,
+                }
+            return building.name
+
+        field.label_from_instance = _label_from_instance
+
+    def clean_buildings(self):
+        buildings = self.cleaned_data.get("buildings")
+        field = self.fields["buildings"]
+        if field.queryset.exists() and not buildings:
+            raise forms.ValidationError(_("Select at least one building."))
+        return buildings
+
+
 # -----------------------------
 # Users (admin area)
 # -----------------------------
