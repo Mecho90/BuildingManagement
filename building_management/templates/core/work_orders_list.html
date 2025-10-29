@@ -84,7 +84,7 @@
             </h2>
             <p class="text-sm text-slate-500 dark:text-slate-400">
               <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Building" %}:</span>
-              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'building_detail' w.building_id %}">
+              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'building_detail' w.building_id %}">
                 {{ w.building.name }}
               </a>
             </p>
@@ -109,7 +109,7 @@
               <span class="priority-badge {% if w.priority == 'HIGH' %}priority-badge--high{% elif w.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">{{ w.get_priority_display }}</span>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap justify-end gap-2">
             {% if w.status == 'DONE' %}
               <form action="{% url 'work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
                 {% csrf_token %}
@@ -124,7 +124,7 @@
             <dt class="font-semibold text-slate-500 dark:text-slate-400">Unit</dt>
             <dd>
               {% if w.unit_id %}
-                <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'building_detail' w.unit.building_id %}">{{ w.unit.building.name }} — #{{ w.unit.number }}</a>
+                <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'building_detail' w.unit.building_id %}">{{ w.unit.building.name }} — #{{ w.unit.number }}</a>
               {% else %}—{% endif %}
             </dd>
           </div>
@@ -168,7 +168,7 @@
               <a class="break-words hyphens-auto" href="{% url 'work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
             </td>
             <td class="px-4 py-3">
-              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'building_detail' w.building_id %}">
+              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'building_detail' w.building_id %}">
                 {{ w.building.name }}
               </a>
             </td>
@@ -202,14 +202,14 @@
             <td class="px-4 py-3">{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
             <td class="px-4 py-3">{{ w.created_at|date:"Y-m-d H:i" }}</td>
             <td class="px-4 py-3">
-              <div class="flex justify-end gap-2">
+              <div class="flex flex-wrap justify-end gap-2">
                 {% if w.status == 'DONE' %}
                   <form action="{% url 'work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
                     {% csrf_token %}
-                  <button class="btn btn-secondary btn-sm" type="submit">{% trans "Archive" %}</button>
+                    <button class="btn btn-secondary btn-sm" type="submit">{% trans "Archive" %}</button>
                   </form>
                 {% endif %}
-              <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
+                <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
               </div>
             </td>
           </tr>

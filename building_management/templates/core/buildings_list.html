@@ -50,7 +50,14 @@
             </div>
             {% if show_owner_column %}
               <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                {% trans "Owner" %}: {{ b.owner }}
+                {% trans "Owner" %}:
+                {% with owner=b.owner %}
+                  {% if owner %}
+                    {{ owner.get_full_name|default:owner.username }}
+                  {% else %}
+                    &mdash;
+                  {% endif %}
+                {% endwith %}
               </span>
             {% endif %}
           </div>
@@ -156,7 +163,15 @@
                 <a href="{% url 'building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
               </td>
               {% if show_owner_column %}
-                <td class="px-4 py-3">{{ b.owner }}</td>
+                <td class="px-4 py-3">
+                  {% with owner=b.owner %}
+                    {% if owner %}
+                      {{ owner.get_full_name|default:owner.username }}
+                    {% else %}
+                      &mdash;
+                    {% endif %}
+                  {% endwith %}
+                </td>
               {% endif %}
               <td class="px-4 py-3">{{ b.get_role_display }}</td>
               <td class="px-4 py-3">{{ b.address }}</td>
