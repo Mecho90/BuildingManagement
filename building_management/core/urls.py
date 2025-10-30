@@ -12,6 +12,9 @@ urlpatterns = [
 
     path("toggle-theme/", views.toggle_theme, name="toggle_theme"),
 
+    # Notifications
+    path("notifications/<str:key>/snooze/", views.NotificationSnoozeView.as_view(), name="notification_snooze"),
+
     # Units
     path("buildings/<int:pk>/units/new/", views.UnitCreateView.as_view(), name="unit_create"),
     path("units/<int:pk>/", views.UnitDetailView.as_view(), name="unit_detail"),

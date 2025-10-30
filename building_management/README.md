@@ -54,6 +54,13 @@ Gunicorn listens on `0.0.0.0:8000` by default; place a reverse proxy such as ngi
 Whitenoise serves collected static files directly from Gunicorn, simplifying the deployment story
 for smaller installations.
 
+### Scheduled Jobs
+
+- **Daily notification sync**: run `python manage.py sync_notifications` once per day (e.g., via cron `0 5 * * *`).
+  This refreshes work-order deadline alerts, clears expired snoozes, prunes acknowledged alerts older than 30 days,
+  and removes stale records so users continue to receive daily reminders for unfinished tasks. The command is
+  idempotent and safe to run more often if desired.
+
 Tailwind is configured with purge-aware `content` globs so unused utilities are removed in the production bundle.
 
 ## Internationalization

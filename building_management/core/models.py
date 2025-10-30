@@ -1,6 +1,8 @@
 # core/models.py
 from __future__ import annotations
 
+from datetime import date
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -316,6 +318,101 @@ class WorkOrder(TimeStampedModel):
         if not self.is_archived:
             self.archived_at = timezone.now()
             self.save(update_fields=["archived_at"], validate=False)
+
+
+class NotificationQuerySet(models.QuerySet):
+    def active(self, *, on: date | None = None):
+        today = on or timezone.localdate()
+        return self.filter(
+            acknowledged_at__isnull=True,
+        ).filter(
+            models.Q(snoozed_until__isnull=True) | models.Q(snoozed_until__lte=today)
+        )
+
+
+class Notification(TimeStampedModel):
+    """
+    Persistent notification targeted at a single user. Uniqueness of ``(user, key)``
+    prevents duplicate alerts for the same logical event (e.g. deadline for work
+    order X).
+    """
+
+    class Level(models.TextChoices):
+        INFO = "info", _("Info")
+        WARNING = "warning", _("Warning")
+        DANGER = "danger", _("Danger")
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    key = models.CharField(max_length=255)
+    category = models.CharField(max_length=40)
+    level = models.CharField(max_length=20, choices=Level.choices, default=Level.INFO)
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    first_seen_at = models.DateTimeField(null=True, blank=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    snoozed_until = models.DateField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    objects = NotificationQuerySet.as_manager()
+
+    class Meta:
+        unique_together = ("user", "key")
+        indexes = [
+            models.Index(fields=("user", "category")),
+            models.Index(fields=("user", "acknowledged_at")),
+            models.Index(fields=("user", "snoozed_until")),
+        ]
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.user}: {self.title}"
+
+    # ------------------------------------------------------------------ helpers
+
+    def acknowledge(self, *, at=None, save: bool = True) -> None:
+        """Mark the notification as acknowledged so it no longer appears."""
+        at = at or timezone.now()
+        if self.acknowledged_at != at:
+            self.acknowledged_at = at
+        if save:
+            self.save(update_fields=["acknowledged_at", "updated_at"])
+
+    def snooze_until(self, target_date: date | None, *, save: bool = True) -> None:
+        """
+        Hide the notification until ``target_date`` (inclusive). Passing ``None``
+        clears any existing snooze window.
+        """
+        if target_date is not None and target_date < timezone.localdate():
+            raise ValidationError(_("Cannot snooze a notification in the past."))
+        self.snoozed_until = target_date
+        if save:
+            self.save(update_fields=["snoozed_until", "updated_at"])
+
+    def mark_seen(self, *, at=None, save: bool = True) -> None:
+        """Record that the notification was presented to the user."""
+        if self.first_seen_at:
+            return
+        at = at or timezone.now()
+        self.first_seen_at = at
+        if save:
+            self.save(update_fields=["first_seen_at", "updated_at"])
+
+    def is_active(self, *, on: date | None = None) -> bool:
+        """Return True if the notification should be visible."""
+        if self.acknowledged_at:
+            return False
+        today = on or timezone.localdate()
+        if self.snoozed_until and self.snoozed_until > today:
+            return False
+        return True
+
+    def delete(self, *args, **kwargs):
+        result = super().delete(*args, **kwargs)
+        return result
 
 
 class UserSecurityProfile(models.Model):

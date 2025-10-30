@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Building, Unit, WorkOrder
+from .models import Building, Notification, Unit, WorkOrder
 
 @admin.register(Building)
 class BuildingAdmin(admin.ModelAdmin):
@@ -23,3 +23,29 @@ class WorkOrderAdmin(admin.ModelAdmin):
     search_fields = ("title", "description", "unit__number", "building__name")
     list_select_related = ("building", "unit")
     autocomplete_fields = ("building", "unit")
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "category",
+        "level",
+        "user",
+        "is_active_display",
+        "snoozed_until",
+        "acknowledged_at",
+        "created_at",
+    )
+    list_filter = ("category", "level", "acknowledged_at", "snoozed_until")
+    search_fields = ("title", "body", "key", "user__username")
+    list_select_related = ("user",)
+    date_hierarchy = "created_at"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("user")
+
+    @admin.display(boolean=True, description="Active")
+    def is_active_display(self, obj):
+        return obj.is_active()

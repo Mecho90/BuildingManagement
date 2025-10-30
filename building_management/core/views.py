@@ -13,7 +13,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.db import transaction
 from django.db.models import Case, When, IntegerField, Q, Count, OuterRef, Subquery, Value
 from django.db.models.functions import Coalesce, Lower, Trim, Replace
-from django.http import JsonResponse, Http404, HttpResponseForbidden, HttpResponseRedirect
+from django.http import HttpResponse, JsonResponse, Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views import View
@@ -38,7 +38,8 @@ from .forms import (
     AdminUserPasswordForm,
     MassAssignWorkOrdersForm,
 )
-from .models import Building, Unit, WorkOrder, UserSecurityProfile
+from .models import Building, Notification, Unit, WorkOrder, UserSecurityProfile
+from .services import NotificationService
 from .views_theme import toggle_theme
 
 User = get_user_model()
@@ -227,131 +228,51 @@ class BuildingListView(LoginRequiredMixin, ListView):
         if not user.is_authenticated:
             return []
 
-        is_admin = user.is_staff or user.is_superuser
-        today = timezone.localdate()
+        notifications: list[dict[str, str | bool]] = []
 
-        notifications: list[dict[str, str]] = []
+        service = NotificationService(user)
+        deadline_notifications = list(service.sync_work_order_deadlines())
+        new_flags = {note.key: note.first_seen_at is None for note in deadline_notifications}
+        if deadline_notifications:
+            service.mark_seen([note.key for note in deadline_notifications])
 
-        # ---- Upcoming deadlines ----
-        thresholds = {
-            WorkOrder.Priority.HIGH: 7,
-            WorkOrder.Priority.MEDIUM: 7,
-            WorkOrder.Priority.LOW: 30,
-        }
-        priority_levels = {
-            WorkOrder.Priority.HIGH: "danger",
-            WorkOrder.Priority.MEDIUM: "warning",
-            WorkOrder.Priority.LOW: "info",
+        level_weights = {
+            Notification.Level.DANGER: 0,
+            Notification.Level.WARNING: 1,
+            Notification.Level.INFO: 2,
         }
 
-        max_window = max(thresholds.values())
-        priority_window = Case(
-            When(priority=WorkOrder.Priority.HIGH, then=Value(thresholds[WorkOrder.Priority.HIGH])),
-            When(priority=WorkOrder.Priority.MEDIUM, then=Value(thresholds[WorkOrder.Priority.MEDIUM])),
-            When(priority=WorkOrder.Priority.LOW, then=Value(thresholds[WorkOrder.Priority.LOW])),
-            default=Value(max_window),
-            output_field=IntegerField(),
-        )
-
-        upcoming = (
-            WorkOrder.objects.visible_to(user)
-            .filter(
-                archived_at__isnull=True,
-                status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
-                deadline__gte=today,
-                deadline__lte=today + timedelta(days=max_window),
-            )
-            .annotate(priority_window=priority_window)
-            .select_related("building__owner", "unit")
-            .order_by("deadline", "-pk")
-        )
-
-        per_priority_counts = {key: 0 for key in thresholds}
-
-        for wo in upcoming:
-            if wo.priority not in per_priority_counts:
-                continue
-            window = thresholds.get(wo.priority, max_window)
-            days_left = (wo.deadline - today).days
-            if days_left > window or per_priority_counts[wo.priority] >= 10:
-                continue
-
-            per_priority_counts[wo.priority] += 1
-
-            building = wo.building
-            building_id = wo.building_id
-            building_name = building.name if building_id else _("your building")
-            owner_label = None
-            if is_admin and building_id:
-                owner = getattr(building, "owner", None)
-                if owner:
-                    owner_label = owner.get_full_name() or owner.username
-
-            if days_left == 0:
-                due_text = _("due today")
-            elif days_left == 1:
-                due_text = _("due tomorrow")
-            else:
-                due_text = ngettext(
-                    "due in %(count)s day",
-                    "due in %(count)s days",
-                    days_left,
-                ) % {"count": days_left}
-
-            deadline_display = formats.date_format(wo.deadline, "DATE_FORMAT")
-
-            message = _(
-                '%(priority)s priority work order "%(title)s" in %(building)s is %(due)s '
-                "(deadline %(deadline)s)"
-            ) % {
-                "priority": wo.get_priority_display(),
-                "title": wo.title,
-                "building": building_name,
-                "due": due_text,
-                "deadline": deadline_display,
-            }
-            if owner_label:
-                message += _(" (owner: %(owner)s)") % {"owner": owner_label}
+        for note in deadline_notifications:
             notifications.append(
                 {
-                    "id": f"wo-deadline-{wo.id}",
-                    "level": priority_levels[wo.priority],
-                    "message": message + ".",
-                    "category": "deadline",
-                    "_priority_weight": 0 if wo.priority == WorkOrder.Priority.HIGH else 1 if wo.priority == WorkOrder.Priority.MEDIUM else 2,
+                    "id": note.key,
+                    "level": note.level,
+                    "message": note.body,
+                    "category": note.category,
+                    "is_new": new_flags.get(note.key, False),
+                    "dismissible": True,
+                    "_priority_weight": level_weights.get(note.level, 99),
                 }
             )
 
-        mass_recent_cutoff = timezone.now() - timedelta(days=7)
-        recent_mass_orders = (
-            WorkOrder.objects.visible_to(user)
-            .filter(
-                mass_assigned=True,
-                created_at__gte=mass_recent_cutoff,
-            )
-            .select_related("building__owner")
-            .order_by("-created_at")[:10]
-        )
-
-        for mass_order in recent_mass_orders:
-            building = mass_order.building
-            building_name = building.name if mass_order.building_id else _("your building")
+        mass_notifications = service.sync_recent_mass_assign()
+        if mass_notifications:
+            service.mark_seen([note.key for note in mass_notifications])
+        for note in mass_notifications:
             notifications.append(
                 {
-                    "id": f"wo-mass-{mass_order.id}",
-                    "level": "info",
-                    "message": _(
-                        'A new mass-assigned work order "%(title)s" was created for %(building)s (deadline %(deadline)s).'
-                    )
-                    % {
-                        "title": mass_order.title,
-                        "building": building_name,
-                        "deadline": formats.date_format(mass_order.deadline, "DATE_FORMAT"),
-                    },
-                    "category": "mass_assign",
+                    "id": note.key,
+                    "level": note.level,
+                    "message": note.body,
+                    "category": note.category,
+                    "is_new": False,
+                    "dismissible": True,
                     "_priority_weight": 3,
                 }
             )
+
+        is_admin = user.is_staff or user.is_superuser
+        today = timezone.localdate()
 
         if is_admin:
             locked_accounts = (
@@ -381,12 +302,16 @@ class BuildingListView(LoginRequiredMixin, ListView):
                         "level": "danger",
                         "message": message,
                         "category": "account_lock",
+                        "is_new": False,
+                        "dismissible": False,
                     }
                 )
 
         notifications.sort(key=lambda item: (item.get("_priority_weight", 99), item.get("id")))
         for item in notifications:
             item.pop("_priority_weight", None)
+            item.setdefault("is_new", False)
+            item.setdefault("dismissible", False)
         return notifications
 
 class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DetailView):
@@ -1378,6 +1303,42 @@ class AdminUserDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
     def delete(self, request, *args, **kwargs):
         # Ensure we destroy the object after messaging in post()
         return super().delete(request, *args, **kwargs)
+
+
+class NotificationSnoozeView(LoginRequiredMixin, View):
+    http_method_names = ["post"]
+
+    def post(self, request, key: str, *args, **kwargs):
+        service = NotificationService(request.user)
+        try:
+            note = Notification.objects.get(user=request.user, key=key)
+        except Notification.DoesNotExist:
+            return JsonResponse({"error": "not_found"}, status=404)
+
+        is_hx = bool(request.headers.get("Hx-Request"))
+        next_url = _safe_next_url(request) or request.META.get("HTTP_REFERER") or reverse("buildings_list")
+
+        if note.category == "mass_assign":
+            note.acknowledge()
+            if is_hx:
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = "notifications:updated"
+                return response
+            messages.info(request, _( "Notification dismissed." ))
+            return HttpResponseRedirect(next_url)
+
+        note = service.snooze_until(key, target_date=timezone.localdate() + timedelta(days=1))
+
+        if is_hx:
+            response = HttpResponse(status=204)
+            response["HX-Trigger"] = "notifications:updated"
+            return response
+
+        messages.info(
+            request,
+            _("Notification dismissed until %(date)s.") % {"date": note.snoozed_until.strftime("%Y-%m-%d")},
+        )
+        return HttpResponseRedirect(next_url)
 
 
 # ----------------------------------------------------------------------
