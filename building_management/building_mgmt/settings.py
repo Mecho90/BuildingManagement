@@ -18,6 +18,14 @@ ALLOWED_HOSTS: list[str] = [host.strip() for host in _hosts_raw.split(",") if ho
 if not ALLOWED_HOSTS:
     ALLOWED_HOSTS = ["*"]
 
+
+def _env_bool(name: str, *, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -33,6 +41,7 @@ AUTO_FIX_CORE_SCHEMA = os.environ.get("DJANGO_AUTO_FIX_CORE_SCHEMA", "").lower()
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -44,7 +53,7 @@ MIDDLEWARE = [
 ]
 if DEBUG and AUTO_FIX_CORE_SCHEMA:
     # why: avoid loading EnsureCoreSchemaMiddleware in production
-    MIDDLEWARE.insert(3, "core.middleware.EnsureCoreSchemaMiddleware")
+    MIDDLEWARE.insert(4, "core.middleware.EnsureCoreSchemaMiddleware")
 
 ROOT_URLCONF = "building_mgmt.urls"
 WSGI_APPLICATION = "building_mgmt.wsgi.application"
@@ -183,6 +192,28 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]  # expects static/css/app.css
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_MANIFEST_STRICT = False
+
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", default=False)
+SESSION_COOKIE_SECURE = _env_bool("DJANGO_SESSION_COOKIE_SECURE", default=SECURE_SSL_REDIRECT)
+CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", default=SECURE_SSL_REDIRECT)
+
+_hsts_seconds = os.environ.get("DJANGO_SECURE_HSTS_SECONDS")
+if _hsts_seconds:
+    try:
+        SECURE_HSTS_SECONDS = int(_hsts_seconds)
+    except ValueError as exc:
+        raise ImproperlyConfigured("DJANGO_SECURE_HSTS_SECONDS must be an integer.") from exc
+else:
+    SECURE_HSTS_SECONDS = 0
+if SECURE_HSTS_SECONDS:
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
+    SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
+
+SECURE_REFERRER_POLICY = os.environ.get("DJANGO_SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
 
 # --- Markdownify (safe subset) ---
 MARKDOWNIFY = {
@@ -201,6 +232,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Optional: set via env for deployments behind a domain/proxy
 # DJANGO_CSRF_TRUSTED_ORIGINS="https://example.com,https://www.example.com"
+CSRF_TRUSTED_ORIGINS: list[str] = []
 _csrf_origins = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 if _csrf_origins:
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()]

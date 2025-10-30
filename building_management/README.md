@@ -4,8 +4,9 @@ Responsive Django/Tailwind UI for managing buildings, units, and work orders.
 
 ## Dependencies
 
-The Python stack is deliberately lean – only Django and `psycopg[binary]` are required.  
-PostgreSQL is recommended for production, but the project now falls back to SQLite when
+The Python stack stays lean but now ships with everything needed for production:
+`Django`, `psycopg[binary]`, `django-markdownify`, `Whitenoise`, and `Gunicorn`.  
+PostgreSQL is recommended for production, but the project falls back to SQLite when
 `DATABASE_URL` is not provided so you can run management commands out of the box.
 
 ## Development Workflow
@@ -23,10 +24,35 @@ PostgreSQL is recommended for production, but the project now falls back to SQLi
    ```bash
    npm run watch:css
    ```
-4. **Run Django**
+4. **Run Django (development)**
    ```bash
    python manage.py runserver
    ```
+
+## Production Quickstart
+
+1. Install dependencies and build static assets (once per deploy):
+   ```bash
+   pip install -r requirements.txt
+   npm install
+   npm run build:css
+   python manage.py collectstatic --noinput
+   ```
+2. Configure environment variables (examples):
+   ```bash
+   export DJANGO_SECRET_KEY="change-me"
+   export DJANGO_ALLOWED_HOSTS="example.com"
+   export DJANGO_SECURE_SSL_REDIRECT=1
+   export DJANGO_CSRF_TRUSTED_ORIGINS="https://example.com,https://www.example.com"
+   ```
+3. Launch the application with Gunicorn (uses `gunicorn.conf.py` by default):
+   ```bash
+   gunicorn -c gunicorn.conf.py building_mgmt.wsgi:application
+   ```
+
+Gunicorn listens on `0.0.0.0:8000` by default; place a reverse proxy such as nginx in front of it. 
+Whitenoise serves collected static files directly from Gunicorn, simplifying the deployment story
+for smaller installations.
 
 Tailwind is configured with purge-aware `content` globs so unused utilities are removed in the production bundle.
 
