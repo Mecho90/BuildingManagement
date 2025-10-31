@@ -172,17 +172,23 @@
       <nav class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center gap-2">
           {% if units_page.has_previous %}
+            <a class="btn btn-secondary" href="?u_page=1{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">« {% trans "First" %}</a>
             <a class="btn btn-secondary" href="?u_page={{ units_page.previous_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">‹ {% trans "Prev" %}</a>
           {% else %}
+            <span class="btn is-disabled">« {% trans "First" %}</span>
             <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
           {% endif %}
           {% if units_page.has_next %}
             <a class="btn btn-secondary" href="?u_page={{ units_page.next_page_number }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Next" %} ›</a>
+            <a class="btn btn-secondary" href="?u_page={{ units_page.paginator.num_pages }}{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_sort %}&u_sort={{ u_sort }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Last" %} »</a>
           {% else %}
             <span class="btn is-disabled">{% trans "Next" %} ›</span>
+            <span class="btn is-disabled">{% trans "Last" %} »</span>
           {% endif %}
         </div>
-        <span class="text-sm text-slate-500 dark:text-slate-300">{% blocktrans %}Page {{ units_page.number }} of {{ units_page.paginator.num_pages }}{% endblocktrans %}</span>
+        <span class="text-sm text-slate-500 dark:text-slate-300">
+          {% trans "Page" %} {{ units_page.number|default:1 }} {% trans "of" %} {{ units_page.paginator.num_pages|default:1 }}
+        </span>
       </nav>
     {% endif %}
   </section>
@@ -329,17 +335,23 @@
       <nav class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center gap-2">
           {% if workorders_page.has_previous %}
+            <a class="btn btn-secondary" href="?w_page=1{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">« {% trans "First" %}</a>
             <a class="btn btn-secondary" href="?w_page={{ workorders_page.previous_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">‹ {% trans "Prev" %}</a>
           {% else %}
+            <span class="btn is-disabled">« {% trans "First" %}</span>
             <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
           {% endif %}
           {% if workorders_page.has_next %}
             <a class="btn btn-secondary" href="?w_page={{ workorders_page.next_page_number }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">{% trans "Next" %} ›</a>
+            <a class="btn btn-secondary" href="?w_page={{ workorders_page.paginator.num_pages }}{% if w_q %}&w_q={{ w_q|urlencode }}{% endif %}{% if w_status %}&w_status={{ w_status }}{% endif %}{% if w_per %}&w_per={{ w_per }}{% endif %}">{% trans "Last" %} »</a>
           {% else %}
             <span class="btn is-disabled">{% trans "Next" %} ›</span>
+            <span class="btn is-disabled">{% trans "Last" %} »</span>
           {% endif %}
         </div>
-        <span class="text-sm text-slate-500 dark:text-slate-300">{% blocktrans %}Page {{ workorders_page.number }} of {{ workorders_page.paginator.num_pages }}{% endblocktrans %}</span>
+        <span class="text-sm text-slate-500 dark:text-slate-300">
+          {% trans "Page" %} {{ workorders_page.number|default:1 }} {% trans "of" %} {{ workorders_page.paginator.num_pages|default:1 }}
+        </span>
       </nav>
     {% endif %}
   </section>

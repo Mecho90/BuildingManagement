@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ building.name }} · {% trans "Archived Work Orders" %} · {% trans "Building Management" %}{% endblock %}
+
+{% block content %}
+<section class="space-y-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <a class="btn btn-secondary" href="{{ back_url }}{% if back_query %}?{{ back_query }}{% endif %}">‹ {% trans "Back to archived list" %}</a>
+    <div class="text-sm text-slate-500 dark:text-slate-300">
+      {% blocktrans count total=total_archived %}{{ total }} archived work order{% plural %}{{ total }} archived work orders{% endblocktrans %}
+    </div>
+  </div>
+
+  <article class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+    <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
+          {{ building.name }}
+        </h1>
+        {% if building.address %}
+          <p class="text-sm text-slate-500 dark:text-slate-400">{{ building.address }}</p>
+        {% endif %}
+      </div>
+      <div class="text-sm text-slate-500 dark:text-slate-300 md:text-right">
+        <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Owner" %}:</span>
+        {% with owner=building.owner %}
+          {% if owner %}
+            {{ owner.get_full_name|default:owner.username }}
+          {% else %}
+            —
+          {% endif %}
+        {% endwith %}
+      </div>
+    </header>
+
+    {% if orders %}
+      <form method="get" class="flex flex-wrap items-center justify-end gap-3 text-sm text-slate-500 dark:text-slate-300">
+        {% for key, value in request.GET.items %}
+          {% if key != "per" and key != "page" %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}" />
+          {% endif %}
+        {% endfor %}
+        <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+        <select id="id_per" name="per" onchange="this.form.submit()" class="input w-24">
+          {% for option in detail_per_choices %}
+            <option value="{{ option }}" {% if detail_per == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </form>
+
+      {% if pagination_object %}
+        <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500 dark:text-slate-300">
+          <span>
+            {% blocktrans trimmed with start=pagination_object.start_index end=pagination_object.end_index total=total_archived %}
+              Showing {{ start }}–{{ end }} of {{ total }} archived work orders
+            {% endblocktrans %}
+          </span>
+        </div>
+      {% endif %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+          <thead class="bg-slate-50 dark:bg-slate-800">
+            <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+              <th class="px-4 py-3">{% trans "Title" %}</th>
+              <th class="px-4 py-3">{% trans "Unit" %}</th>
+              <th class="px-4 py-3">{% trans "Priority" %}</th>
+              <th class="px-4 py-3">{% trans "Status" %}</th>
+              <th class="px-4 py-3">{% trans "Created" %}</th>
+              <th class="px-4 py-3">{% trans "Archived" %}</th>
+              <th class="px-4 py-3">{% trans "Owner" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+            {% for wo in orders %}
+              <tr class="text-slate-700 dark:text-slate-200">
+                <td class="px-4 py-3 font-medium">
+                  <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'work_order_detail' wo.id %}?next={{ request.get_full_path|urlencode }}">{{ wo.title }}</a>
+                </td>
+                <td class="px-4 py-3">
+                  {% if wo.unit_id %}
+                    #{{ wo.unit.number }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                  <span class="priority-badge {% if wo.priority == 'HIGH' %}priority-badge--high{% elif wo.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">
+                    {{ wo.get_priority_display }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {{ wo.get_status_display }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">{{ wo.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-4 py-3">{{ wo.archived_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-4 py-3">
+                  {% with owner=building.owner %}
+                    {% if owner %}
+                      {{ owner.get_full_name|default:owner.username }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  {% endwith %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if pagination_object and pagination_object.has_other_pages %}
+        <nav class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            {% if pagination_object.has_previous %}
+              <a class="btn btn-secondary" href="?{% if detail_page_query %}{{ detail_page_query }}&{% endif %}page=1">« {% trans "First" %}</a>
+              <a class="btn btn-secondary" href="?{% if detail_page_query %}{{ detail_page_query }}&{% endif %}page={{ pagination_object.previous_page_number }}">‹ {% trans "Prev" %}</a>
+            {% else %}
+              <span class="btn is-disabled">« {% trans "First" %}</span>
+              <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
+            {% endif %}
+            {% if pagination_object.has_next %}
+              <a class="btn btn-secondary" href="?{% if detail_page_query %}{{ detail_page_query }}&{% endif %}page={{ pagination_object.next_page_number }}">{% trans "Next" %} ›</a>
+              <a class="btn btn-secondary" href="?{% if detail_page_query %}{{ detail_page_query }}&{% endif %}page={{ pagination_object.paginator.num_pages }}">{% trans "Last" %} »</a>
+            {% else %}
+              <span class="btn is-disabled">{% trans "Next" %} ›</span>
+              <span class="btn is-disabled">{% trans "Last" %} »</span>
+            {% endif %}
+          </div>
+          <span class="text-sm text-slate-500 dark:text-slate-300">
+            {% trans "Page" %} {{ pagination_object.number|default:1 }} {% trans "of" %} {{ pagination_object.paginator.num_pages|default:1 }}
+          </span>
+        </nav>
+      {% endif %}
+    {% else %}
+      <p class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+        {% trans "No archived work orders match the selected filters for this building." %}
+      </p>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

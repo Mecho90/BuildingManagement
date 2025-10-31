@@ -240,7 +240,7 @@
           <span class="btn is-disabled">{% trans "Last" %} »</span>
         {% endif %}
       </div>
-      <span class="text-sm text-slate-500 dark:text-slate-300">{% blocktrans %}Page {{ page_obj.number }} of {{ paginator.num_pages }}{% endblocktrans %}</span>
+      <span class="text-sm text-slate-500 dark:text-slate-300">{% trans "Page" %} {{ page_obj.number|default:1 }} {% trans "of" %} {{ paginator.num_pages|default:1 }}</span>
     </nav>
   {% endif %}
 </section>

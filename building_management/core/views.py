@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from itertools import groupby
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -11,7 +10,7 @@ from django.core.paginator import Paginator
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import redirect_to_login
 from django.db import transaction
-from django.db.models import Case, When, IntegerField, Q, Count, OuterRef, Subquery, Value
+from django.db.models import Case, When, IntegerField, Q, Count, OuterRef, Subquery, Value, Max, Min
 from django.db.models.functions import Coalesce, Lower, Trim, Replace
 from django.http import HttpResponse, JsonResponse, Http404, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
@@ -220,7 +219,20 @@ class BuildingListView(LoginRequiredMixin, ListView):
             ctx["per"] = 10
         ctx["sort"] = getattr(self, "_effective_sort", "name")
         ctx["show_owner_column"] = self.request.user.is_staff or self.request.user.is_superuser
-        ctx["notifications"] = self._build_notifications()
+
+        notifications_list = self._build_notifications()
+        note_paginator = Paginator(notifications_list, 5)
+        note_page_number = self.request.GET.get("note_page")
+        try:
+            notifications_page = note_paginator.get_page(note_page_number)
+        except (TypeError, ValueError):
+            notifications_page = note_paginator.get_page(1)
+
+        params = self.request.GET.copy()
+        params.pop("note_page", None)
+        ctx["notifications_page"] = notifications_page
+        ctx["note_page_query"] = params.urlencode()
+        ctx["notifications"] = notifications_page.object_list
         return ctx
 
     def _build_notifications(self):
@@ -987,8 +999,40 @@ class MassAssignWorkOrdersView(LoginRequiredMixin, AdminRequiredMixin, FormView)
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         buildings = list(self.get_queryset())
-        ctx["technical_support_buildings"] = buildings
+        page = self.request.GET.get("b_page")
+        paginator = Paginator(buildings, 30)
+        try:
+            buildings_page = paginator.get_page(page)
+        except (TypeError, ValueError):
+            buildings_page = paginator.get_page(1)
+
+        params = self.request.GET.copy()
+        params.pop("b_page", None)
+        ctx["technical_support_buildings"] = buildings_page.object_list
+        ctx["buildings_page"] = buildings_page
+        ctx["buildings_page_query"] = params.urlencode()
         ctx["technical_support_count"] = len(buildings)
+        ctx["mass_select_open"] = self.request.method == "POST" or bool(self.request.GET.get("b_page"))
+
+        form = ctx.get("form")
+        page_widgets = []
+        if form is not None:
+            widget_map = {}
+            for checkbox in form["buildings"]:
+                widget_data = getattr(checkbox, "data", {}) or {}
+                widget_value = widget_data.get("value")
+                if widget_value is None:
+                    continue
+                widget_map[widget_value] = checkbox
+
+            buildings_field = form.fields.get("buildings")
+            if buildings_field is not None:
+                for building in buildings_page.object_list:
+                    prepared_value = buildings_field.prepare_value(building.pk)
+                    checkbox_widget = widget_map.get(prepared_value)
+                    if checkbox_widget is not None:
+                        page_widgets.append(checkbox_widget)
+        ctx["building_checkboxes_page"] = page_widgets
         return ctx
 
     def form_valid(self, form):
@@ -1065,14 +1109,15 @@ class MassAssignWorkOrdersView(LoginRequiredMixin, AdminRequiredMixin, FormView)
         return super().form_valid(form)
 
 
-class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+class ArchivedWorkOrderFilterMixin:
     """
-    Staff-only list of archived work orders, grouped by building for easy browsing.
+    Shared filtering helpers for archived work order views.
     """
 
-    model = WorkOrder
-    template_name = "core/work_orders_archive.html"
-    context_object_name = "orders"
+    SUMMARY_PER_CHOICES = (10, 20, 50, 100)
+    SUMMARY_PER_DEFAULT = 10
+    DETAIL_PER_CHOICES = (10, 20, 50, 100)
+    DETAIL_PER_DEFAULT = 10
 
     _sort_choices = [
         ("archived_desc", _lazy("Archived (Newest first)")),
@@ -1084,6 +1129,19 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         ("building_asc", _lazy("Building (A → Z)")),
         ("building_desc", _lazy("Building (Z → A)")),
     ]
+
+    model = WorkOrder
+    context_object_name = "orders"
+    paginate_by = 20
+
+    def _parse_per_param(self, value, choices, default):
+        try:
+            per = int(value)
+        except (TypeError, ValueError):
+            return default
+        if per not in choices:
+            return default
+        return per
 
     def test_func(self):
         user = self.request.user
@@ -1097,7 +1155,10 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
             self.get_redirect_field_name(),
         )
 
-    def get_queryset(self):
+    def get_filtered_queryset(self):
+        if hasattr(self, "_filtered_queryset"):
+            return self._filtered_queryset
+
         request = self.request
         qs = (
             WorkOrder.objects.visible_to(request.user)
@@ -1105,7 +1166,12 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
             .select_related("building__owner", "unit")
         )
 
-        # Annotate priority for sorting
+        self._summary_per = self._parse_per_param(
+            request.GET.get("b_per"),
+            self.SUMMARY_PER_CHOICES,
+            self.SUMMARY_PER_DEFAULT,
+        )
+
         qs = qs.annotate(
             priority_order=Case(
                 When(priority__iexact="high", then=0),
@@ -1116,7 +1182,6 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
             )
         )
 
-        # Free-text search across title/description/building
         search = (request.GET.get("q") or "").strip()
         if search:
             qs = qs.filter(
@@ -1126,10 +1191,7 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
             )
         self._search = search
 
-        # Owner filter (staff only)
-        owner_ids = list(
-            qs.values_list("building__owner_id", flat=True).distinct()
-        )
+        owner_ids = list(qs.values_list("building__owner_id", flat=True).distinct())
         owner_ids = [oid for oid in owner_ids if oid]
         owner_qs = (
             User.objects.filter(id__in=owner_ids)
@@ -1156,7 +1218,6 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
             owner_filter = None
         self._owner = owner_param
 
-        # Sorting options (always include building so groupby works)
         sort_param = (request.GET.get("sort") or "archived_desc").strip()
         sort_map = {
             "archived_desc": ("building__name", "building_id", "-archived_at", "-id"),
@@ -1173,31 +1234,161 @@ class ArchivedWorkOrderListView(LoginRequiredMixin, UserPassesTestMixin, ListVie
         self._sort = sort_param
         qs = qs.order_by(*sort_map[sort_param])
 
+        summary_qs = qs.values(
+            "building_id",
+            "building__name",
+            "building__owner__first_name",
+            "building__owner__last_name",
+            "building__owner__username",
+        ).annotate(
+            total=Count("id"),
+            latest_archived=Max("archived_at"),
+            earliest_archived=Min("archived_at"),
+            latest_created=Max("created_at"),
+            earliest_created=Min("created_at"),
+            min_priority=Min("priority_order"),
+            max_priority=Max("priority_order"),
+        )
+
+        summary_sort_map = {
+            "archived_desc": ("-latest_archived", "-earliest_archived", "building__name", "building_id"),
+            "archived_asc": ("earliest_archived", "building__name", "building_id"),
+            "created_desc": ("-latest_created", "building__name", "building_id"),
+            "created_asc": ("earliest_created", "building__name", "building_id"),
+            "priority": ("min_priority", "building__name", "building_id"),
+            "priority_desc": ("-max_priority", "building__name", "building_id"),
+            "building_asc": ("building__name", "building_id"),
+            "building_desc": ("-building__name", "-building_id"),
+        }
+        summary_order = summary_sort_map.get(sort_param, ("building__name", "building_id"))
+        summary_qs = summary_qs.order_by(*summary_order)
+
+        self._building_summary = [
+            {
+                "id": item["building_id"],
+                "name": item["building__name"],
+                "total": item["total"],
+                "owner": (
+                    (item["building__owner__first_name"] or item["building__owner__last_name"])
+                    and f"{item['building__owner__first_name']} {item['building__owner__last_name']}".strip()
+                )
+                or item["building__owner__username"],
+            }
+            for item in summary_qs
+        ]
+
+        params = request.GET.copy()
+        params.pop("page", None)
+        self._archive_query = params.urlencode()
+
+        self._filtered_queryset = qs
         return qs
+
+    def get_queryset(self):
+        return self.get_filtered_queryset()
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        orders = list(ctx.get("orders", []))
-
-        grouped = []
-        for _, items in groupby(orders, key=lambda wo: wo.building):
-            items_list = list(items)
-            if not items_list:
-                continue
-            building = items_list[0].building
-            grouped.append(
-                {
-                    "building": building,
-                    "orders": items_list,
-                }
-            )
-
-        ctx["grouped_orders"] = grouped
         ctx["q"] = getattr(self, "_search", "")
         ctx["owner"] = getattr(self, "_owner", "")
         ctx["owner_choices"] = getattr(self, "_owner_choices", [])
         ctx["sort"] = getattr(self, "_sort", "archived_desc")
         ctx["sort_choices"] = self._sort_choices
+        ctx["archive_page_query"] = getattr(self, "_archive_query", "")
+        summary_per = getattr(self, "_summary_per", self.SUMMARY_PER_DEFAULT)
+        summary = getattr(self, "_building_summary", [])
+        summary_paginator = Paginator(summary, summary_per) if summary else None
+        summary_page = None
+        if summary_paginator:
+            page_number = self.request.GET.get("b_page")
+            try:
+                summary_page = summary_paginator.get_page(page_number)
+            except (TypeError, ValueError):
+                summary_page = summary_paginator.get_page(1)
+        ctx["building_summary_page"] = summary_page
+        ctx["building_summary_total"] = summary_paginator.count if summary_paginator else 0
+        summary_params = self.request.GET.copy()
+        summary_params.pop("b_page", None)
+        ctx["building_summary_query"] = summary_params.urlencode()
+        ctx["building_summary_per"] = summary_per
+        ctx["building_summary_per_choices"] = self.SUMMARY_PER_CHOICES
+        return ctx
+
+
+class ArchivedWorkOrderListView(
+    ArchivedWorkOrderFilterMixin,
+    LoginRequiredMixin,
+    UserPassesTestMixin,
+    ListView,
+):
+    """
+    Staff-only list of archived work orders grouped by building summary.
+    """
+
+    template_name = "core/work_orders_archive_list.html"
+    paginate_by = None
+
+    def get_queryset(self):
+        # Pre-compute filters but avoid fetching the full order list.
+        self.get_filtered_queryset()
+        return WorkOrder.objects.none()
+
+
+class ArchivedWorkOrderDetailView(
+    ArchivedWorkOrderFilterMixin,
+    LoginRequiredMixin,
+    UserPassesTestMixin,
+    ListView,
+):
+    """
+    Archived work orders for a single building.
+    """
+
+    template_name = "core/work_orders_archive_detail.html"
+    paginate_by = None
+
+    def get_paginate_by(self, queryset):
+        per = self._parse_per_param(
+            self.request.GET.get("per"),
+            self.DETAIL_PER_CHOICES,
+            self.DETAIL_PER_DEFAULT,
+        )
+        self._detail_per = per
+        return per
+
+    def get_queryset(self):
+        qs = self.get_filtered_queryset()
+        building_id = self.kwargs.get("building_id")
+        qs = qs.filter(building_id=building_id)
+        if not qs.exists():
+            raise Http404()
+        self._current_building = qs[0].building
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        orders = list(ctx.get("orders", []))
+        ctx["orders"] = orders
+        page_obj = ctx.get("page_obj")
+        ctx["pagination_object"] = page_obj
+        building = getattr(self, "_current_building", None)
+        if not building and orders:
+            building = orders[0].building
+        if not building:
+            building = get_object_or_404(
+                Building.objects.select_related("owner"),
+                pk=self.kwargs.get("building_id"),
+            )
+        ctx["building"] = building
+        total = page_obj.paginator.count if page_obj is not None else len(orders)
+        ctx["total_archived"] = total
+        detail_params = self.request.GET.copy()
+        detail_params.pop("page", None)
+        ctx["detail_page_query"] = detail_params.urlencode()
+        ctx["back_url"] = reverse("work_orders_archive")
+        ctx["back_query"] = ctx["detail_page_query"]
+        ctx["detail_per"] = getattr(self, "_detail_per", self.DETAIL_PER_DEFAULT)
+        ctx["detail_per_choices"] = self.DETAIL_PER_CHOICES
         return ctx
 
 

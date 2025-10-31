@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Archived Work Orders" %} · {% trans "Building Management" %}{% endblock %}
+
+{% block content %}
+<section class="space-y-8">
+  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{% trans "Archived Work Orders" %}</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Review completed and archived work orders grouped by building." %}</p>
+    </div>
+  </div>
+
+  <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-5 md:items-end">
+    {% url 'work_orders_archive' as archive_reset_url %}
+    {% with placeholder=_('Title, description, or building') %}
+      <div class="md:col-span-2 flex flex-col gap-2">
+        <label class="sr-only" for="id_q">{% trans "Search archived work orders" %}</label>
+        <div class="flex flex-col gap-2 md:flex-row md:items-center">
+          <input id="id_q" class="input flex-1" type="text" name="q" value="{{ q }}" placeholder="{{ placeholder }}" autocomplete="off" />
+          <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
+          {% if q or owner or sort != 'archived_desc' %}
+            <a class="btn btn-secondary md:mt-0" href="{{ archive_reset_url }}">{% trans "Reset" %}</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endwith %}
+
+    {% if owner_choices %}
+      <div class="flex flex-col gap-2">
+        <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+        <select id="id_owner" name="owner" onchange="this.form.submit()" class="input">
+          <option value="" {% if not owner %}selected{% endif %}>{% trans "All" %}</option>
+          {% for opt in owner_choices %}
+            <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% else %}
+      <div class="hidden md:block"></div>
+    {% endif %}
+
+    <div class="flex flex-col gap-2">
+      <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
+      <select id="id_sort" name="sort" onchange="this.form.submit()" class="input">
+        {% for value, label in sort_choices %}
+          <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <label for="id_b_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+      <select id="id_b_per" name="b_per" onchange="this.form.submit()" class="input w-24">
+        {% for option in building_summary_per_choices %}
+          <option value="{{ option }}" {% if building_summary_per == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+
+  {% if building_summary_page %}
+    <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Buildings with archived work orders" %}</h2>
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {% blocktrans count total=building_summary_total %}{{ total }} building{% plural %}{{ total }} buildings{% endblocktrans %}
+        </span>
+      </div>
+      <ul class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {% with query=request.GET.urlencode %}
+          {% for item in building_summary_page %}
+            <li class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-900/60">
+              <a class="font-medium text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-100 break-words hyphens-auto" href="{% url 'work_orders_archive_building' item.id %}{% if query %}?{{ query }}{% endif %}">
+                <span>{{ item.name }}</span>
+                <span class="block text-xs text-slate-500 dark:text-slate-400">{{ item.owner }}</span>
+              </a>
+              <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200">
+                {% blocktrans with total=item.total %}{{ total }} archived{% endblocktrans %}
+              </span>
+            </li>
+          {% endfor %}
+        {% endwith %}
+      </ul>
+      {% if building_summary_page.paginator.num_pages > 1 %}
+        <nav class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            {% if building_summary_page.has_previous %}
+              <a class="btn btn-secondary" href="?{% if building_summary_query %}{{ building_summary_query }}&{% endif %}b_page=1">« {% trans "First" %}</a>
+              <a class="btn btn-secondary" href="?{% if building_summary_query %}{{ building_summary_query }}&{% endif %}b_page={{ building_summary_page.previous_page_number }}">‹ {% trans "Prev" %}</a>
+            {% else %}
+              <span class="btn is-disabled">« {% trans "First" %}</span>
+              <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
+            {% endif %}
+            {% if building_summary_page.has_next %}
+              <a class="btn btn-secondary" href="?{% if building_summary_query %}{{ building_summary_query }}&{% endif %}b_page={{ building_summary_page.next_page_number }}">{% trans "Next" %} ›</a>
+              <a class="btn btn-secondary" href="?{% if building_summary_query %}{{ building_summary_query }}&{% endif %}b_page={{ building_summary_page.paginator.num_pages }}">{% trans "Last" %} »</a>
+            {% else %}
+              <span class="btn is-disabled">{% trans "Next" %} ›</span>
+              <span class="btn is-disabled">{% trans "Last" %} »</span>
+            {% endif %}
+          </div>
+          <span class="text-sm text-slate-500 dark:text-slate-300">
+            {% trans "Page" %} {{ building_summary_page.number|default:1 }} {% trans "of" %} {{ building_summary_page.paginator.num_pages|default:1 }}
+          </span>
+        </nav>
+      {% endif %}
+    </section>
+  {% else %}
+    <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+      {% trans "No archived work orders yet." %}
+    </p>
+  {% endif %}
+</section>
+{% endblock %}

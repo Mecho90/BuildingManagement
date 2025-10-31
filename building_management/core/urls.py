@@ -31,6 +31,11 @@ urlpatterns = [
     path("work-orders/<int:pk>/archive/", views.WorkOrderArchiveView.as_view(), name="work_order_archive"),
     path("work-orders/mass-assign/", views.MassAssignWorkOrdersView.as_view(), name="work_orders_mass_assign"),
     path("work-orders/archive/", views.ArchivedWorkOrderListView.as_view(), name="work_orders_archive"),
+    path(
+        "work-orders/archive/<int:building_id>/",
+        views.ArchivedWorkOrderDetailView.as_view(),
+        name="work_orders_archive_building",
+    ),
 
     # Admin user management (superuser-only dashboard)
     path("manage/users/", views.AdminUserListView.as_view(), name="users_list"),
