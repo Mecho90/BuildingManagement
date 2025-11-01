@@ -90,9 +90,9 @@ class TimeStampedModel(models.Model):
 
 class Building(TimeStampedModel):
     class Role(models.TextChoices):
-        TECH_SUPPORT = "TECH_SUPPORT", _( "Technical Support" )
-        PROPERTY_MANAGER = "PROPERTY_MANAGER", _( "Property Manager" )
-        EXTERNAL_CONTRACTOR = "EXTERNAL_CONTRACTOR", _( "External Contractor" )
+        TECH_SUPPORT = "TECH_SUPPORT", _("Technical Support")
+        PROPERTY_MANAGER = "PROPERTY_MANAGER", _("Property Manager")
+        EXTERNAL_CONTRACTOR = "EXTERNAL_CONTRACTOR", _("External Contractor")
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -145,7 +145,7 @@ class Building(TimeStampedModel):
 
 phone_validator = RegexValidator(
     r"^\+?\d{7,15}$",
-    _( "Enter a valid phone number (digits with optional leading +, 7–15 digits)." ),
+    _("Enter a valid phone number (digits with optional leading +, 7–15 digits)."),
 )
 
 
@@ -215,14 +215,14 @@ class Unit(TimeStampedModel):
 
 class WorkOrder(TimeStampedModel):
     class Status(models.TextChoices):
-        OPEN = "OPEN", _( "Open" )
-        IN_PROGRESS = "IN_PROGRESS", _( "In progress" )
-        DONE = "DONE", _( "Done" )
+        OPEN = "OPEN", _("Open")
+        IN_PROGRESS = "IN_PROGRESS", _("In progress")
+        DONE = "DONE", _("Done")
 
     class Priority(models.TextChoices):
-        LOW = "LOW", _( "Low" )
-        MEDIUM = "MEDIUM", _( "Medium" )
-        HIGH = "HIGH", _( "High" )
+        LOW = "LOW", _("Low")
+        MEDIUM = "MEDIUM", _("Medium")
+        HIGH = "HIGH", _("High")
 
     building = models.ForeignKey(
         Building,
@@ -284,7 +284,7 @@ class WorkOrder(TimeStampedModel):
         # If a unit is set but building is missing/mismatched, align it
         if self.unit_id and self.building_id and self.unit.building_id != self.building_id:
             raise ValidationError(
-                {"unit": _( "Selected unit does not belong to the selected building." )}
+                {"unit": _("Selected unit does not belong to the selected building.")}
             )
 
     def save(self, *args, **kwargs):
@@ -417,8 +417,8 @@ class Notification(TimeStampedModel):
 
 class UserSecurityProfile(models.Model):
     class LockReason(models.TextChoices):
-        FAILED_ATTEMPTS = "failed_attempts", _( "Too many failed login attempts" )
-        MANUAL = "manual", _( "Manually locked" )
+        FAILED_ATTEMPTS = "failed_attempts", _("Too many failed login attempts")
+        MANUAL = "manual", _("Manually locked")
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,

@@ -1,0 +1,38 @@
+{% load i18n %}
+{% comment %}
+Reusable pagination controls.
+Expected variables:
+- page_obj: django.core.paginator.Page
+- paginator (optional): paginator instance; defaults to page_obj.paginator
+- query_string (optional): existing query string without page parameter
+- page_param (optional): name of the page parameter, defaults to "page"
+{% endcomment %}
+{% if page_obj %}
+  {% with current_paginator=paginator|default:page_obj.paginator %}
+    {% if current_paginator and current_paginator.num_pages > 1 %}
+      {% with param=page_param|default:'page' %}
+        <nav class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="flex flex-wrap items-center gap-2">
+            {% if page_obj.has_previous %}
+              <a class="btn btn-secondary" href="?{% if query_string %}{{ query_string }}&{% endif %}{{ param }}=1">« {% trans "First" %}</a>
+              <a class="btn btn-secondary" href="?{% if query_string %}{{ query_string }}&{% endif %}{{ param }}={{ page_obj.previous_page_number }}">‹ {% trans "Prev" %}</a>
+            {% else %}
+              <span class="btn is-disabled">« {% trans "First" %}</span>
+              <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
+            {% endif %}
+            {% if page_obj.has_next %}
+              <a class="btn btn-secondary" href="?{% if query_string %}{{ query_string }}&{% endif %}{{ param }}={{ page_obj.next_page_number }}">{% trans "Next" %} ›</a>
+              <a class="btn btn-secondary" href="?{% if query_string %}{{ query_string }}&{% endif %}{{ param }}={{ current_paginator.num_pages }}">{% trans "Last" %} »</a>
+            {% else %}
+              <span class="btn is-disabled">{% trans "Next" %} ›</span>
+              <span class="btn is-disabled">{% trans "Last" %} »</span>
+            {% endif %}
+          </div>
+          <span class="text-sm text-slate-500 dark:text-slate-300">
+            {% trans "Page" %} {{ page_obj.number|default:1 }} {% trans "of" %} {{ current_paginator.num_pages|default:1 }}
+          </span>
+        </nav>
+      {% endwith %}
+    {% endif %}
+  {% endwith %}
+{% endif %}

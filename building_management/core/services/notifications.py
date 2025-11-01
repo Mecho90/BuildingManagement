@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Iterable, Sequence
 
+from django.db import transaction
 from django.db.models import Case, IntegerField, Value, When
 from django.utils import formats, timezone
 from django.utils.translation import gettext as _, ngettext
@@ -60,7 +61,54 @@ class NotificationService:
 
     def bulk_upsert(self, payloads: Iterable[NotificationPayload]) -> list[Notification]:
         """Persist a batch of notifications and return the resulting objects."""
-        return [self.upsert(payload) for payload in payloads]
+        payloads = list(payloads)
+        if not payloads:
+            return []
+
+        keys = [payload.key for payload in payloads]
+        now = timezone.now()
+
+        with transaction.atomic():
+            existing = {
+                note.key: note
+                for note in Notification.objects.select_for_update().filter(user=self.user, key__in=keys)
+            }
+
+            to_create: list[Notification] = []
+            to_update: list[Notification] = []
+
+            for payload in payloads:
+                defaults = {
+                    "category": payload.category,
+                    "title": payload.title,
+                    "body": payload.body,
+                    "level": payload.level,
+                    "snoozed_until": payload.snoozed_until,
+                    "expires_at": payload.expires_at,
+                }
+                note = existing.get(payload.key)
+                if note is None:
+                    note = Notification(user=self.user, key=payload.key, **defaults)
+                    to_create.append(note)
+                    existing[payload.key] = note
+                else:
+                    for field, value in defaults.items():
+                        setattr(note, field, value)
+                    note.updated_at = now
+                    to_update.append(note)
+
+            if to_create:
+                Notification.objects.bulk_create(to_create)
+
+            if to_update:
+                Notification.objects.bulk_update(
+                    to_update,
+                    ["category", "title", "body", "level", "snoozed_until", "expires_at", "updated_at"],
+                )
+
+        refreshed = Notification.objects.filter(user=self.user, key__in=keys)
+        refreshed_map = {note.key: note for note in refreshed}
+        return [refreshed_map[payload.key] for payload in payloads]
 
     def acknowledge(self, keys: Sequence[str]) -> int:
         """Acknowledge notifications identified by ``keys``."""
@@ -185,8 +233,7 @@ class NotificationService:
             deadline_display = formats.date_format(wo.deadline, "DATE_FORMAT")
             message = _(
                 '%(priority)s priority work order "%(title)s" in %(building)s is %(due)s '
-                "(deadline %(deadline)s)"
-            ) % {
+                "(deadline %(deadline)s)") % {
                 "priority": wo.get_priority_display(),
                 "title": wo.title,
                 "building": building_name,
@@ -194,7 +241,7 @@ class NotificationService:
                 "deadline": deadline_display,
             }
             if owner_label:
-                message += _( " (owner: %(owner)s)" ) % {"owner": owner_label}
+                message += _(" (owner: %(owner)s)") % {"owner": owner_label}
             message += "."
 
             key = f"wo-deadline-{wo.pk}"

@@ -35,18 +35,20 @@
     </header>
 
     {% if orders %}
-      <form method="get" class="flex flex-wrap items-center justify-end gap-3 text-sm text-slate-500 dark:text-slate-300">
+      <form method="get" class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+        <div class="flex flex-wrap items-center gap-2">
+          <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-200">{% trans "Page size" %}</label>
+          <select id="id_per" name="per" onchange="this.form.submit()" class="input w-24">
+            {% for option in detail_per_choices %}
+              <option value="{{ option }}" {% if detail_per == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
         {% for key, value in request.GET.items %}
           {% if key != "per" and key != "page" %}
             <input type="hidden" name="{{ key }}" value="{{ value }}" />
           {% endif %}
         {% endfor %}
-        <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-        <select id="id_per" name="per" onchange="this.form.submit()" class="input w-24">
-          {% for option in detail_per_choices %}
-            <option value="{{ option }}" {% if detail_per == option %}selected{% endif %}>{{ option }}</option>
-          {% endfor %}
-        </select>
       </form>
 
       {% if pagination_object %}
@@ -110,28 +112,8 @@
           </tbody>
         </table>
       </div>
-      {% if pagination_object and pagination_object.has_other_pages %}
-        <nav class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex items-center gap-2">
-            {% if pagination_object.has_previous %}
-              <a class="btn btn-secondary" href="?{% if detail_page_query %}{{ detail_page_query }}&{% endif %}page=1">« {% trans "First" %}</a>
-              <a class="btn btn-secondary" href="?{% if detail_page_query %}{{ detail_page_query }}&{% endif %}page={{ pagination_object.previous_page_number }}">‹ {% trans "Prev" %}</a>
-            {% else %}
-              <span class="btn is-disabled">« {% trans "First" %}</span>
-              <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
-            {% endif %}
-            {% if pagination_object.has_next %}
-              <a class="btn btn-secondary" href="?{% if detail_page_query %}{{ detail_page_query }}&{% endif %}page={{ pagination_object.next_page_number }}">{% trans "Next" %} ›</a>
-              <a class="btn btn-secondary" href="?{% if detail_page_query %}{{ detail_page_query }}&{% endif %}page={{ pagination_object.paginator.num_pages }}">{% trans "Last" %} »</a>
-            {% else %}
-              <span class="btn is-disabled">{% trans "Next" %} ›</span>
-              <span class="btn is-disabled">{% trans "Last" %} »</span>
-            {% endif %}
-          </div>
-          <span class="text-sm text-slate-500 dark:text-slate-300">
-            {% trans "Page" %} {{ pagination_object.number|default:1 }} {% trans "of" %} {{ pagination_object.paginator.num_pages|default:1 }}
-          </span>
-        </nav>
+      {% if pagination_object %}
+        {% include "core/includes/pagination.html" with page_obj=pagination_object paginator=pagination_object.paginator query_string=detail_page_query %}
       {% endif %}
     {% else %}
       <p class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">

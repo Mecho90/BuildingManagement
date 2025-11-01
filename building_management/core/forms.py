@@ -81,8 +81,7 @@ class UnitForm(forms.ModelForm):
 
         # show an inline hint in the input
         self.fields["contact_phone"].widget.attrs.setdefault(
-            "placeholder", "+359..."
-        )
+            "placeholder", "+359...")
 
     def _resolve_building(self):
         if self._resolved_building is not None:
@@ -110,7 +109,7 @@ class UnitForm(forms.ModelForm):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise forms.ValidationError(
-                    _( "Apartment number must be unique within this building." )
+                    _("Apartment number must be unique within this building.")
                 )
         return number
 
@@ -228,7 +227,7 @@ class WorkOrderForm(forms.ModelForm):
             self.fields["unit"].widget.attrs.pop("disabled", None)
         else:
             self.fields["unit"].widget.attrs["disabled"] = "disabled"
-            self.fields["unit"].empty_label = _( "Select a building first" )
+            self.fields["unit"].empty_label = _("Select a building first")
 
         self.fields["unit"].label = _("Unit")
         self.fields["priority"].label = _("Priority")
