@@ -117,6 +117,40 @@ Optional env vars:
 - `DJANGO_DB_SSLMODE` – override the default SSL mode (`require` for non-local hosts, unset for localhost).
 - `DJANGO_DB_APP_NAME` – registers a custom `application_name` with Postgres for monitoring.
 
+## File Storage & Attachments
+
+Work order attachments persist under `MEDIA_ROOT` (default `./media/`) with URLs served from `MEDIA_URL` (default `/media/`). Local storage works out of the box; switch to S3 by installing `django-storages[boto3]` and setting `DJANGO_FILE_STORAGE=s3`.
+
+### Local development quickstart
+
+1. Create the media directory (`mkdir -p media`) and ensure your user can write to it.
+2. Run the dev server and open any work order detail page.
+3. Use the **Upload files** button to add images or documents; uploads stream via the attachment API and store under `media/work_orders/<order-id>/`.
+4. Delete attachments from the detail page or admin inline to keep the directory tidy. Git should continue to ignore everything under `media/`.
+
+When `DEFAULT_FILE_STORAGE` is set to S3 the same UI applies; credentials and the bucket policy must allow `PutObject`, `GetObject`, and `DeleteObject` for the configured prefix.
+
+### Key environment variables
+
+- `DJANGO_MEDIA_ROOT` / `DJANGO_MEDIA_URL` – override the media filesystem path or public URL.
+- `DJANGO_FILE_STORAGE` – `local` (default) or `s3`. For S3 also set `AWS_STORAGE_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, optional `AWS_S3_REGION_NAME`, `AWS_S3_CUSTOM_DOMAIN`, `AWS_S3_CACHE_CONTROL`, `AWS_QUERYSTRING_AUTH`, `AWS_DEFAULT_ACL`.
+- `DJANGO_ATTACHMENT_MAX_BYTES` – maximum upload size (default 10 MB).
+- `DJANGO_ATTACHMENT_ALLOWED_TYPES` – comma-separated MIME types allowed in addition to images (`application/pdf,application/msword,...` by default).
+- `DJANGO_ATTACHMENT_ALLOWED_PREFIXES` – MIME prefixes treated as safe (defaults to `image/`).
+- `DJANGO_ATTACHMENT_SCAN_HANDLER` – optional dotted path to an antivirus scan callable; it should raise `ValidationError` when a file is rejected.
+- `DJANGO_X_FRAME_OPTIONS` – overrides the frame-embedding policy (defaults to `SAMEORIGIN` so PDF previews work in the inline viewer).
+- `ATTACHMENTS_OFFICE_VIEWER_URL` – template used for Office document previews (defaults to Microsoft Office Online viewer; `{url}` is replaced with the encoded attachment URL). When previews are disabled (or the viewer cannot reach your host), the UI falls back to `ms-*-` protocol links that open files in the local Office installation.
+- `ATTACHMENTS_OFFICE_VIEWER_ENABLED` – set to `0`/`false` if you want to skip embedding Office Online (useful for offline/dev environments).
+
+User-facing validation strings are localized; remember to update both the English and Bulgarian `.po` catalogs after changing copy.
+
+### Mobile & accessibility notes
+
+- The lightbox supports pinch/zoom, drag-to-pan, and keyboard shortcuts (`+`, `-`, `0`, `Esc`).
+- Screen readers announce progress updates in the upload queue and treat the spinner as `role="status"` while images load.
+- Buttons stay reachable on small viewports; long filenames wrap automatically without breaking layout.
+- The async uploader hides completed items after a short delay to keep the focus on the attachment grid.
+
 ### Postgres Schema Verification
 
 After importing data into PostgreSQL you can sanity-check the schema and row counts:
@@ -169,3 +203,7 @@ The suite captures screenshots for mobile (iPhone 13 Mini) and desktop (Chrome) 
 - **Session-safe forms**: shared `_form_layout.html` ensures consistent field spacing, error handling, and responsive alignment.
 
 These patterns should be reused for future additions to maintain alignment with the mobile design system.
+
+## Release Notes
+
+- **2025‑11‑02** – Added work order attachments with inline uploads, zoomable previews, REST API endpoints, and Playwright coverage across desktop and mobile breakpoints.

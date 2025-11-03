@@ -12,7 +12,12 @@ from .admin import (
     AdminUserPasswordView,
     AdminUserUpdateView,
 )
-from .api import api_buildings, api_units
+from .api import (
+    api_buildings,
+    api_units,
+    api_workorder_attachment_detail,
+    api_workorder_attachments,
+)
 from .buildings import (
     BuildingCreateView,
     BuildingDeleteView,
@@ -46,6 +51,8 @@ __all__ = [
     "AdminUserUpdateView",
     "api_buildings",
     "api_units",
+    "api_workorder_attachments",
+    "api_workorder_attachment_detail",
     "BuildingCreateView",
     "BuildingDeleteView",
     "BuildingDetailView",

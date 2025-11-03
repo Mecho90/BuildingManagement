@@ -91,6 +91,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
             sort_field = "-" + base if sort.startswith("-") else base
 
         self._effective_sort = sort
+        self._buildings_total = qs.count()
         return qs.order_by(sort_field, "id")
 
     def get_context_data(self, **kwargs):
@@ -117,6 +118,14 @@ class BuildingListView(LoginRequiredMixin, ListView):
         ctx["note_page_query"] = params.urlencode()
         ctx["notifications"] = notifications_page.object_list
         ctx["pagination_query"] = _querystring_without(self.request, "page")
+        ctx["buildings_total"] = getattr(self, "_buildings_total", None)
+        if ctx["buildings_total"] is None:
+            paginator = ctx.get("paginator")
+            if paginator is not None:
+                ctx["buildings_total"] = paginator.count
+            else:
+                object_list = ctx.get("object_list") or []
+                ctx["buildings_total"] = len(object_list)
         return ctx
 
     def _build_notifications(self):

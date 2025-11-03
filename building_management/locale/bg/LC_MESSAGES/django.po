@@ -91,6 +91,10 @@ msgstr "Статус"
 msgid "Deadline"
 msgstr "Краен срок"
 
+#: templates/core/buildings_list.html:20
+msgid "Total buildings: %(count)s"
+msgstr "Общо сгради: %(count)s"
+
 #: core/forms.py:253
 msgid "Selected unit does not belong to the chosen building."
 msgstr "Избраният апартамент не принадлежи на избраната сграда."
@@ -120,6 +124,144 @@ msgstr "Описание"
 #: core/forms.py:294 templates/core/work_orders_mass_assign.html:33
 msgid "Buildings to include"
 msgstr "Сгради за включване"
+
+#: core/forms.py:333
+msgid "Add attachments"
+msgstr "Добави прикачени файлове"
+
+#: core/forms.py:336
+msgid "Upload one or more images or documents related to this work order."
+msgstr ""
+"Качете едно или повече изображения или документи, свързани с тази поръчка."
+
+#: core/forms.py:353
+msgid "Remove existing attachments"
+msgstr "Премахни наличните файлове"
+
+#: core/forms.py:360
+msgid "Select files to delete when saving this work order."
+msgstr "Изберете файловете, които да бъдат изтрити при запазване на поръчката."
+
+#: core/forms.py:381 core/views/api.py:152
+msgid "One or more attachments could not be found."
+msgstr "Един или повече файлове не бяха намерени."
+
+#: core/services/files.py:115
+msgid "Files must be smaller than %(size)s."
+msgstr "Файловете трябва да са по-малки от %(size)s."
+
+#: core/services/files.py:123
+msgid ""
+"Unsupported file type: %(mime)s. Allowed types: %(types)s or %(prefixes)s."
+msgstr ""
+"Неподдържан тип файл: %(mime)s. Позволени типове: %(types)s или %(prefixes)s."
+
+#: core/views/api.py:138 core/views/api.py:186
+msgid "You do not have permission to modify attachments for this work order."
+msgstr "Нямате права да променяте файловете за тази поръчка."
+
+#: core/views/api.py:144
+msgid "No files were provided."
+msgstr "Не бяха предоставени файлове."
+
+#: core/views/work_orders.py:286 core/views/api.py:45
+msgid "Attachment %(id)s"
+msgstr "Файл %(id)s"
+
+#: templates/core/work_order_detail.html:73
+msgid "Attachments"
+msgstr "Прикачени файлове"
+
+#: templates/core/work_order_detail.html:93
+msgid "Tap to zoom"
+msgstr "Докоснете за увеличаване"
+
+#: templates/core/work_order_detail.html:107
+msgid "FILE"
+msgstr "ФАЙЛ"
+
+#: templates/core/work_order_detail.html:126
+msgid "Download"
+msgstr "Изтегли"
+
+#: templates/core/work_order_detail.html:134
+msgid "Zoom"
+msgstr "Увеличи"
+
+#: templates/core/work_order_detail.html:166
+msgid "Uploaded %(date)s"
+msgstr "Качено на %(date)s"
+
+#: templates/core/work_order_detail.html:180
+msgid "Upload files"
+msgstr "Качи файлове"
+
+#: templates/core/work_order_detail.html:188 core/views/work_orders.py:341
+msgid "Select one or more files to upload without leaving this page."
+msgstr ""
+"Изберете един или повече файла за качване без да напускате страницата."
+
+#: templates/core/work_order_detail.html:156
+msgid "Preview"
+msgstr "Преглед"
+
+#: core/views/work_orders.py:346
+msgid "Loading preview…"
+msgstr "Зареждане на преглед…"
+
+#: core/views/work_orders.py:129
+msgid "Save this work order before adding attachments."
+msgstr "Запазете поръчката, преди да добавяте файлове."
+
+#: templates/core/work_order_detail.html:203
+msgid "JavaScript is required for inline uploads. Use the edit form to add files when JavaScript is disabled."
+msgstr ""
+"JavaScript е задължителен за директното качване. Използвайте формата за "
+"редакция, за да добавите файлове, когато JavaScript е изключен."
+
+#: core/views/work_orders.py:327
+msgid "Zoom in"
+msgstr "Увеличаване"
+
+#: core/views/work_orders.py:328
+msgid "Zoom out"
+msgstr "Намаляване"
+
+#: core/views/work_orders.py:329
+msgid "Close"
+msgstr "Затвори"
+
+#: core/views/work_orders.py:330
+msgid "Reset zoom"
+msgstr "Нулиране на увеличението"
+
+#: core/views/work_orders.py:331
+msgid "Open original"
+msgstr "Отвори оригинала"
+
+#: core/views/work_orders.py:332
+msgid "Loading..."
+msgstr "Зареждане..."
+
+#: core/views/work_orders.py:334
+msgid "No attachments uploaded yet."
+msgstr "Все още няма прикачени файлове."
+
+#: core/views/work_orders.py:339
+msgid "Remove this attachment?"
+msgstr "Да се премахне ли този файл?"
+
+#: core/views/work_orders.py:342
+msgid "Uploading…"
+msgstr "Качване…"
+
+#: core/views/work_orders.py:343
+msgid "Uploaded"
+msgstr "Качено"
+
+#: core/views/work_orders.py:344
+msgid "Upload failed"
+msgstr "Качването неуспешно"
 
 #: core/forms.py:316
 #, python-format
@@ -636,6 +778,8 @@ msgstr "Редакция на сграда"
 #: templates/core/user_details.html:20 templates/core/users_list.html:74
 #: templates/core/work_order_detail.html:12
 #: templates/core/work_order_detail.html:15
+#: templates/core/work_order_detail.html:142
+#: templates/core/work_order_detail.html:191
 #: templates/core/work_orders_list.html:119
 #: templates/core/work_orders_list.html:212
 msgid "Delete"

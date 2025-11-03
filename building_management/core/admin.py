@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Building, Notification, Unit, WorkOrder
+from .models import Building, Notification, Unit, WorkOrder, WorkOrderAttachment
+
+
+class WorkOrderAttachmentInline(admin.TabularInline):
+    model = WorkOrderAttachment
+    extra = 0
+    fields = ("file", "original_name", "content_type", "size", "created_at", "updated_at")
+    readonly_fields = ("original_name", "content_type", "size", "created_at", "updated_at")
+    show_change_link = True
 
 @admin.register(Building)
 class BuildingAdmin(admin.ModelAdmin):
@@ -23,6 +31,7 @@ class WorkOrderAdmin(admin.ModelAdmin):
     search_fields = ("title", "description", "unit__number", "building__name")
     list_select_related = ("building", "unit")
     autocomplete_fields = ("building", "unit")
+    inlines = (WorkOrderAttachmentInline,)
 
 
 @admin.register(Notification)

@@ -1,15 +1,57 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, SetPasswordForm
 from django.utils import timezone
+from django.utils.html import format_html
 from django.utils.text import capfirst
+from django.template.defaultfilters import filesizeformat
 from django.utils.translation import gettext_lazy as _
 
-from .models import Building, Unit, WorkOrder, UserSecurityProfile
+from .models import Building, Unit, WorkOrder, WorkOrderAttachment, UserSecurityProfile
+from .services.files import validate_work_order_attachment
 
 User = get_user_model()
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    """
+    Accept multiple uploaded files. Returns a list of UploadedFile objects.
+    """
+
+    widget = MultipleFileInput(attrs={"multiple": True})
+
+    def __init__(self, *args, **kwargs):
+        widget = kwargs.pop("widget", self.widget)
+        widget.attrs.setdefault("multiple", True)
+        widget.attrs.setdefault("class", "input")
+        super().__init__(*args, widget=widget, **kwargs)
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        if not isinstance(data, (list, tuple)):
+            data = [data]
+
+        cleaned = []
+        errors = []
+        for uploaded in data:
+            try:
+                cleaned_file = super().clean(uploaded, initial)
+                validate_work_order_attachment(cleaned_file)
+                cleaned.append(cleaned_file)
+            except forms.ValidationError as exc:
+                errors.extend(exc.error_list)
+        if errors:
+            raise forms.ValidationError(errors)
+        return cleaned
 
 
 # -----------------------------
@@ -190,6 +232,8 @@ class WorkOrderForm(forms.ModelForm):
         self._building = building
         self._locked_building_obj = self._coerce_building(building)
         self._effective_building = None
+        self._existing_attachments = []
+        self._attachment_lookup: dict[str, WorkOrderAttachment] = {}
         super().__init__(*args, **kwargs)
 
         # 1) Building choices / lock + hide if provided
@@ -234,6 +278,50 @@ class WorkOrderForm(forms.ModelForm):
         self.fields["status"].label = _("Status")
         self.fields["deadline"].label = _("Deadline")
 
+        # Attachments (upload)
+        self.fields["new_attachments"] = MultipleFileField(
+            required=False,
+            label=_("Add attachments"),
+            help_text=_("Upload one or more images or documents related to this work order."),
+        )
+
+        # Attachments (delete existing)
+        if self.instance.pk:
+            attachments = list(
+                self.instance.attachments.order_by("-created_at").select_related(None)
+            )
+            if attachments:
+                self._existing_attachments = attachments
+                choices = []
+                for attachment in attachments:
+                    key = str(attachment.pk)
+                    self._attachment_lookup[key] = attachment
+                    name = attachment.original_name or Path(attachment.file.name).name
+                    url = ""
+                    if attachment.file:
+                        try:
+                            url = attachment.file.url
+                        except ValueError:
+                            url = ""
+                    size_label = filesizeformat(attachment.size or 0)
+                    label_html = format_html(
+                        '<span class="flex items-center gap-2">'
+                        '<a href="{url}" target="_blank" rel="noopener noreferrer" class="link">{name}</a>'
+                        '<span class="text-xs text-slate-500 dark:text-slate-400">({size})</span>'
+                        '</span>',
+                        url=url,
+                        name=name,
+                        size=size_label,
+                    )
+                    choices.append((key, label_html))
+                self.fields["remove_attachments"] = forms.MultipleChoiceField(
+                    required=False,
+                    label=_("Remove existing attachments"),
+                    choices=choices,
+                    widget=forms.CheckboxSelectMultiple,
+                    help_text=_("Select files to delete when saving this work order."),
+                )
+
     # ---------- validation ----------
     def clean(self):
         cleaned = super().clean()
@@ -264,6 +352,15 @@ class WorkOrderForm(forms.ModelForm):
         self._effective_building = building
         return cleaned
 
+    def clean_remove_attachments(self):
+        ids = self.cleaned_data.get("remove_attachments")
+        if not ids:
+            return []
+        invalid = [attachment_id for attachment_id in ids if attachment_id not in self._attachment_lookup]
+        if invalid:
+            raise forms.ValidationError(_("One or more attachments could not be found."))
+        return ids
+
     # ---------- save ----------
     def save(self, commit: bool = True):
         obj: WorkOrder = super().save(commit=False)
@@ -275,6 +372,28 @@ class WorkOrderForm(forms.ModelForm):
         if commit:
             obj.save()
         return obj
+
+    # ---------- attachments helpers ----------
+    def save_attachments(self, work_order: WorkOrder):
+        """
+        Persist uploaded attachments and delete any that were flagged for removal.
+        """
+        remove_ids = self.cleaned_data.get("remove_attachments", []) if hasattr(self, "cleaned_data") else []
+        if remove_ids:
+            to_delete = [
+                self._attachment_lookup[pk] for pk in remove_ids if pk in self._attachment_lookup
+            ]
+            for attachment in to_delete:
+                attachment.delete()
+
+        new_files = self.cleaned_data.get("new_attachments", []) if hasattr(self, "cleaned_data") else []
+        for uploaded in new_files:
+            attachment = WorkOrderAttachment(
+                work_order=work_order,
+                file=uploaded,
+                original_name=getattr(uploaded, "name", ""),
+            )
+            attachment.save()
 
 
 class MassAssignWorkOrdersForm(forms.Form):

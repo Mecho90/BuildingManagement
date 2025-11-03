@@ -6,7 +6,7 @@
     {% if subtitle %}<p class="text-sm text-slate-500 dark:text-slate-400">{{ subtitle }}</p>{% endif %}
   </header>
 
-  <form method="post" novalidate class="space-y-6">
+  <form method="post" novalidate class="space-y-6"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
     {% csrf_token %}
     {% if next_url %}
       <input type="hidden" name="next" value="{{ next_url }}"/>

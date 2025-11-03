@@ -9,6 +9,9 @@
       <div>
         <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">{% trans "Buildings" %}</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Browse and manage your properties." %}</p>
+        <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
+          {% blocktrans with count=buildings_total %}Total buildings: {{ count }}{% endblocktrans %}
+        </p>
       </div>
       <a class="btn self-start md:self-center" href="{% url 'building_create' %}">{% trans "Add new building" %}</a>
     </div>

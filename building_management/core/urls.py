@@ -47,4 +47,14 @@ urlpatterns = [
     # APIs (optional)
     path("api/buildings/", views.api_buildings, name="api_buildings"),
     path("api/buildings/<int:building_id>/units/", views.api_units, name="api_units"),
+    path(
+        "api/work-orders/<int:pk>/attachments/",
+        views.api_workorder_attachments,
+        name="api_workorder_attachments",
+    ),
+    path(
+        "api/work-orders/<int:pk>/attachments/<int:attachment_id>/",
+        views.api_workorder_attachment_detail,
+        name="api_workorder_attachment_detail",
+    ),
 ]

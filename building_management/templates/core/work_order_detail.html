@@ -1,7 +1,12 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{% trans "Work Order" %} · {{ order.title }}{% endblock %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/attachments.css' %}">
+{% endblock %}
 
 {% block content %}
 <section class="space-y-6">
@@ -52,7 +57,7 @@
       </div>
     </dl>
 
-    <section class="space-y-2">
+    <section class="space-y-3">
       <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Description" %}</h2>
       <div class="prose prose-sm max-w-none dark:prose-invert">
         {% if order.description %}
@@ -62,6 +67,13 @@
         {% endif %}
       </div>
     </section>
+
+    {{ attachment_panel_html|safe }}
   </article>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script src="{% static 'js/attachments.js' %}" defer></script>
 {% endblock %}

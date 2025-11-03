@@ -1,7 +1,10 @@
 # core/models.py
 from __future__ import annotations
 
+import mimetypes
+import uuid
 from datetime import date
+from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -318,6 +321,76 @@ class WorkOrder(TimeStampedModel):
         if not self.is_archived:
             self.archived_at = timezone.now()
             self.save(update_fields=["archived_at"], validate=False)
+
+
+def work_order_attachment_upload_to(instance, filename: str) -> str:
+    """
+    Store attachments under per-work-order directories with a UUID filename so
+    user uploads cannot collide and paths remain opaque.
+    """
+    extension = Path(filename).suffix.lower()
+    # Keep extension only if it is reasonably short (guards against crafted names)
+    if len(extension) > 10:
+        extension = ""
+    work_order_id = instance.work_order_id or "unassigned"
+    return f"work_orders/{work_order_id}/{uuid.uuid4().hex}{extension}"
+
+
+class WorkOrderAttachment(TimeStampedModel):
+    work_order = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+        verbose_name=_("Work order"),
+    )
+    file = models.FileField(
+        upload_to=work_order_attachment_upload_to,
+        verbose_name=_("File"),
+        help_text=_("Upload images or documents related to this work order."),
+    )
+    original_name = models.CharField(
+        _("Original filename"),
+        max_length=255,
+        editable=False,
+    )
+    content_type = models.CharField(
+        _("Content type"),
+        max_length=255,
+        editable=False,
+        blank=True,
+    )
+    size = models.PositiveBigIntegerField(
+        _("Size (bytes)"),
+        editable=False,
+        default=0,
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("Work order attachment")
+        verbose_name_plural = _("Work order attachments")
+
+    def __str__(self) -> str:  # pragma: no cover
+        return self.original_name or Path(self.file.name).name
+
+    def save(self, *args, **kwargs):
+        if self.file:
+            name = Path(self.file.name).name
+            if not self.original_name:
+                self.original_name = name
+
+            detected = getattr(getattr(self.file, "file", None), "content_type", "")
+            if not detected:
+                detected, _ = mimetypes.guess_type(name)
+            if detected:
+                self.content_type = detected
+
+            try:
+                self.size = int(self.file.size)
+            except (TypeError, AttributeError, ValueError):
+                self.size = 0
+
+        super().save(*args, **kwargs)
 
 
 class NotificationQuerySet(models.QuerySet):

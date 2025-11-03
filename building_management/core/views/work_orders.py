@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from pathlib import Path
 from functools import lru_cache
+from urllib.parse import quote_plus
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -13,8 +15,11 @@ from django.db.models import Case, Count, IntegerField, Max, Min, OuterRef, Q, S
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
+from django.conf import settings
 from django.utils import formats, timezone
 from django.utils.translation import gettext as _, gettext_lazy as _lazy, ngettext
+from django.template.defaultfilters import filesizeformat
+from django.template.loader import render_to_string
 from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, UpdateView
 
@@ -57,6 +62,198 @@ def _cached_owner_choices(owner_ids: tuple[int, ...]) -> list[dict[str, str]]:
         {"id": str(owner.id), "label": owner.get_full_name() or owner.username}
         for owner in owners
     ]
+
+
+def _office_viewer_enabled(request) -> bool:
+    if not getattr(settings, "ATTACHMENTS_OFFICE_VIEWER_ENABLED", True):
+        return False
+    host = request.get_host().split(":", 1)[0]
+    if host in {"127.0.0.1", "localhost"}:
+        return False
+    return True
+
+
+def _build_attachment_panel_context(request, order: WorkOrder | None):
+    attachment_items: list[dict[str, object]] = []
+    can_manage = False
+    attachments_api_url = ""
+    delete_template = ""
+    upload_disabled_reason = ""
+    doc_extensions = {"doc", "docx", "odt", "rtf", "txt"}
+    office_protocol_map = {
+        "doc": "ms-word:ofe|u|{url}",
+        "docx": "ms-word:ofe|u|{url}",
+        "xls": "ms-excel:ofe|u|{url}",
+        "xlsx": "ms-excel:ofe|u|{url}",
+        "ppt": "ms-powerpoint:ofv|u|{url}",
+        "pptx": "ms-powerpoint:ofv|u|{url}",
+        "pps": "ms-powerpoint:ofv|u|{url}",
+        "ppsx": "ms-powerpoint:ofv|u|{url}",
+    }
+
+    office_viewer_allowed = _office_viewer_enabled(request)
+
+    if order and getattr(order, "pk", None):
+        attachments = list(order.attachments.order_by("-created_at"))
+        for attachment in attachments:
+            url = ""
+            try:
+                url = attachment.file.url
+            except ValueError:
+                url = ""
+            absolute_url = request.build_absolute_uri(url) if url else ""
+
+            filename = (attachment.original_name or "").strip()
+            if not filename:
+                file_attr = getattr(attachment.file, "name", "")
+                if file_attr:
+                    filename = Path(file_attr).name.strip()
+            if not filename:
+                filename = _("Attachment %(id)s") % {"id": attachment.pk}
+
+            mime = (attachment.content_type or "").lower()
+            is_image = mime.startswith("image/")
+            extension = Path(filename).suffix.lower().lstrip(".")
+            size_raw = getattr(attachment, "size", 0) or 0
+            size_label = filesizeformat(size_raw) if size_raw else ""
+            created = timezone.localtime(attachment.created_at)
+
+            if is_image:
+                category = "image"
+            elif extension == "pdf":
+                category = "pdf"
+            elif extension in doc_extensions:
+                category = "doc"
+            else:
+                category = "file"
+
+            office_exts = {
+                "doc",
+                "docx",
+                "xls",
+                "xlsx",
+                "ppt",
+                "pptx",
+                "pps",
+                "ppsx",
+                "odt",
+                "ods",
+                "odp",
+            }
+            office_viewer_template = getattr(
+                settings,
+                "ATTACHMENTS_OFFICE_VIEWER_URL",
+                "https://view.officeapps.live.com/op/embed.aspx?src={url}",
+            )
+            preview_url = None
+            preview_external = False
+            if is_image:
+                preview_url = url
+            elif category == "pdf":
+                preview_url = url
+            elif category == "doc" and absolute_url:
+                if office_viewer_allowed:
+                    preview_url = office_viewer_template.format(url=quote_plus(absolute_url))
+                else:
+                    proto = office_protocol_map.get(extension)
+                    if proto:
+                        preview_url = proto.format(url=absolute_url)
+                        preview_external = True
+
+            attachment_items.append(
+                {
+                    "attachment": attachment,
+                    "url": url,
+                    "absolute_url": absolute_url,
+                    "filename": filename,
+                    "mime": mime,
+                    "is_image": is_image,
+                    "extension": extension,
+                    "size_label": size_label,
+                    "category": category,
+                    "created_display": created.strftime("%Y-%m-%d %H:%M"),
+                    "created_iso": created.isoformat(),
+                    "preview_url": preview_url,
+                    "preview_external": preview_external,
+                }
+            )
+
+        if request.user.is_authenticated and order.building_id:
+            can_manage = _user_can_access_building(request.user, order.building)
+
+        attachments_api_url = reverse("api_workorder_attachments", args=[order.pk])
+        delete_template = reverse(
+            "api_workorder_attachment_detail", args=[order.pk, 0]
+        ).replace("/0/", "/{id}/")
+    else:
+        upload_disabled_reason = _("Save this work order before adding attachments.")
+        if request.user.is_authenticated:
+            can_manage = True
+
+    attachment_i18n = {
+        "zoom_in": _("Zoom in"),
+        "zoom_out": _("Zoom out"),
+        "close": _("Close"),
+        "reset": _("Reset zoom"),
+        "open": _("Open original"),
+        "loading": _("Loading..."),
+        "tap_hint": _("Tap to zoom"),
+        "download": _("Download"),
+        "zoom": _("Zoom"),
+        "empty": _("No attachments uploaded yet."),
+        "uploaded_at": _("Uploaded %(date)s"),
+        "delete": _("Delete"),
+        "delete_confirm": _("Remove this attachment?"),
+        "upload_button": _("Upload files"),
+        "upload_hint": _("Select one or more files to upload without leaving this page."),
+        "uploading": _("Uploading…"),
+        "uploaded": _("Uploaded"),
+        "failed": _("Upload failed"),
+        "preview": _("Preview"),
+        "doc_loading": _("Loading preview…"),
+    }
+
+    has_order = bool(order and getattr(order, "pk", None))
+    show_upload_controls = (has_order and can_manage) or not has_order
+    upload_enabled = bool(attachments_api_url)
+    draft_mode = not has_order
+
+    return {
+        "attachment_items": attachment_items,
+        "attachment_i18n": attachment_i18n,
+        "can_manage_attachments": can_manage and has_order,
+        "attachments_api_url": attachments_api_url,
+        "attachments_delete_url_template": delete_template,
+        "attachments_show_upload": show_upload_controls,
+        "attachments_upload_enabled": upload_enabled,
+        "attachments_upload_disabled_reason": upload_disabled_reason,
+        "attachment_panel_title": _("Attachments"),
+        "attachments_draft_mode": draft_mode,
+        "new_attachments_field": None,
+        "remove_attachments_field": None,
+    }
+
+
+def _render_attachment_panel(request, *, order=None, form=None) -> dict[str, object]:
+    context = _build_attachment_panel_context(request, order)
+
+    if form is not None:
+        try:
+            context["new_attachments_field"] = form["new_attachments"]
+        except KeyError:
+            context["new_attachments_field"] = None
+        try:
+            context["remove_attachments_field"] = form["remove_attachments"]
+        except KeyError:
+            context["remove_attachments_field"] = None
+
+    html = render_to_string(
+        "core/includes/attachments_panel.html",
+        context,
+        request=request,
+    )
+    context["attachment_panel_html"] = html
+    return context
 
 
 class UnitsWidgetMixin:
@@ -253,12 +450,17 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
     template_name = "core/work_order_detail.html"
     context_object_name = "order"
 
+    def get_queryset(self):
+        base = WorkOrder.objects.visible_to(self.request.user)
+        return base.select_related("building", "unit").prefetch_related("attachments")
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         next_url = _safe_next_url(self.request)
         ctx["next_url"] = next_url
         if next_url:
             ctx["cancel_url"] = next_url
+        ctx.update(_render_attachment_panel(self.request, order=self.object))
         return ctx
 
     def test_func(self):
@@ -301,15 +503,22 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
             )
         ctx["units_api_template"] = reverse("api_units", args=[0]).replace("/0/", "/{id}/")
         self._prepare_units_widget(ctx)
+        form = ctx.get("form")
+        if form is not None:
+            ctx.update(_render_attachment_panel(self.request, order=form.instance, form=form))
+        else:
+            ctx.update(_render_attachment_panel(self.request, order=None))
         return ctx
 
     def form_valid(self, form):
-        obj = form.save(commit=False)
-        if not _user_can_access_building(self.request.user, obj.building):
+        prospective = form.save(commit=False)
+        if not _user_can_access_building(self.request.user, prospective.building):
             raise Http404()
-        obj.save()
+        with transaction.atomic():
+            response = super().form_valid(form)
+            form.save_attachments(self.object)
         messages.success(self.request, _("Work order created."))
-        return super().form_valid(form)
+        return response
 
     def get_success_url(self):
         next_url = _safe_next_url(self.request)
@@ -346,6 +555,12 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             ctx["cancel_url"] = reverse("building_detail", args=[building.pk])
         ctx["units_api_template"] = reverse("api_units", args=[0]).replace("/0/", "/{id}/")
         self._prepare_units_widget(ctx)
+        order_obj = ctx.get("object", getattr(self, "object", None))
+        form = ctx.get("form")
+        if form is not None:
+            ctx.update(_render_attachment_panel(self.request, order=order_obj, form=form))
+        else:
+            ctx.update(_render_attachment_panel(self.request, order=order_obj))
         return ctx
 
     def test_func(self):
@@ -358,7 +573,9 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             raise Http404()
         if obj.archived_at and obj.status != WorkOrder.Status.DONE:
             obj.archived_at = None
-        obj.save()
+        with transaction.atomic():
+            obj.save()
+            form.save_attachments(obj)
         self.object = obj
         messages.warning(self.request, _("Work order updated."))
         return HttpResponseRedirect(self.get_success_url())

@@ -1,0 +1,169 @@
+{% load i18n %}
+{% with panel_title=attachment_panel_title|default:_('Attachments') %}
+<section class="space-y-3">
+  <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{{ panel_title }}</h2>
+
+  <!-- attachments debug: enabled={{ attachments_upload_enabled }} url={{ attachments_api_url }} show_upload={{ attachments_show_upload }} -->
+  <div class="space-y-3"
+       data-attachments-wrapper>
+    <p class="text-sm text-slate-500 dark:text-slate-400"
+       data-attachments-empty
+       {% if attachment_items %}hidden{% endif %}>{{ attachment_i18n.empty }}</p>
+
+    <ul class="attachments-grid"
+        data-attachments
+        data-can-manage="{{ can_manage_attachments|yesno:'1,0' }}"
+        data-label-empty="{{ attachment_i18n.empty|escape }}"
+        data-label-zoom-in="{{ attachment_i18n.zoom_in|escape }}"
+        data-label-zoom-out="{{ attachment_i18n.zoom_out|escape }}"
+        data-label-close="{{ attachment_i18n.close|escape }}"
+        data-label-reset="{{ attachment_i18n.reset|escape }}"
+        data-label-open="{{ attachment_i18n.open|escape }}"
+        data-label-loading="{{ attachment_i18n.loading|escape }}"
+        data-label-tap-hint="{{ attachment_i18n.tap_hint|escape }}"
+        data-label-download="{{ attachment_i18n.download|escape }}"
+        data-label-zoom="{{ attachment_i18n.zoom|escape }}"
+        data-label-delete="{{ attachment_i18n.delete|escape }}"
+        data-label-delete-confirm="{{ attachment_i18n.delete_confirm|escape }}"
+        data-label-uploaded="{{ attachment_i18n.uploaded_at|escape }}"
+        data-label-file="{% trans 'FILE' %}"
+        data-label-preview="{{ attachment_i18n.preview|escape }}"
+        data-label-doc-loading="{{ attachment_i18n.doc_loading|escape }}"
+        data-delete-endpoint-template="{{ attachments_delete_url_template }}">
+      {% for item in attachment_items %}
+        <li class="attachments-grid__item" data-attachment-id="{{ item.attachment.pk }}">
+          <article class="attachment-card attachment-card--{{ item.category }}">
+            <div class="attachment-card__media">
+              {% if item.is_image and item.url %}
+                <button type="button"
+                        class="attachment-card__preview"
+                        data-attachment-viewer
+                        data-src="{{ item.url }}"
+                        data-name="{{ item.filename }}"
+                        data-type="{{ item.mime }}">
+                  <img src="{{ item.url }}" alt="{{ item.filename }}" loading="lazy"/>
+                  <span class="attachment-card__preview-hint">{{ attachment_i18n.tap_hint }}</span>
+                </button>
+              {% else %}
+                <div class="attachment-card__placeholder" aria-hidden="true">
+                  <span class="attachment-card__placeholder-text">
+                    {% if item.extension %}
+                      {{ item.extension|upper }}
+                    {% else %}
+                      {% trans "FILE" %}
+                    {% endif %}
+                  </span>
+                </div>
+              {% endif %}
+            </div>
+            <div class="attachment-card__body">
+              <h3 class="attachment-card__title">{{ item.filename }}</h3>
+              <div class="attachment-card__meta">
+                {% if item.mime %}
+                  <span>{{ item.mime }}</span>
+                {% endif %}
+                {% if item.size_label %}
+                  <span>{{ item.size_label }}</span>
+                {% endif %}
+              </div>
+              {% if item.url %}
+                <div class="attachment-card__actions">
+                  <a href="{{ item.url }}"
+                     class="attachment-card__action"
+                     target="_blank"
+                     rel="noopener noreferrer">
+                    {{ attachment_i18n.download }}
+                  </a>
+                  {% if item.is_image %}
+                    <button type="button"
+                            class="attachment-card__action attachment-card__action--secondary"
+                            data-attachment-viewer
+                            data-src="{{ item.url }}"
+                            data-name="{{ item.filename }}"
+                            data-type="{{ item.mime }}">
+                      {{ attachment_i18n.zoom }}
+                    </button>
+                  {% endif %}
+                  {% if can_manage_attachments %}
+                    <button type="button"
+                            class="attachment-card__action attachment-card__action--danger"
+                            data-attachment-delete
+                            data-attachment-id="{{ item.attachment.pk }}">
+                      {{ attachment_i18n.delete }}
+                    </button>
+                  {% endif %}
+                </div>
+              {% endif %}
+              <time class="attachment-card__timestamp" datetime="{{ item.created_iso }}">
+                {% blocktrans with date=item.created_display %}Uploaded {{ date }}{% endblocktrans %}
+              </time>
+            </div>
+          </article>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  {% if attachments_show_upload %}
+    {% if attachments_upload_enabled %}
+      <div class="attachment-upload"
+           data-attachment-upload
+           data-upload-endpoint="{{ attachments_api_url }}"
+           data-delete-endpoint-template="{{ attachments_delete_url_template }}"
+           data-label-browse="{{ attachment_i18n.upload_button|escape }}"
+           data-label-uploading="{{ attachment_i18n.uploading|escape }}"
+           data-label-uploaded="{{ attachment_i18n.uploaded|escape }}"
+           data-label-failed="{{ attachment_i18n.failed|escape }}"
+           data-label-empty="{{ attachment_i18n.empty|escape }}"
+           data-label-uploaded-template="{{ attachment_i18n.uploaded_at|escape }}"
+           data-label-delete="{{ attachment_i18n.delete|escape }}"
+           data-label-delete-confirm="{{ attachment_i18n.delete_confirm|escape }}">
+        <div class="attachment-upload__controls">
+          <button type="button"
+                  class="attachment-upload__button"
+                  data-attachment-upload-trigger>
+            {{ attachment_i18n.upload_button }}
+          </button>
+          <input type="file"
+                 data-attachment-upload-input
+                 multiple
+                 hidden>
+        </div>
+        <div class="attachment-upload__queue" data-attachment-upload-queue hidden></div>
+        <p class="attachment-upload__hint">{{ attachment_i18n.upload_hint }}</p>
+        <noscript>
+          <p class="attachment-upload__noscript text-sm text-slate-500 dark:text-slate-400">
+            {% trans "JavaScript is required for inline uploads. Use the edit form to add files when JavaScript is disabled." %}
+          </p>
+        </noscript>
+      </div>
+    {% else %}
+      <div class="attachment-upload attachment-upload--disabled">
+        <p class="attachment-upload__hint">{{ attachments_upload_disabled_reason }}</p>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {% if new_attachments_field and new_attachments_field.errors %}
+    <div class="errors">
+      {% for e in new_attachments_field.errors %}<div>{{ e }}</div>{% endfor %}
+    </div>
+  {% endif %}
+  {% if remove_attachments_field and remove_attachments_field.errors %}
+    <div class="errors">
+      {% for e in remove_attachments_field.errors %}<div>{{ e }}</div>{% endfor %}
+    </div>
+  {% endif %}
+
+  {% if remove_attachments_field %}
+    <div class="sr-only">
+      {{ remove_attachments_field }}
+    </div>
+  {% endif %}
+  {% if new_attachments_field %}
+    <div class="sr-only">
+      {{ new_attachments_field }}
+    </div>
+  {% endif %}
+</section>
+{% endwith %}

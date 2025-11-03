@@ -3,16 +3,79 @@
 {% block title %}{% if form.instance.pk %}{% trans "Edit Work Order" %}{% else %}{% trans "New Work Order" %}{% endif %} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
-  {% if form.instance.pk %}
-    {% include "core/_form_layout.html" with form=form title=_('Edit Work Order') subtitle="" cancel_url=cancel_url %}
-  {% else %}
-    {% include "core/_form_layout.html" with form=form title=_('New Work Order') subtitle="" cancel_url=cancel_url %}
-  {% endif %}
+<section class="space-y-6">
+  <header class="space-y-1">
+    <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">
+      {% if form.instance.pk %}{% trans "Edit Work Order" %}{% else %}{% trans "New Work Order" %}{% endif %}
+    </h1>
+  </header>
+
+  <form method="post" novalidate class="space-y-6"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
+    {% csrf_token %}
+    {% if next_url %}
+      <input type="hidden" name="next" value="{{ next_url }}"/>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+      <div class="alert alert--danger">
+        {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+      </div>
+    {% endif %}
+
+    {% for h in form.hidden_fields %}
+      {{ h }}
+      {% if h.errors %}
+        <div class="errors">{% for e in h.errors %}<div>{{ e }}</div>{% endfor %}</div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="grid gap-5">
+      {% for field in form.visible_fields %}
+        {% if field.name != 'new_attachments' and field.name != 'remove_attachments' %}
+          {% if field.field.widget.input_type == 'checkbox' %}
+            <div class="space-y-1">
+              <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ field }}
+                <span>{{ field.label }}</span>
+              </label>
+              {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
+              {% if field.errors %}
+                <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="space-y-1">
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
+              {% if field.errors %}
+                <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
+              {% endif %}
+            </div>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    {{ attachment_panel_html|safe }}
+
+    <div class="flex flex-wrap justify-end gap-3">
+      <button class="btn" type="submit">{% trans "Save" %}</button>
+      <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+</section>
 {% endblock %}
 
 {% block extra_js %}
   {{ block.super }}
+  <script src="{% static 'js/attachments.js' %}" defer></script>
   {% if units_api_template %}
     <script src="{% static 'js/work-order-units.js' %}" defer></script>
   {% endif %}
+{% endblock %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/attachments.css' %}">
 {% endblock %}

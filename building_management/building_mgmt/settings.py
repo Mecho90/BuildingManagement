@@ -26,6 +26,20 @@ def _env_bool(name: str, *, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_int(name: str, *, default: int, minimum: int | None = None) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        value = default
+    else:
+        try:
+            value = int(raw)
+        except ValueError as exc:
+            raise ImproperlyConfigured(f"{name} must be an integer.") from exc
+    if minimum is not None and value < minimum:
+        raise ImproperlyConfigured(f"{name} must be >= {minimum}.")
+    return value
+
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -120,16 +134,7 @@ def _database_config_from_env() -> dict[str, object]:
     }
 
 
-    def _env_int(name: str, *, default: int) -> int:
-        raw = os.environ.get(name)
-        if raw is None or raw == "":
-            return default
-        try:
-            return int(raw)
-        except ValueError as exc:
-            raise ImproperlyConfigured(f"{name} must be an integer.") from exc
-
-    conn_max_age = _env_int("DJANGO_DB_CONN_MAX_AGE", default=60)
+    conn_max_age = _env_int("DJANGO_DB_CONN_MAX_AGE", default=60, minimum=0)
     if conn_max_age < 0:
         raise ImproperlyConfigured("DJANGO_DB_CONN_MAX_AGE must be >= 0.")
     if conn_max_age:
@@ -195,6 +200,65 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_MANIFEST_STRICT = False
 
+# --- Media storage ---
+_media_root = os.environ.get("DJANGO_MEDIA_ROOT")
+MEDIA_ROOT = Path(_media_root).expanduser() if _media_root else BASE_DIR / "media"
+MEDIA_URL = os.environ.get("DJANGO_MEDIA_URL", "/media/")
+
+FILE_STORAGE_BACKEND = os.environ.get("DJANGO_FILE_STORAGE", "local").strip().lower()
+if FILE_STORAGE_BACKEND in {"", "local", "filesystem"}:
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+elif FILE_STORAGE_BACKEND in {"s3", "aws"}:
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    try:
+        import storages  # noqa: F401
+    except ImportError as exc:  # pragma: no cover - configuration error path
+        raise ImproperlyConfigured(
+            "DJANGO_FILE_STORAGE='s3' requires django-storages[boto3] to be installed."
+        ) from exc
+    AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME")
+    if not AWS_STORAGE_BUCKET_NAME:
+        raise ImproperlyConfigured(
+            "AWS_STORAGE_BUCKET_NAME must be set when DJANGO_FILE_STORAGE='s3'."
+        )
+    AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME")
+    AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+    AWS_S3_CUSTOM_DOMAIN = os.environ.get("AWS_S3_CUSTOM_DOMAIN")
+    AWS_QUERYSTRING_AUTH = _env_bool("AWS_QUERYSTRING_AUTH", default=False)
+    AWS_DEFAULT_ACL = os.environ.get("AWS_DEFAULT_ACL", "private")
+    AWS_S3_OBJECT_PARAMETERS = {
+        "CacheControl": os.environ.get("AWS_S3_CACHE_CONTROL", "max-age=86400"),
+    }
+else:
+    raise ImproperlyConfigured(
+        "Unsupported DJANGO_FILE_STORAGE backend. Use 'local' or 's3'."
+    )
+
+# --- Work order attachment policy ---
+WORK_ORDER_ATTACHMENT_MAX_BYTES = _env_int(
+    "DJANGO_ATTACHMENT_MAX_BYTES",
+    default=10 * 1024 * 1024,
+    minimum=1,
+)
+
+_allowed_types = os.environ.get(
+    "DJANGO_ATTACHMENT_ALLOWED_TYPES",
+    "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+)
+WORK_ORDER_ATTACHMENT_ALLOWED_TYPES = tuple(
+    sorted({token.strip().lower() for token in _allowed_types.split(",") if token.strip()})
+)
+
+_allowed_prefixes = os.environ.get(
+    "DJANGO_ATTACHMENT_ALLOWED_PREFIXES",
+    "image/",
+)
+WORK_ORDER_ATTACHMENT_ALLOWED_PREFIXES = tuple(
+    sorted({token.strip().lower() for token in _allowed_prefixes.split(",") if token.strip()})
+)
+WORK_ORDER_ATTACHMENT_SCAN_HANDLER = os.environ.get("DJANGO_ATTACHMENT_SCAN_HANDLER", "")
+
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", default=False)
@@ -214,6 +278,8 @@ if SECURE_HSTS_SECONDS:
     SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=True)
 
 SECURE_REFERRER_POLICY = os.environ.get("DJANGO_SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
+
+X_FRAME_OPTIONS = os.environ.get("DJANGO_X_FRAME_OPTIONS", "SAMEORIGIN")
 
 # --- Markdownify (safe subset) ---
 MARKDOWNIFY = {

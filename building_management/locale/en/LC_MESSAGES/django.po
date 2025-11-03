@@ -91,6 +91,10 @@ msgstr "Status"
 msgid "Deadline"
 msgstr "Deadline"
 
+#: templates/core/buildings_list.html:20
+msgid "Total buildings: %(count)s"
+msgstr "Total buildings: %(count)s"
+
 #: core/forms.py:253
 msgid "Selected unit does not belong to the chosen building."
 msgstr "Selected unit does not belong to the chosen building."
