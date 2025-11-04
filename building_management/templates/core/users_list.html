@@ -94,4 +94,57 @@
   {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
 {% endif %}
 </section>
+  {% if overview_rows %}
+    <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div class="flex flex-col gap-1">
+        <h2 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "User overview" %}</h2>
+        <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Summary of buildings, units, and tasks per user." %}</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+          <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+            <tr>
+              <th class="px-4 py-3">{% trans "User" %}</th>
+              <th class="px-4 py-3">{% trans "Administrator" %}</th>
+              <th class="px-4 py-3 text-right">{% trans "Buildings" %}</th>
+              <th class="px-4 py-3 text-right">{% trans "Units" %}</th>
+              <th class="px-4 py-3 text-right">{% trans "High priority tasks" %}</th>
+              <th class="px-4 py-3 text-right">{% trans "Medium priority tasks" %}</th>
+              <th class="px-4 py-3 text-right">{% trans "Low priority tasks" %}</th>
+              <th class="px-4 py-3 text-right">{% trans "Archived tasks" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+            {% trans "Yes,No" as yesno_choices %}
+            {% for row in overview_rows %}
+              <tr class="text-slate-700 dark:text-slate-100">
+                <td class="px-4 py-3 font-medium">{{ row.user.get_full_name|default:row.user.username }}</td>
+                <td class="px-4 py-3">{{ row.is_admin|yesno:yesno_choices }}</td>
+                <td class="px-4 py-3 text-right">{{ row.buildings }}</td>
+                <td class="px-4 py-3 text-right">{{ row.units }}</td>
+                <td class="px-4 py-3 text-right">{{ row.priority_high }}</td>
+                <td class="px-4 py-3 text-right">{{ row.priority_medium }}</td>
+                <td class="px-4 py-3 text-right">{{ row.priority_low }}</td>
+                <td class="px-4 py-3 text-right">{{ row.archived }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          {% if overview_totals %}
+            <tfoot class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+              <tr>
+                <th class="px-4 py-3 text-left" colspan="2">{% trans "Totals" %}</th>
+                <th class="px-4 py-3 text-right">{{ overview_totals.buildings }}</th>
+                <th class="px-4 py-3 text-right">{{ overview_totals.units }}</th>
+                <th class="px-4 py-3 text-right">{{ overview_totals.priority_high }}</th>
+                <th class="px-4 py-3 text-right">{{ overview_totals.priority_medium }}</th>
+                <th class="px-4 py-3 text-right">{{ overview_totals.priority_low }}</th>
+                <th class="px-4 py-3 text-right">{{ overview_totals.archived }}</th>
+              </tr>
+            </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </section>
+  {% endif %}
+</section>
 {% endblock %}

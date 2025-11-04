@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections import defaultdict
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -11,6 +13,7 @@ from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
 from ..forms import AdminUserCreateForm, AdminUserPasswordForm, AdminUserUpdateForm
+from ..models import Building, Unit, WorkOrder
 from .common import AdminRequiredMixin, _querystring_without
 
 User = get_user_model()
@@ -47,14 +50,97 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         ctx["q"] = getattr(self, "_search", "")
         ctx["pagination_query"] = _querystring_without(self.request, "page")
+        object_list = list(ctx.get("object_list") or [])
+        overview_data = self._build_overview(object_list)
+        if overview_data:
+            ctx["overview_rows"] = overview_data["rows"]
+            ctx["overview_totals"] = overview_data["totals"]
         paginator = ctx.get("paginator")
         if paginator is not None:
-            total_users = paginator.count
+            ctx["users_total"] = paginator.count
         else:
-            object_list = ctx.get("object_list")
-            total_users = len(object_list) if object_list is not None else 0
-        ctx["users_total"] = total_users
+            ctx["users_total"] = len(object_list)
         return ctx
+
+    def _build_overview(self, users) -> dict[str, object] | None:
+        if not users:
+            return None
+
+        user_ids = [user.pk for user in users if user.pk is not None]
+        if not user_ids:
+            return None
+
+        def _empty_stats():
+            return {
+                "buildings": 0,
+                "units": 0,
+                "priority_high": 0,
+                "priority_medium": 0,
+                "priority_low": 0,
+                "archived": 0,
+            }
+
+        stats = {uid: _empty_stats() for uid in user_ids}
+
+        for row in (
+            Building.objects.filter(owner_id__in=user_ids)
+            .values("owner_id")
+            .annotate(total=Count("id"))
+        ):
+            stats[row["owner_id"]]["buildings"] = row["total"]
+
+        for row in (
+            Unit.objects.filter(building__owner_id__in=user_ids)
+            .values("building__owner_id")
+            .annotate(total=Count("id"))
+        ):
+            stats[row["building__owner_id"]]["units"] = row["total"]
+
+        active_workorders = (
+            WorkOrder.objects.filter(
+                building__owner_id__in=user_ids,
+                archived_at__isnull=True,
+            )
+            .values("building__owner_id", "priority")
+            .annotate(total=Count("id"))
+        )
+        priority_map = {
+            WorkOrder.Priority.HIGH: "priority_high",
+            WorkOrder.Priority.MEDIUM: "priority_medium",
+            WorkOrder.Priority.LOW: "priority_low",
+        }
+        for row in active_workorders:
+            key = priority_map.get(row["priority"])
+            if key:
+                stats[row["building__owner_id"]][key] = row["total"]
+
+        for row in (
+            WorkOrder.objects.filter(
+                building__owner_id__in=user_ids,
+                archived_at__isnull=False,
+            )
+            .values("building__owner_id")
+            .annotate(total=Count("id"))
+        ):
+            stats[row["building__owner_id"]]["archived"] = row["total"]
+
+        totals = defaultdict(int)
+        overview_rows: list[dict[str, object]] = []
+        for user in users:
+            user_stats = stats.get(user.pk)
+            if not user_stats:
+                user_stats = _empty_stats()
+            for key, value in user_stats.items():
+                totals[key] += value
+            overview_rows.append(
+                {
+                    "user": user,
+                    "is_admin": user.is_superuser,
+                    **user_stats,
+                }
+            )
+
+        return {"rows": overview_rows, "totals": dict(totals)}
 
 
 class AdminUserCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):

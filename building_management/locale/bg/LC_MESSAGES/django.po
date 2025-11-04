@@ -675,6 +675,38 @@ msgstr "Масово възлагане"
 msgid "User Management"
 msgstr "Управление на потребители"
 
+#: templates/core/users_list.html:22
+msgid "High priority tasks"
+msgstr "Работни задачи с висок приоритет"
+
+#: templates/core/users_list.html:23
+msgid "Medium priority tasks"
+msgstr "Работни задачи със среден приоритет"
+
+#: templates/core/users_list.html:24
+msgid "Low priority tasks"
+msgstr "Работни задачи с нисък приоритет"
+
+#: templates/core/users_list.html:25
+msgid "Archived tasks"
+msgstr "Архивирани задачи"
+
+#: templates/core/users_list.html:108
+msgid "Totals"
+msgstr "Общо"
+
+#: templates/core/users_list.html:101
+msgid "User overview"
+msgstr "Общ преглед на потребители"
+
+#: templates/core/users_list.html:102
+msgid "Summary of buildings, units, and tasks per user."
+msgstr "Обобщение на сградите, апартаментите и задачите за всеки потребител."
+
+#: templates/core/users_list.html:109
+msgid "User"
+msgstr "Потребител"
+
 #: templates/base.html:34
 msgid "Admin Panel"
 msgstr "Администраторски панел"
@@ -1497,20 +1529,6 @@ msgstr "Парола"
 #~ msgid "Superuser status"
 #~ msgstr "Статут на супер-потребител"
 
-#, fuzzy
-#~| msgid "Username"
-#~ msgid "User"
-#~ msgstr "Потребителско име"
-
-#, fuzzy
-#~| msgid "Username"
-#~ msgid "Users"
-#~ msgstr "Потребителско име"
-
-#, fuzzy
-#~| msgid "Login"
-#~ msgid "Last Login"
-#~ msgstr "Вход"
 
 #: core/views/work_orders.py:592
 msgid "Archived (Newest first)"
