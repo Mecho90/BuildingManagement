@@ -245,7 +245,7 @@ WORK_ORDER_ATTACHMENT_MAX_BYTES = _env_int(
 
 _allowed_types = os.environ.get(
     "DJANGO_ATTACHMENT_ALLOWED_TYPES",
-    "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip,application/x-zip-compressed,application/x-7z-compressed,application/x-tar,application/gzip",
 )
 WORK_ORDER_ATTACHMENT_ALLOWED_TYPES = tuple(
     sorted({token.strip().lower() for token in _allowed_types.split(",") if token.strip()})

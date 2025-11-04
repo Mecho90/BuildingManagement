@@ -31,6 +31,11 @@ def _config_from_settings() -> AttachmentValidationConfig:
             "application/pdf",
             "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/x-7z-compressed",
+            "application/x-tar",
+            "application/gzip",
         ),
     )
     if isinstance(raw_types, str):
@@ -42,7 +47,7 @@ def _config_from_settings() -> AttachmentValidationConfig:
     raw_prefixes = getattr(
         settings,
         "WORK_ORDER_ATTACHMENT_ALLOWED_PREFIXES",
-        ("image/",),
+        ("image/", "application/zip", "application/x-7z", "application/x-gzip"),
     )
     if isinstance(raw_prefixes, str):
         tokens = raw_prefixes.split(",")

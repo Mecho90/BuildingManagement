@@ -25,6 +25,9 @@
   const previewLabel = attachmentsList ? attachmentsList.dataset.labelPreview || "Preview" : "Preview"
   const docLoadingLabel = attachmentsList ? attachmentsList.dataset.labelDocLoading || "Loading preview..." : "Loading preview..."
   const deleteLabel = attachmentsList ? attachmentsList.dataset.labelDelete || "Delete" : "Delete"
+  const deleteNext = attachmentsList
+    ? attachmentsList.dataset.nextUrl || `${window.location.pathname}${window.location.search}`
+    : `${window.location.pathname}${window.location.search}`
   const uploadedTemplate =
     (attachmentsList && attachmentsList.dataset.labelUploaded) ||
     (uploadRoot && uploadRoot.dataset.labelUploadedTemplate) ||
@@ -243,7 +246,7 @@
       if (canManage && meta.delete_url) {
         const deleteLink = document.createElement("a")
         deleteLink.className = "attachment-card__action attachment-card__action--danger"
-        deleteLink.href = meta.delete_url
+        deleteLink.href = decorateDeleteUrl(meta.delete_url)
         deleteLink.textContent = deleteLabel
         if (meta.delete_confirm) {
           deleteLink.title = stripTags(meta.delete_confirm)
@@ -298,6 +301,26 @@
       /* noop */
     }
     return ""
+  }
+
+  function decorateDeleteUrl (url) {
+    if (!url) {
+      return url
+    }
+    try {
+      const parsed = new URL(url, window.location.origin)
+      if (deleteNext && !parsed.searchParams.has("next")) {
+        parsed.searchParams.set("next", deleteNext)
+      }
+      return parsed.pathname + parsed.search + parsed.hash
+    } catch (error) {
+      /* noop */
+    }
+    if (url.includes("next=") || !deleteNext) {
+      return url
+    }
+    const glue = url.includes("?") ? "&" : "?"
+    return `${url}${glue}next=${encodeURIComponent(deleteNext)}`
   }
 
   // -------------------------------------------------------------------------

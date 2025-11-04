@@ -13,6 +13,7 @@
     <ul class="attachments-grid"
         data-attachments
         data-can-manage="{{ can_manage_attachments|yesno:'1,0' }}"
+        data-next-url="{{ request.get_full_path }}"
         data-label-empty="{{ attachment_i18n.empty|escape }}"
         data-label-zoom-in="{{ attachment_i18n.zoom_in|escape }}"
         data-label-zoom-out="{{ attachment_i18n.zoom_out|escape }}"

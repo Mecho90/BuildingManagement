@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 from functools import lru_cache
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -167,6 +167,9 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
                 "workorder_attachment_delete",
                 args=[order.pk, attachment.pk],
             )
+            current_target = request.get_full_path()
+            if current_target:
+                delete_url = f"{delete_url}?{urlencode({'next': current_target})}"
 
             attachment_items.append(
                 {
@@ -1094,6 +1097,7 @@ class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
             WorkOrder.objects.visible_to(request.user).select_related("building"),
             pk=kwargs.get("order_pk"),
         )
+        self.next_url = _safe_next_url(request)
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -1104,6 +1108,8 @@ class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
         return _user_can_access_building(self.request.user, self.work_order.building)
 
     def get_success_url(self):
+        if getattr(self, "next_url", None):
+            return self.next_url
         return reverse("work_order_detail", args=[self.work_order.pk])
 
     def delete(self, request, *args, **kwargs):
@@ -1122,7 +1128,9 @@ class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
         attachment = ctx.get("object") or getattr(self, "object", None)
         display_name = self._attachment_display_name(attachment)
         ctx["work_order"] = self.work_order
-        ctx["cancel_url"] = self.get_success_url()
+        cancel_target = self.next_url or self.get_success_url()
+        ctx["cancel_url"] = cancel_target
+        ctx["next_url"] = self.next_url
         ctx["delete_message"] = format_attachment_delete_confirm(display_name, self.work_order)
         ctx["attachment_name"] = display_name
         if attachment is not None:
