@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.template.defaultfilters import filesizeformat
+from django.urls import reverse
 from urllib.parse import quote_plus
 
 from django.conf import settings
@@ -17,7 +18,7 @@ from django.views.decorators.http import require_http_methods
 
 from ..models import Building, Unit, WorkOrder, WorkOrderAttachment
 from ..services import validate_work_order_attachment
-from .common import _user_can_access_building
+from .common import _user_can_access_building, format_attachment_delete_confirm
 
 __all__ = [
     "api_units",
@@ -43,7 +44,11 @@ def _office_viewer_enabled(request) -> bool:
     return True
 
 
-def _attachment_payload(request, attachment: WorkOrderAttachment) -> dict[str, object]:
+def _attachment_payload(
+    request,
+    attachment: WorkOrderAttachment,
+    order: WorkOrder | None = None,
+) -> dict[str, object]:
     url = ""
     try:
         url = attachment.file.url
@@ -119,6 +124,17 @@ def _attachment_payload(request, attachment: WorkOrderAttachment) -> dict[str, o
                 preview_url = proto.format(url=absolute_url)
                 preview_external = True
 
+    work_order = order
+    if work_order is None and hasattr(attachment, "work_order"):
+        work_order = attachment.work_order
+
+    delete_url = ""
+    if work_order and getattr(work_order, "pk", None):
+        delete_url = reverse(
+            "workorder_attachment_delete",
+            args=[work_order.pk, attachment.pk],
+        )
+
     return {
         "id": attachment.pk,
         "name": filename,
@@ -133,6 +149,8 @@ def _attachment_payload(request, attachment: WorkOrderAttachment) -> dict[str, o
         "is_image": content_type.startswith("image/"),
         "category": category,
         "extension": extension,
+        "delete_url": delete_url,
+        "delete_confirm": format_attachment_delete_confirm(filename, work_order),
     }
 
 def api_units(request, building_id: int | None = None):
@@ -188,7 +206,7 @@ def api_workorder_attachments(request, pk: int):
 
     if request.method == "GET":
         attachments = [
-            _attachment_payload(request, obj)
+            _attachment_payload(request, obj, order)
             for obj in order.attachments.order_by("-created_at")
         ]
         return JsonResponse({"attachments": attachments}, status=200)
@@ -229,7 +247,7 @@ def api_workorder_attachments(request, pk: int):
             original_name=getattr(uploaded, "name", ""),
         )
         attachment.save()
-        created_payloads.append(_attachment_payload(request, attachment))
+        created_payloads.append(_attachment_payload(request, attachment, order))
 
     body: dict[str, object] = {"attachments": created_payloads}
     if errors:

@@ -25,11 +25,14 @@
         data-label-zoom="{{ attachment_i18n.zoom|escape }}"
         data-label-delete="{{ attachment_i18n.delete|escape }}"
         data-label-delete-confirm="{{ attachment_i18n.delete_confirm|escape }}"
+        data-label-delete-title="{{ attachment_i18n.delete_title|escape }}"
+        data-label-delete-note="{{ attachment_i18n.delete_note|escape }}"
+        data-label-delete-confirm-button="{{ attachment_i18n.delete_confirm_button|escape }}"
+        data-label-cancel="{{ attachment_i18n.cancel|escape }}"
         data-label-uploaded="{{ attachment_i18n.uploaded_at|escape }}"
         data-label-file="{% trans 'FILE' %}"
         data-label-preview="{{ attachment_i18n.preview|escape }}"
-        data-label-doc-loading="{{ attachment_i18n.doc_loading|escape }}"
-        data-delete-endpoint-template="{{ attachments_delete_url_template }}">
+        data-label-doc-loading="{{ attachment_i18n.doc_loading|escape }}">
       {% for item in attachment_items %}
         <li class="attachments-grid__item" data-attachment-id="{{ item.attachment.pk }}">
           <article class="attachment-card attachment-card--{{ item.category }}">
@@ -85,12 +88,11 @@
                     </button>
                   {% endif %}
                   {% if can_manage_attachments %}
-                    <button type="button"
-                            class="attachment-card__action attachment-card__action--danger"
-                            data-attachment-delete
-                            data-attachment-id="{{ item.attachment.pk }}">
+                    <a href="{{ item.delete_url }}"
+                       class="attachment-card__action attachment-card__action--danger"
+                       title="{{ item.delete_confirm|default_if_none:''|striptags }}">
                       {{ attachment_i18n.delete }}
-                    </button>
+                    </a>
                   {% endif %}
                 </div>
               {% endif %}
@@ -109,7 +111,6 @@
       <div class="attachment-upload"
            data-attachment-upload
            data-upload-endpoint="{{ attachments_api_url }}"
-           data-delete-endpoint-template="{{ attachments_delete_url_template }}"
            data-label-browse="{{ attachment_i18n.upload_button|escape }}"
            data-label-uploading="{{ attachment_i18n.uploading|escape }}"
            data-label-uploaded="{{ attachment_i18n.uploaded|escape }}"
@@ -117,7 +118,11 @@
            data-label-empty="{{ attachment_i18n.empty|escape }}"
            data-label-uploaded-template="{{ attachment_i18n.uploaded_at|escape }}"
            data-label-delete="{{ attachment_i18n.delete|escape }}"
-           data-label-delete-confirm="{{ attachment_i18n.delete_confirm|escape }}">
+           data-label-delete-confirm="{{ attachment_i18n.delete_confirm|escape }}"
+           data-label-delete-title="{{ attachment_i18n.delete_title|escape }}"
+           data-label-delete-note="{{ attachment_i18n.delete_note|escape }}"
+           data-label-delete-confirm-button="{{ attachment_i18n.delete_confirm_button|escape }}"
+           data-label-cancel="{{ attachment_i18n.cancel|escape }}">
         <div class="attachment-upload__controls">
           <button type="button"
                   class="attachment-upload__button"

@@ -24,7 +24,7 @@ from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, UpdateView
 
 from ..forms import MassAssignWorkOrdersForm, WorkOrderForm
-from ..models import Building, Notification, Unit, WorkOrder
+from ..models import Building, Notification, Unit, WorkOrder, WorkOrderAttachment
 from ..services import NotificationService
 from .common import (
     AdminRequiredMixin,
@@ -32,6 +32,7 @@ from .common import (
     _querystring_without,
     _safe_next_url,
     _user_can_access_building,
+    format_attachment_delete_confirm,
 )
 
 User = get_user_model()
@@ -47,6 +48,7 @@ __all__ = [
     "MassAssignWorkOrdersView",
     "ArchivedWorkOrderListView",
     "ArchivedWorkOrderDetailView",
+    "WorkOrderAttachmentDeleteView",
 ]
 
 
@@ -160,6 +162,12 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
                         preview_url = proto.format(url=absolute_url)
                         preview_external = True
 
+            delete_confirm_message = format_attachment_delete_confirm(filename, order)
+            delete_url = reverse(
+                "workorder_attachment_delete",
+                args=[order.pk, attachment.pk],
+            )
+
             attachment_items.append(
                 {
                     "attachment": attachment,
@@ -175,6 +183,8 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
                     "created_iso": created.isoformat(),
                     "preview_url": preview_url,
                     "preview_external": preview_external,
+                    "delete_confirm": delete_confirm_message,
+                    "delete_url": delete_url,
                 }
             )
 
@@ -182,9 +192,6 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
             can_manage = _user_can_access_building(request.user, order.building)
 
         attachments_api_url = reverse("api_workorder_attachments", args=[order.pk])
-        delete_template = reverse(
-            "api_workorder_attachment_detail", args=[order.pk, 0]
-        ).replace("/0/", "/{id}/")
     else:
         upload_disabled_reason = _("Save this work order before adding attachments.")
         if request.user.is_authenticated:
@@ -203,7 +210,11 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
         "empty": _("No attachments uploaded yet."),
         "uploaded_at": _("Uploaded %(date)s"),
         "delete": _("Delete"),
-        "delete_confirm": _("Remove this attachment?"),
+        "delete_confirm": _("Are you sure you want to delete this attachment?"),
+        "delete_title": _("Delete attachment"),
+        "delete_note": _("This action cannot be undone."),
+        "delete_confirm_button": _("Yes, delete"),
+        "cancel": _("Cancel"),
         "upload_button": _("Upload files"),
         "upload_hint": _("Select one or more files to upload without leaving this page."),
         "uploading": _("Uploading…"),
@@ -223,7 +234,6 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
         "attachment_i18n": attachment_i18n,
         "can_manage_attachments": can_manage and has_order,
         "attachments_api_url": attachments_api_url,
-        "attachments_delete_url_template": delete_template,
         "attachments_show_upload": show_upload_controls,
         "attachments_upload_enabled": upload_enabled,
         "attachments_upload_disabled_reason": upload_disabled_reason,
@@ -1072,3 +1082,63 @@ class ArchivedWorkOrderDetailView(
         ctx["detail_per"] = getattr(self, "_detail_per", self.DETAIL_PER_DEFAULT)
         ctx["detail_per_choices"] = self.DETAIL_PER_CHOICES
         return ctx
+
+
+class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    model = WorkOrderAttachment
+    template_name = "core/attachment_confirm_delete.html"
+    pk_url_kwarg = "attachment_pk"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.work_order = get_object_or_404(
+            WorkOrder.objects.visible_to(request.user).select_related("building"),
+            pk=kwargs.get("order_pk"),
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related("work_order", "work_order__building")
+        return qs.filter(work_order=self.work_order)
+
+    def test_func(self):
+        return _user_can_access_building(self.request.user, self.work_order.building)
+
+    def get_success_url(self):
+        return reverse("work_order_detail", args=[self.work_order.pk])
+
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        name = self._attachment_display_name(self.object)
+        success_url = self.get_success_url()
+        self.object.delete()
+        messages.error(
+            request,
+            _("Attachment \"%(name)s\" deleted.") % {"name": name},
+        )
+        return HttpResponseRedirect(success_url)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        attachment = ctx.get("object") or getattr(self, "object", None)
+        display_name = self._attachment_display_name(attachment)
+        ctx["work_order"] = self.work_order
+        ctx["cancel_url"] = self.get_success_url()
+        ctx["delete_message"] = format_attachment_delete_confirm(display_name, self.work_order)
+        ctx["attachment_name"] = display_name
+        if attachment is not None:
+            meta = attachment._meta
+            ctx.setdefault("object_verbose_name", meta.verbose_name)
+            ctx.setdefault("object_model_name", meta.model_name)
+        return ctx
+
+    def _attachment_display_name(self, attachment):
+        if not attachment:
+            return ""
+        name = (attachment.original_name or "").strip()
+        if not name:
+            file_attr = getattr(attachment.file, "name", "")
+            if file_attr:
+                name = Path(file_attr).name.strip()
+        if not name:
+            name = _("Attachment %(id)s") % {"id": attachment.pk}
+        return name

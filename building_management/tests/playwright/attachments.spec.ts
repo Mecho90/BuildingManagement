@@ -102,12 +102,16 @@ test.describe('Work order attachments', () => {
 
     await activeQueueItem.waitFor({ state: 'detached' });
 
-    page.once('dialog', (dialog) => dialog.accept());
-    await card.locator('[data-attachment-delete]').click();
-    await expect(
-      attachmentsGrid.locator(`[data-attachment-id="${cardId}"]`)
-    ).toHaveCount(0);
-    await expect(attachmentsGrid.locator('.attachments-grid__item')).toHaveCount(0);
-    await expect(emptyState).toBeVisible();
+    const deleteLink = card.getByRole('link', { name: /delete/i });
+    await deleteLink.click();
+    await page.waitForURL(new RegExp(`/work-orders/${workOrderId}/attachments/\\d+/delete/`));
+    await expect(page.getByRole('heading', { name: /delete attachment/i })).toBeVisible();
+    await page.getByRole('button', { name: /yes, delete/i }).click();
+    await page.waitForURL(new RegExp(`/work-orders/${workOrderId}/$`));
+
+    const refreshedGrid = page.locator('[data-attachments]');
+    await expect(refreshedGrid.locator(`[data-attachment-id="${cardId}"]`)).toHaveCount(0);
+    await expect(refreshedGrid.locator('.attachments-grid__item')).toHaveCount(0);
+    await expect(page.locator('[data-attachments-empty]')).toBeVisible();
   });
 });

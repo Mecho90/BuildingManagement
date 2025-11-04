@@ -25,9 +25,6 @@
   const previewLabel = attachmentsList ? attachmentsList.dataset.labelPreview || "Preview" : "Preview"
   const docLoadingLabel = attachmentsList ? attachmentsList.dataset.labelDocLoading || "Loading preview..." : "Loading preview..."
   const deleteLabel = attachmentsList ? attachmentsList.dataset.labelDelete || "Delete" : "Delete"
-  const deleteConfirmLabel = attachmentsList
-    ? attachmentsList.dataset.labelDeleteConfirm || "Remove this attachment?"
-    : "Remove this attachment?"
   const uploadedTemplate =
     (attachmentsList && attachmentsList.dataset.labelUploaded) ||
     (uploadRoot && uploadRoot.dataset.labelUploadedTemplate) ||
@@ -38,10 +35,6 @@
     "No attachments uploaded yet."
   const filePlaceholderLabel = attachmentsList ? attachmentsList.dataset.labelFile || "FILE" : "FILE"
 
-  const deleteEndpointTemplate =
-    (attachmentsList && attachmentsList.dataset.deleteEndpointTemplate) ||
-    (uploadRoot && uploadRoot.dataset.deleteEndpointTemplate) ||
-    ""
   const canManage = attachmentsList ? attachmentsList.dataset.canManage === "1" : false
   const csrfToken = getCSRFToken()
 
@@ -108,48 +101,6 @@
       }
       return
     }
-
-    if (!canManage) {
-      return
-    }
-
-    const deleteTrigger = target.closest("[data-attachment-delete]")
-    if (!deleteTrigger) {
-      return
-    }
-
-    event.preventDefault()
-    const attachmentId = deleteTrigger.dataset.attachmentId
-    if (!attachmentId) {
-      return
-    }
-    if (deleteConfirmLabel && !window.confirm(deleteConfirmLabel)) {
-      return
-    }
-    if (!deleteEndpointTemplate) {
-      return
-    }
-    const endpoint = deleteEndpointTemplate.replace("{id}", attachmentId)
-    fetch(endpoint, {
-      method: "DELETE",
-      headers: buildHeaders(),
-      credentials: "same-origin"
-    })
-      .then(function (response) {
-        if (!response.ok) {
-          throw new Error("Failed to delete attachment")
-        }
-        const listItem = attachmentsList.querySelector(
-          '[data-attachment-id="' + escapeSelector(String(attachmentId)) + '"]'
-        )
-        if (listItem) {
-          listItem.remove()
-          updateEmptyState()
-        }
-      })
-      .catch(function (error) {
-        window.alert(error.message)
-      })
   }
 
   function updateEmptyState () {
@@ -289,14 +240,15 @@
         actions.appendChild(zoomButton)
       }
 
-      if (canManage) {
-        const deleteButton = document.createElement("button")
-        deleteButton.type = "button"
-        deleteButton.className = "attachment-card__action attachment-card__action--danger"
-        deleteButton.dataset.attachmentDelete = "1"
-        deleteButton.dataset.attachmentId = String(meta.id)
-        deleteButton.textContent = deleteLabel
-        actions.appendChild(deleteButton)
+      if (canManage && meta.delete_url) {
+        const deleteLink = document.createElement("a")
+        deleteLink.className = "attachment-card__action attachment-card__action--danger"
+        deleteLink.href = meta.delete_url
+        deleteLink.textContent = deleteLabel
+        if (meta.delete_confirm) {
+          deleteLink.title = stripTags(meta.delete_confirm)
+        }
+        actions.appendChild(deleteLink)
       }
 
       body.appendChild(actions)
@@ -938,6 +890,13 @@
       headers["X-CSRFToken"] = csrfToken
     }
     return headers
+  }
+
+  function stripTags (value) {
+    if (!value) {
+      return ""
+    }
+    return String(value).replace(/<[^>]+>/g, "")
   }
 
   function escapeSelector (value) {

@@ -5,7 +5,9 @@ from typing import Iterable
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.views import redirect_to_login
 from django.http import HttpRequest
+from django.utils.html import format_html
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.translation import gettext as _
 
 __all__ = [
     "AdminRequiredMixin",
@@ -13,6 +15,7 @@ __all__ = [
     "_safe_next_url",
     "_querystring_without",
     "_user_can_access_building",
+    "format_attachment_delete_confirm",
 ]
 
 
@@ -38,6 +41,39 @@ def _querystring_without(request: HttpRequest, *keys: str) -> str:
     for key in keys:
         params.pop(key, None)
     return params.urlencode()
+
+
+def format_attachment_delete_confirm(filename: str | None, order=None) -> str:
+    """
+    Build a human-friendly confirmation message for deleting an attachment,
+    matching the wording used across other delete confirmations.
+    """
+    name = (filename or "").strip() or _("this attachment")
+    if order is not None:
+        order_title = getattr(order, "title", "").strip()
+        building = getattr(order, "building", None)
+        building_name = getattr(building, "name", "").strip() if building else ""
+        if order_title and building_name:
+            return format_html(
+                _(
+                    "Are you sure you want to delete <strong>{filename}</strong> from <strong>{order}</strong> for <strong>{building}</strong>?"
+                ),
+                filename=name,
+                order=order_title,
+                building=building_name,
+            )
+        if order_title:
+            return format_html(
+                _(
+                    "Are you sure you want to delete <strong>{filename}</strong> from <strong>{order}</strong>?"
+                ),
+                filename=name,
+                order=order_title,
+            )
+    return format_html(
+        _("Are you sure you want to delete <strong>{filename}</strong>?"),
+        filename=name,
+    )
 
 
 class CachedObjectMixin:

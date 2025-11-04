@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Delete Attachment" %} · {% trans "Building Management" %}{% endblock %}
+
+{% block content %}
+<section class="flex min-h-[50vh] items-center justify-center px-4">
+  <div class="w-full max-w-lg space-y-5 rounded-2xl border border-rose-200/60 bg-white p-6 text-center shadow-card dark:border-rose-700/50 dark:bg-slate-900">
+    <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Delete attachment" %}</h1>
+    <p class="text-sm text-slate-600 dark:text-slate-300">
+      {{ delete_message }}
+      <br>{% trans "This action cannot be undone." %}
+    </p>
+    <form method="post" class="flex flex-col gap-3 sm:flex-row sm:justify-center">
+      {% csrf_token %}
+      <button class="btn btn-danger min-w-[160px]">{% trans "Yes, delete" %}</button>
+      <a class="btn btn-secondary" href="{{ cancel_url }}">{% trans "Cancel" %}</a>
+    </form>
+  </div>
+</section>
+{% endblock %}

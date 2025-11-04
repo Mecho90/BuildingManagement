@@ -260,8 +260,20 @@ msgid "No attachments uploaded yet."
 msgstr "Все още няма прикачени файлове."
 
 #: core/views/work_orders.py:339
-msgid "Remove this attachment?"
-msgstr "Да се премахне ли този файл?"
+msgid "Are you sure you want to delete this attachment?"
+msgstr "Сигурни ли сте, че искате да изтриете този файл?"
+
+#: core/views/common.py:70
+msgid "Are you sure you want to delete <strong>{filename}</strong> from <strong>{order}</strong> for <strong>{building}</strong>?"
+msgstr "Сигурни ли сте, че искате да изтриете <strong>{filename}</strong> от <strong>{order}</strong> за <strong>{building}</strong>?"
+
+#: core/views/common.py:77
+msgid "Are you sure you want to delete <strong>{filename}</strong> from <strong>{order}</strong>?"
+msgstr "Сигурни ли сте, че искате да изтриете <strong>{filename}</strong> от <strong>{order}</strong>?"
+
+#: core/views/common.py:82
+msgid "Are you sure you want to delete <strong>{filename}</strong>?"
+msgstr "Сигурни ли сте, че искате да изтриете <strong>{filename}</strong>?"
 
 #: core/views/work_orders.py:342
 msgid "Uploading…"
@@ -274,6 +286,10 @@ msgstr "Качено"
 #: core/views/work_orders.py:344
 msgid "Upload failed"
 msgstr "Качването неуспешно"
+
+#: core/views/work_orders.py:345
+msgid "Delete attachment"
+msgstr "Изтриване на прикачен файл"
 
 #: core/forms.py:316
 #, python-format
@@ -1255,11 +1271,11 @@ msgstr "Няма намерени потребители."
 
 #: templates/core/work_order_confirm_delete.html:3
 msgid "Delete Work Order"
-msgstr "Изтриване на работна поръчка"
+msgstr "Изтриване на работна задача"
 
 #: templates/core/work_order_confirm_delete.html:8
 msgid "Delete work order"
-msgstr "Изтриване на работна поръчка"
+msgstr "Изтриване на работна задача"
 
 #: templates/core/work_order_confirm_delete.html:10
 #, python-format
@@ -1267,6 +1283,8 @@ msgid ""
 "Are you sure you want to delete <strong>%(title)s</strong> for "
 "<strong>%(building)s</strong>?"
 msgstr ""
+"Сигурни ли сте, че искате да изтриете <strong>%(title)s</strong> за "
+"<strong>%(building)s</strong>?"
 
 #: templates/core/work_order_confirm_delete.html:11
 msgid "This cannot be undone."
