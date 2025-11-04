@@ -47,6 +47,13 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         ctx["q"] = getattr(self, "_search", "")
         ctx["pagination_query"] = _querystring_without(self.request, "page")
+        paginator = ctx.get("paginator")
+        if paginator is not None:
+            total_users = paginator.count
+        else:
+            object_list = ctx.get("object_list")
+            total_users = len(object_list) if object_list is not None else 0
+        ctx["users_total"] = total_users
         return ctx
 
 

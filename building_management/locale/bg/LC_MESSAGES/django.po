@@ -95,6 +95,18 @@ msgstr "Краен срок"
 msgid "Total buildings: %(count)s"
 msgstr "Общо сгради: %(count)s"
 
+#: templates/core/work_orders_archive_list.html:14
+msgid "Total archived buildings: %(count)s"
+msgstr "Общо архивирани сгради: %(count)s"
+
+#: templates/core/users_list.html:12
+msgid "Total users: %(count)s"
+msgstr "Общо потребители: %(count)s"
+
+#: templates/core/work_orders_list.html:14
+msgid "Total work orders: %(count)s"
+msgstr "Общо работни поръчки: %(count)s"
+
 #: core/forms.py:253
 msgid "Selected unit does not belong to the chosen building."
 msgstr "Избраният апартамент не принадлежи на избраната сграда."

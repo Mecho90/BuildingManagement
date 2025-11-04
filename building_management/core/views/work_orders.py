@@ -397,6 +397,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
         qs = qs.order_by(*sort_map[sort_param])
 
+        self._total_orders = qs.count()
         self._search = search
         self._status = status
         self._owner = owner_param
@@ -412,6 +413,12 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        total_orders = getattr(self, "_total_orders", None)
+        if total_orders is None and ctx.get("paginator") is not None:
+            total_orders = ctx["paginator"].count
+        if total_orders is None:
+            object_list = getattr(self, "object_list", None)
+            total_orders = len(object_list) if object_list is not None else 0
         ctx.update(
             {
                 "q": getattr(self, "_search", ""),
@@ -436,6 +443,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 ],
                 "show_owner_info": self.request.user.is_staff or self.request.user.is_superuser,
                 "pagination_query": _querystring_without(self.request, "page"),
+                "total_orders": total_orders,
             }
         )
         if not (self.request.user.is_staff or self.request.user.is_superuser):

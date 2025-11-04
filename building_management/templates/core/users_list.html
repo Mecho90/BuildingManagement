@@ -9,6 +9,9 @@
       <p class="text-sm text-slate-500 dark:text-slate-400">
         {% trans "Administrators can create, edit, remove users or reset passwords from here." %}
       </p>
+      <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
+        {% blocktrans with count=users_total %}Total users: {{ count }}{% endblocktrans %}
+      </p>
     </div>
     <div class="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
       <a class="btn" href="{% url 'user_create' %}">{% trans "Add user" %}</a>

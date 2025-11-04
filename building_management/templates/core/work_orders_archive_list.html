@@ -9,6 +9,9 @@
     <div>
       <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{% trans "Archived Work Orders" %}</h1>
       <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Review completed and archived work orders grouped by building." %}</p>
+      <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
+        {% blocktrans with count=building_summary_total %}Total archived buildings: {{ count }}{% endblocktrans %}
+      </p>
     </div>
   </div>
 
