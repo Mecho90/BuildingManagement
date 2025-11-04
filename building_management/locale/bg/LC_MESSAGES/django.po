@@ -323,7 +323,7 @@ msgstr "Техническа поддръжка"
 
 #: core/models.py:94
 msgid "Property Manager"
-msgstr "Отговорник Сграда"
+msgstr "Отговорник сграда"
 
 #: core/models.py:95
 msgid "External Contractor"
