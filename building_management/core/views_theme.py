@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 
 
+@login_required
 def toggle_theme(request: HttpRequest):
     current = request.session.get("theme", "light")
     request.session["theme"] = "dark" if current == "light" else "light"

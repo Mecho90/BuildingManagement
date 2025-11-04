@@ -1,12 +1,18 @@
 from __future__ import annotations
+
 import threading
-from typing import Iterable, Set
+from typing import Set
+from urllib.parse import quote, urlparse
 
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth import logout
 from django.core.management import call_command
 from django.db import connection
-
+from django.http import HttpResponseRedirect
+from django.shortcuts import resolve_url
+from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 
 _lock = threading.Lock()
 _bootstrapped = False  # process-level guard
@@ -82,3 +88,111 @@ class EnsureCoreSchemaMiddleware:
         except Exception as exc:
             # Non-fatal in dev; logs let you diagnose if needed
             print(f"[core] Auto-migrate skipped due to error: {exc}")
+
+
+class SessionIdleTimeoutMiddleware:
+    """
+    Require re-authentication after periods of inactivity, regardless of URL.
+
+    Stores the last activity timestamp in the session. If the elapsed time since
+    the last request exceeds the configured timeout, the middleware logs the
+    user out and redirects them to the login page.
+    """
+
+    session_key = "_last_activity_ts"
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        timeout = getattr(
+            settings,
+            "SESSION_IDLE_TIMEOUT_SECONDS",
+            getattr(settings, "SESSION_COOKIE_AGE", 0),
+        )
+        try:
+            self.timeout_seconds = int(timeout) if timeout else 0
+        except (TypeError, ValueError):
+            self.timeout_seconds = 0
+        self._exempt_prefixes: tuple[str, ...] | None = None
+
+    def __call__(self, request):
+        if self.timeout_seconds > 0 and getattr(request, "user", None) and request.user.is_authenticated:
+            path = request.path_info or "/"
+            if not self._is_exempt_path(path):
+                now_ts = int(timezone.now().timestamp())
+                last_ts = request.session.get(self.session_key)
+                try:
+                    last_ts_val = int(float(last_ts))
+                except (TypeError, ValueError):
+                    last_ts_val = None
+                if last_ts_val is not None and now_ts - last_ts_val > self.timeout_seconds:
+                    redirect_url = self._login_redirect_url(request)
+                    logout(request)
+                    return HttpResponseRedirect(redirect_url)
+                request.session[self.session_key] = now_ts
+        else:
+            if self.session_key in request.session:
+                request.session.pop(self.session_key, None)
+
+        response = self.get_response(request)
+        return response
+
+    def _login_redirect_url(self, request) -> str:
+        login_url = resolve_url(getattr(settings, "LOGIN_URL", "login"))
+        login_path = self._normalize_prefix(login_url)
+        next_url = request.get_full_path()
+        if next_url and not next_url.startswith(login_path):
+            separator = "&" if "?" in login_url else "?"
+            login_url = f"{login_url}{separator}next={quote(next_url)}"
+        return login_url
+
+    def _is_exempt_path(self, path: str) -> bool:
+        for prefix in self._get_exempt_prefixes():
+            if prefix and path.startswith(prefix):
+                return True
+        return False
+
+    def _get_exempt_prefixes(self) -> tuple[str, ...]:
+        if self._exempt_prefixes is not None:
+            return self._exempt_prefixes
+
+        prefixes: set[str] = set()
+
+        prefixes.add(self._normalize_prefix(resolve_url(getattr(settings, "LOGIN_URL", "login"))))
+
+        logout_url = getattr(settings, "LOGOUT_URL", None)
+        if logout_url:
+            prefixes.add(self._normalize_prefix(resolve_url(logout_url)))
+
+        try:
+            prefixes.add(self._normalize_prefix(reverse("logout_to_login")))
+        except NoReverseMatch:
+            pass
+
+        static_url = getattr(settings, "STATIC_URL", "")
+        if static_url:
+            prefixes.add(self._normalize_prefix(static_url))
+
+        media_url = getattr(settings, "MEDIA_URL", "")
+        if media_url:
+            prefixes.add(self._normalize_prefix(media_url))
+
+        extra = getattr(settings, "SESSION_IDLE_TIMEOUT_EXEMPT_PATHS", ())
+        for entry in extra:
+            prefixes.add(self._normalize_prefix(entry))
+
+        # Remove empty markers to avoid matching every path
+        prefixes.discard("")
+        prefixes.discard("/")
+
+        self._exempt_prefixes = tuple(sorted(prefixes, key=len, reverse=True))
+        return self._exempt_prefixes
+
+    @staticmethod
+    def _normalize_prefix(value: str) -> str:
+        if not value:
+            return ""
+        parsed = urlparse(str(value))
+        prefix = parsed.path or str(value)
+        if not prefix.startswith("/"):
+            prefix = "/" + prefix
+        return prefix.rstrip("/") or "/"

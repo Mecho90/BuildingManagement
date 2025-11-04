@@ -307,7 +307,7 @@ msgstr "Техническа поддръжка"
 
 #: core/models.py:94
 msgid "Property Manager"
-msgstr "Управител на имот"
+msgstr "Отговорник Сграда"
 
 #: core/models.py:95
 msgid "External Contractor"
@@ -325,7 +325,7 @@ msgstr "Външен изпълнител"
 #: templates/core/work_orders_list.html:93
 #: templates/core/work_orders_list.html:153
 msgid "Owner"
-msgstr "Собственик"
+msgstr "Отговорник"
 
 #: core/models.py:103 templates/core/buildings_list.html:92
 #: templates/core/buildings_list.html:94 templates/core/buildings_list.html:96
@@ -583,11 +583,11 @@ msgstr "Сграда (Я → А)"
 
 #: core/views/work_orders.py:237
 msgid "Owner (A → Z)"
-msgstr "Собственик (А → Я)"
+msgstr "Отговорник (А → Я)"
 
 #: core/views/work_orders.py:238
 msgid "Owner (Z → A)"
-msgstr "Собственик (Я → А)"
+msgstr "Отговорник (Я → А)"
 
 #: core/views/work_orders.py:311
 msgid "Work order created."
@@ -657,7 +657,7 @@ msgstr "Управление на сгради"
 #: templates/core/work_orders_list.html:4
 #: templates/core/work_orders_list.html:10
 msgid "Work Orders"
-msgstr "Работни поръчки"
+msgstr "Работни задачи"
 
 #: templates/base.html:26 templates/core/building_detail.html:253
 #: templates/core/building_detail.html:298
@@ -867,7 +867,7 @@ msgstr "Поръчки"
 #: templates/core/building_detail.html:179
 #: templates/core/work_orders_list.html:13
 msgid "Add work order"
-msgstr "Добави поръчка"
+msgstr "Добави задача"
 
 #: templates/core/building_detail.html:184
 #: templates/core/work_orders_list.html:18
@@ -1241,10 +1241,8 @@ msgid "This cannot be undone."
 msgstr "Това не може да бъде отменено."
 
 #: templates/core/work_order_detail.html:4
-#, fuzzy
-#| msgid "Work Orders"
 msgid "Work Order"
-msgstr "Работни поръчки"
+msgstr "Работна задача"
 
 #: templates/core/work_order_detail.html:9
 msgid "Back"
@@ -1266,7 +1264,7 @@ msgstr "Нова поръчка"
 #: templates/core/work_orders_archive_list.html:4
 #: templates/core/work_orders_archive_list.html:10
 msgid "Archived Work Orders"
-msgstr "Архивирани поръчки"
+msgstr "Архивирани задачи"
 
 #: templates/core/work_orders_archive_detail.html:9
 msgid "Back to archived list"
@@ -1313,7 +1311,7 @@ msgstr "Сортиране"
 
 #: templates/core/work_orders_archive_list.html:66
 msgid "Buildings with archived work orders"
-msgstr "Сгради с архивирани поръчки"
+msgstr "Сгради с архивирани задачи"
 
 #: templates/core/work_orders_archive_list.html:68
 #, python-format

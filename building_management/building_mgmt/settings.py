@@ -62,6 +62,7 @@ MIDDLEWARE = [
     # dev-only middleware below is added when DEBUG is True
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.SessionIdleTimeoutMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -304,5 +305,7 @@ if _csrf_origins:
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()]
 
 # --- Sessions ---
-SESSION_COOKIE_AGE = 30 * 60  # expire after 30 minutes of inactivity
-SESSION_SAVE_EVERY_REQUEST = os.environ.get("DJANGO_SESSION_SAVE_EVERY_REQUEST", "").lower() in {"1", "true", "yes"}  # opt-in sliding sessions
+SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes inactivity window
+SESSION_COOKIE_AGE = SESSION_IDLE_TIMEOUT_SECONDS
+SESSION_SAVE_EVERY_REQUEST = _env_bool("DJANGO_SESSION_SAVE_EVERY_REQUEST", default=True)  # sliding expiry keeps active users signed in
+SESSION_IDLE_TIMEOUT_EXEMPT_PATHS: tuple[str, ...] = ()
