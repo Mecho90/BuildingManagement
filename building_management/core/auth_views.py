@@ -15,7 +15,7 @@ class RoleAwareLoginView(LoginView):
 
     def get(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect("buildings_list")
+            return redirect("core:buildings_list")
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -81,7 +81,7 @@ class RoleAwareLoginView(LoginView):
         url = self.get_redirect_url()
         if url:
             return url
-        return reverse("buildings_list")
+        return reverse("core:buildings_list")
 
 @require_http_methods(["GET", "POST"])  # allow link-clicks and form posts
 def logout_to_login(request):

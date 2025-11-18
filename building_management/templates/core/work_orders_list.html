@@ -13,65 +13,96 @@
         {% blocktrans with count=total_orders %}Total work orders: {{ count }}{% endblocktrans %}
       </p>
     </div>
-    <a class="btn self-start md:self-center" href="{% url 'work_order_create' %}?next={{ request.get_full_path|urlencode }}">{% trans "Add work order" %}</a>
+    <a class="btn self-start md:self-center" href="{% url 'core:work_order_create' %}?next={{ request.get_full_path|urlencode }}">{% trans "Add work order" %}</a>
   </div>
 
-  <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-5 md:items-end">
-    <div class="md:col-span-2 flex flex-col gap-2">
-      <label class="sr-only" for="id_q">{% trans "Search work orders" %}</label>
-      <div class="flex flex-col gap-2 md:flex-row md:items-center">
-        <input
-          id="id_q"
-          class="input flex-1"
-          type="text"
-          name="q"
-          value="{{ q }}"
-          placeholder="{% trans "Title or description" %}"
-        />
-        <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
+  <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div class="grid gap-4 md:grid-cols-5 md:items-end">
+      <input type="hidden" name="priority" value="{{ priority }}"/>
+      <div class="md:col-span-2 flex flex-col gap-2">
+        <label class="sr-only" for="id_q">{% trans "Search work orders" %}</label>
+        <div class="flex flex-col gap-2 md:flex-row md:items-center">
+          <input
+            id="id_q"
+            class="input flex-1"
+            type="text"
+            name="q"
+            value="{{ q }}"
+            placeholder="{% trans "Title or description" %}"
+          />
+          <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
+        </div>
       </div>
-    </div>
 
-    <div class="flex flex-col gap-2 md:col-span-1">
-      <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-      <select id="id_per" name="per" onchange="this.form.submit()" class="input">
-        {% for opt in per_choices %}
-          <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div class="flex flex-col gap-2 md:col-span-1">
-      <label for="id_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
-      <select id="id_status" name="status" onchange="this.form.submit()" class="input">
-        <option value="" {% if not status %}selected{% endif %}>{% trans "All" %}</option>
-        {% for val, label in status_choices %}
-          <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    {% if owner_choices %}
       <div class="flex flex-col gap-2 md:col-span-1">
-        <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
-        <select id="id_owner" name="owner" onchange="this.form.submit()" class="input">
-          <option value="" {% if not owner %}selected{% endif %}>{% trans "All" %}</option>
-          {% for opt in owner_choices %}
-            <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+        <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+        <select id="id_per" name="per" onchange="this.form.submit()" class="input">
+          {% for opt in per_choices %}
+            <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
           {% endfor %}
         </select>
       </div>
-    {% else %}
-      <div class="hidden md:col-span-1 md:block"></div>
-    {% endif %}
 
-    <div class="flex flex-col gap-2 md:col-span-1">
-      <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
-      <select id="id_sort" name="sort" onchange="this.form.submit()" class="input">
-        {% for value, label in sort_choices %}
-          <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+      <div class="flex flex-col gap-2 md:col-span-1">
+        <label for="id_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
+        <select id="id_status" name="status" onchange="this.form.submit()" class="input">
+          <option value="" {% if not status %}selected{% endif %}>{% trans "All" %}</option>
+          {% for val, label in status_choices %}
+            <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% if owner_choices %}
+        <div class="flex flex-col gap-2 md:col-span-1">
+          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+          <select id="id_owner" name="owner" onchange="this.form.submit()" class="input">
+            <option value="" {% if not owner %}selected{% endif %}>{% trans "All" %}</option>
+            {% for opt in owner_choices %}
+              <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% else %}
+        <div class="hidden md:col-span-1 md:block"></div>
+      {% endif %}
+
+      <div class="flex flex-col gap-2 md:col-span-1">
+        <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
+        <select id="id_sort" name="sort" onchange="this.form.submit()" class="input">
+          {% for value, label in sort_choices %}
+            <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Quick filters" %}</span>
+        <a href="?status=OPEN{% if priority %}&priority={{ priority }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if status == 'OPEN' %}badge--active{% else %}badge--ghost{% endif %}">
+          {% trans "Open" %}
+        </a>
+        <a href="?status=IN_PROGRESS{% if priority %}&priority={{ priority }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if status == 'IN_PROGRESS' %}badge--active{% else %}badge--ghost{% endif %}">
+          {% trans "In progress" %}
+        </a>
+        <a href="?status=DONE{% if priority %}&priority={{ priority }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if status == 'DONE' %}badge--active{% else %}badge--ghost{% endif %}">
+          {% trans "Done" %}
+        </a>
+        <span class="mx-2 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true"></span>
+        <a href="?priority=HIGH{% if status %}&status={{ status }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if priority == 'HIGH' %}badge--active{% else %}badge--ghost{% endif %}">
+          {% trans "High priority" %}
+        </a>
+        <a href="?priority=MEDIUM{% if status %}&status={{ status }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if priority == 'MEDIUM' %}badge--active{% else %}badge--ghost{% endif %}">
+          {% trans "Medium priority" %}
+        </a>
+        <a href="?priority=LOW{% if status %}&status={{ status }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if priority == 'LOW' %}badge--active{% else %}badge--ghost{% endif %}">
+          {% trans "Low priority" %}
+        </a>
+      </div>
+      {% if q or status or owner or sort != 'priority' or per != 10 or priority %}
+        <a class="btn btn-secondary btn-sm" href="{% url 'core:work_orders_list' %}">{% trans "Reset" %}</a>
+      {% endif %}
     </div>
   </form>
 
@@ -81,13 +112,13 @@
         <div class="flex items-start justify-between gap-2">
           <div>
             <h2 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
-              <a href="{% url 'work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+              <a href="{% url 'core:work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
                 {{ w.title }}
               </a>
             </h2>
             <p class="text-sm text-slate-500 dark:text-slate-400">
               <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Building" %}:</span>
-              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'building_detail' w.building_id %}">
+              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'core:building_detail' w.building_id %}">
                 {{ w.building.name }}
               </a>
             </p>
@@ -114,12 +145,12 @@
           </div>
           <div class="flex flex-wrap justify-end gap-2">
             {% if w.status == 'DONE' %}
-              <form action="{% url 'work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
+              <form action="{% url 'core:work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
                 {% csrf_token %}
                 <button class="btn btn-secondary btn-sm" type="submit">{% trans "Archive" %}</button>
               </form>
             {% endif %}
-            <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
+            <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
           </div>
         </div>
         <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -127,7 +158,7 @@
             <dt class="font-semibold text-slate-500 dark:text-slate-400">Unit</dt>
             <dd>
               {% if w.unit_id %}
-                <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'building_detail' w.unit.building_id %}">{{ w.unit.building.name }} — #{{ w.unit.number }}</a>
+                <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'core:building_detail' w.unit.building_id %}">{{ w.unit.building.name }} — #{{ w.unit.number }}</a>
               {% else %}—{% endif %}
             </dd>
           </div>
@@ -142,7 +173,12 @@
         </dl>
       </article>
     {% empty %}
-      <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">{% trans "No work orders." %}</p>
+      <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-sm text-slate-600 dark:text-slate-300">{% trans "You haven't created any work orders yet." %}</p>
+        <a class="btn mt-3" href="{% url 'core:work_order_create' %}?next={{ request.get_full_path|urlencode }}">
+          {% trans "Create your first work order" %}
+        </a>
+      </div>
     {% endfor %}
   </div>
 
@@ -168,10 +204,10 @@
         {% for w in orders %}
           <tr class="text-sm text-slate-700 dark:text-slate-200">
             <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
-              <a class="break-words hyphens-auto" href="{% url 'work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
+              <a class="break-words hyphens-auto" href="{% url 'core:work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
             </td>
             <td class="px-4 py-3">
-              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'building_detail' w.building_id %}">
+              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'core:building_detail' w.building_id %}">
                 {{ w.building.name }}
               </a>
             </td>
@@ -207,18 +243,26 @@
             <td class="px-4 py-3">
               <div class="flex flex-wrap justify-end gap-2">
                 {% if w.status == 'DONE' %}
-                  <form action="{% url 'work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
+                  <form action="{% url 'core:work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
                     {% csrf_token %}
                     <button class="btn btn-secondary btn-sm" type="submit">{% trans "Archive" %}</button>
                   </form>
                 {% endif %}
-                <a class="btn btn-danger btn-sm" href="{% url 'work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
+                <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
               </div>
             </td>
           </tr>
         {% empty %}
           <tr>
-            <td colspan="{% if show_owner_info %}10{% else %}8{% endif %}" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">{% trans "No work orders." %}</td>
+            <td colspan="{% if show_owner_info %}10{% else %}8{% endif %}" class="px-4 py-12 text-center text-slate-500 dark:text-slate-300">
+              <p class="text-sm">{% trans "No work orders found with the current filters." %}</p>
+              <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <a class="btn" href="{% url 'core:work_order_create' %}?next={{ request.get_full_path|urlencode }}">{% trans "Create work order" %}</a>
+                {% if q or status or owner or sort != 'priority' or per != 10 or priority %}
+                  <a class="btn btn-secondary" href="{% url 'core:work_orders_list' %}">{% trans "Clear filters" %}</a>
+                {% endif %}
+              </div>
+            </td>
           </tr>
         {% endfor %}
       </tbody>

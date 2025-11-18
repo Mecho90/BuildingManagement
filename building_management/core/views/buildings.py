@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Case, IntegerField, Q, When
 from django.http import Http404, HttpResponseForbidden
@@ -91,7 +92,6 @@ class BuildingListView(LoginRequiredMixin, ListView):
             sort_field = "-" + base if sort.startswith("-") else base
 
         self._effective_sort = sort
-        self._buildings_total = qs.count()
         return qs.order_by(sort_field, "id")
 
     def get_context_data(self, **kwargs):
@@ -118,20 +118,23 @@ class BuildingListView(LoginRequiredMixin, ListView):
         ctx["note_page_query"] = params.urlencode()
         ctx["notifications"] = notifications_page.object_list
         ctx["pagination_query"] = _querystring_without(self.request, "page")
-        ctx["buildings_total"] = getattr(self, "_buildings_total", None)
-        if ctx["buildings_total"] is None:
-            paginator = ctx.get("paginator")
-            if paginator is not None:
-                ctx["buildings_total"] = paginator.count
-            else:
-                object_list = ctx.get("object_list") or []
-                ctx["buildings_total"] = len(object_list)
+        paginator = ctx.get("paginator")
+        if paginator is not None:
+            ctx["buildings_total"] = paginator.count
+        else:
+            object_list = ctx.get("object_list") or []
+            ctx["buildings_total"] = len(object_list)
         return ctx
 
     def _build_notifications(self):
         user = self.request.user
         if not user.is_authenticated:
             return []
+
+        cache_key = f"buildings:list-notifications:{user.pk}"
+        cached_notifications = cache.get(cache_key)
+        if cached_notifications is not None:
+            return [note.copy() for note in cached_notifications]
 
         notifications: list[dict[str, str | bool]] = []
 
@@ -228,6 +231,12 @@ class BuildingListView(LoginRequiredMixin, ListView):
             item.pop("_priority_weight", None)
             item.setdefault("is_new", False)
             item.setdefault("dismissible", False)
+
+        cache.set(
+            cache_key,
+            tuple(note.copy() for note in notifications),
+            timeout=60,
+        )
         return notifications
 
 class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DetailView):
@@ -257,6 +266,49 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         bld = self.object
+        request = self.request
+
+        active_tab = request.GET.get("tab", "").strip().lower()
+
+        def _tab_hint_from_params() -> str:
+            units_keys = {"u_q", "u_sort", "u_per", "u_page"}
+            work_keys = {"w_q", "w_status", "w_per", "w_page"}
+            params = set(request.GET.keys())
+            if params & work_keys:
+                return "work_orders"
+            if params & units_keys:
+                return "units"
+            return "overview"
+
+        if active_tab not in {"overview", "units", "work_orders"}:
+            active_tab = _tab_hint_from_params()
+
+        ctx["active_tab"] = active_tab
+
+        def _tab_url(target: str) -> str:
+            params = request.GET.copy()
+            params["tab"] = target
+            if target == "overview":
+                for key in list(params.keys()):
+                    if key.startswith("u_") or key.startswith("w_"):
+                        params.pop(key, None)
+            elif target == "units":
+                for key in list(params.keys()):
+                    if key.startswith("w_"):
+                        params.pop(key, None)
+            elif target == "work_orders":
+                for key in list(params.keys()):
+                    if key.startswith("u_"):
+                        params.pop(key, None)
+            query = params.urlencode()
+            base = request.path
+            return f"{base}?{query}" if query else base
+
+        ctx["tab_urls"] = {
+            "overview": _tab_url("overview"),
+            "units": _tab_url("units"),
+            "work_orders": _tab_url("work_orders"),
+        }
 
         # ========================= Units =========================
         u_q = (self.request.GET.get("u_q") or "").strip()
@@ -289,6 +341,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 "u_q": u_q,
                 "u_per": u_per,
                 "u_sort": u_sort,
+                "u_active": active_tab == "units",
             }
         )
         ctx["units_pagination_query"] = _querystring_without(self.request, "u_page")
@@ -331,6 +384,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 "w_per": w_per,
                 "w_status": w_status,
                 "w_status_choices": WorkOrder.Status.choices,
+                "w_active": active_tab == "work_orders",
             }
         )
         ctx["workorders_pagination_query"] = _querystring_without(self.request, "w_page")
@@ -342,7 +396,7 @@ class BuildingCreateView(LoginRequiredMixin, CreateView):
     model = Building
     form_class = BuildingForm
     template_name = "core/building_form.html"
-    success_url = reverse_lazy("buildings_list")
+    success_url = reverse_lazy("core:buildings_list")
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -383,13 +437,13 @@ class BuildingUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse("building_detail", args=[self.object.pk])
+        return reverse("core:building_detail", args=[self.object.pk])
 
 
 class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
     model = Building
     template_name = "core/building_confirm_delete.html"
-    success_url = reverse_lazy("buildings_list")
+    success_url = reverse_lazy("core:buildings_list")
 
     def test_func(self):
         building = self.get_object()
@@ -405,20 +459,32 @@ class BuildingDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         meta = obj._meta
         ctx.setdefault("object_verbose_name", meta.verbose_name)
         ctx.setdefault("object_model_name", meta.model_name)
-        ctx.setdefault("cancel_url", reverse("building_detail", args=[obj.pk]))
+        ctx.setdefault("cancel_url", reverse("core:building_detail", args=[obj.pk]))
         return ctx
 
 class UnitDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DetailView):
     model = Unit
     template_name = "core/unit_detail.html"
     context_object_name = "unit"
+    pk_url_kwarg = "unit_pk"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.building = get_object_or_404(
+            Building.objects.visible_to(request.user),
+            pk=self.kwargs["building_pk"],
+        )
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        return Unit.objects.select_related("building")
+        return Unit.objects.select_related("building").filter(building=self.building)
 
     def test_func(self):
-        unit = self.get_object()
-        return _user_can_access_building(self.request.user, unit.building)
+        return _user_can_access_building(self.request.user, self.building)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["building"] = self.building
+        return ctx
 
 
 class UnitCreateView(LoginRequiredMixin, CreateView):
@@ -429,7 +495,7 @@ class UnitCreateView(LoginRequiredMixin, CreateView):
     # Resolve the building up-front using a user-aware queryset
     def dispatch(self, request, *args, **kwargs):
         self.building = get_object_or_404(
-            Building.objects.visible_to(request.user), pk=self.kwargs["pk"]
+            Building.objects.visible_to(request.user), pk=self.kwargs["building_pk"]
         )
         # security: only building owner or staff may add units to this building
         if not (request.user.is_staff or self.building.owner_id == request.user.id):
@@ -456,15 +522,15 @@ class UnitCreateView(LoginRequiredMixin, CreateView):
         # form.save() already sets the building; no need to reassign
         form.save()
         messages.success(self.request, _("Unit created."))
-        return redirect("building_detail", pk=self.building.pk)
+        return redirect("core:building_detail", pk=self.building.pk)
 
     def get_success_url(self):
-        return reverse("building_detail", args=[self.building.pk])
+        return reverse("core:building_detail", args=[self.building.pk])
     
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["building"] = self.building
-        ctx["cancel_url"] = reverse("building_detail", args=[self.building.pk])
+        ctx["cancel_url"] = reverse("core:building_detail", args=[self.building.pk])
         return ctx
 
 
@@ -472,15 +538,20 @@ class UnitUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin,
     model = Unit
     form_class = UnitForm
     template_name = "core/unit_form.html"
+    pk_url_kwarg = "unit_pk"
 
-    def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.building = obj.building
-        return obj
+    def dispatch(self, request, *args, **kwargs):
+        self.building = get_object_or_404(
+            Building.objects.visible_to(request.user),
+            pk=self.kwargs["building_pk"],
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Unit.objects.select_related("building").filter(building=self.building)
 
     def test_func(self):
-        unit = self.get_object()
-        return self.request.user.is_staff or unit.building.owner_id == self.request.user.id
+        return self.request.user.is_staff or self.building.owner_id == self.request.user.id
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -494,24 +565,29 @@ class UnitUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin,
         return response
 
     def get_success_url(self):
-        return reverse("building_detail", args=[self.building.pk])
+        return reverse("core:building_detail", args=[self.building.pk])
 
 
 class UnitDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
     model = Unit
     template_name = "core/unit_confirm_delete.html"
+    pk_url_kwarg = "unit_pk"
 
-    def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.building = obj.building
-        return obj
+    def dispatch(self, request, *args, **kwargs):
+        self.building = get_object_or_404(
+            Building.objects.visible_to(request.user),
+            pk=self.kwargs["building_pk"],
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Unit.objects.select_related("building").filter(building=self.building)
 
     def test_func(self):
-        unit = self.get_object()
-        return _user_can_access_building(self.request.user, unit.building)
+        return _user_can_access_building(self.request.user, self.building)
 
     def get_success_url(self):
-        return reverse("building_detail", args=[self.building.pk])
+        return reverse("core:building_detail", args=[self.building.pk])
 
     def post(self, request, *args, **kwargs):
         messages.error(request, _("Unit deleted."))
@@ -523,5 +599,5 @@ class UnitDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin,
         meta = obj._meta
         ctx.setdefault("object_verbose_name", meta.verbose_name)
         ctx.setdefault("object_model_name", meta.model_name)
-        ctx.setdefault("cancel_url", reverse("building_detail", args=[self.building.pk]))
+        ctx.setdefault("cancel_url", reverse("core:building_detail", args=[self.building.pk]))
         return ctx

@@ -42,7 +42,7 @@ class WorkOrderArchiveViewTests(TestCase):
 
         self.client.login(username="archive-owner", password="pass1234")
         response = self.client.post(
-            reverse("work_order_archive", args=[work_order.pk]),
+            reverse("core:work_order_archive", args=[work_order.pk]),
             follow=True,
         )
         self.assertEqual(response.status_code, 200)
@@ -60,7 +60,7 @@ class WorkOrderArchiveViewTests(TestCase):
         )
 
         self.client.login(username="archive-owner", password="pass1234")
-        response = self.client.post(reverse("work_order_archive", args=[work_order.pk]))
+        response = self.client.post(reverse("core:work_order_archive", args=[work_order.pk]))
         self.assertEqual(response.status_code, 404)
         work_order.refresh_from_db()
         self.assertIsNone(work_order.archived_at)
@@ -128,12 +128,12 @@ class NotificationSnoozeViewTests(TestCase):
         self.note_key = f"wo-deadline-{self.work_order.pk}"
 
     def test_requires_auth(self):
-        response = self.client.post(reverse("notification_snooze", args=[self.note_key]))
+        response = self.client.post(reverse("core:notification_snooze", args=[self.note_key]))
         self.assertEqual(response.status_code, 302)
 
     def test_snoozes_until_tomorrow(self):
         self.client.login(username="notify-owner", password="pass1234")
-        url = reverse("notification_snooze", args=[self.note_key])
+        url = reverse("core:notification_snooze", args=[self.note_key])
         response = self.client.post(url, follow=False)
         self.assertEqual(response.status_code, 302)
         note = Notification.objects.get(user=self.user, key=self.note_key)
@@ -141,7 +141,7 @@ class NotificationSnoozeViewTests(TestCase):
 
     def test_not_found_returns_404(self):
         self.client.login(username="notify-owner", password="pass1234")
-        response = self.client.post(reverse("notification_snooze", args=["missing-key"]))
+        response = self.client.post(reverse("core:notification_snooze", args=["missing-key"]))
         self.assertEqual(response.status_code, 404)
 
     def test_mass_assign_dismiss_acknowledges(self):
@@ -158,7 +158,7 @@ class NotificationSnoozeViewTests(TestCase):
         key = f"wo-mass-{mass_order.pk}"
 
         self.client.login(username="notify-owner", password="pass1234")
-        response = self.client.post(reverse("notification_snooze", args=[key]), follow=False)
+        response = self.client.post(reverse("core:notification_snooze", args=[key]), follow=False)
         self.assertEqual(response.status_code, 302)
 
         note = Notification.objects.get(user=self.user, key=key)

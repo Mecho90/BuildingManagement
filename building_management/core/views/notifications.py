@@ -27,7 +27,7 @@ class NotificationSnoozeView(LoginRequiredMixin, View):
             return JsonResponse({"error": "not_found"}, status=404)
 
         is_hx = bool(request.headers.get("Hx-Request"))
-        next_url = _safe_next_url(request) or request.META.get("HTTP_REFERER") or reverse("buildings_list")
+        next_url = _safe_next_url(request) or request.META.get("HTTP_REFERER") or reverse("core:buildings_list")
 
         if note.category == "mass_assign":
             note.acknowledge()

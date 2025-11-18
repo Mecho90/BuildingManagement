@@ -51,7 +51,7 @@ class WorkOrderAttachmentAPITests(TestCase):
             deadline="2030-01-01",
         )
 
-        self.attachments_url = reverse("api_workorder_attachments", args=[self.work_order.pk])
+        self.attachments_url = reverse("core:api_workorder_attachments", args=[self.work_order.pk])
 
     def test_requires_authentication(self):
         response = self.client.get(self.attachments_url)
@@ -131,7 +131,7 @@ class WorkOrderAttachmentAPITests(TestCase):
             content_type="image/png",
             size=file_data.size,
         )
-        url = reverse("api_workorder_attachment_detail", args=[self.work_order.pk, attachment.pk])
+        url = reverse("core:api_workorder_attachment_detail", args=[self.work_order.pk, attachment.pk])
 
         response = self.client.delete(url)
         self.assertEqual(response.status_code, 200)

@@ -164,7 +164,7 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
 
             delete_confirm_message = format_attachment_delete_confirm(filename, order)
             delete_url = reverse(
-                "workorder_attachment_delete",
+                "core:workorder_attachment_delete",
                 args=[order.pk, attachment.pk],
             )
             current_target = request.get_full_path()
@@ -194,7 +194,7 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
         if request.user.is_authenticated and order.building_id:
             can_manage = _user_can_access_building(request.user, order.building)
 
-        attachments_api_url = reverse("api_workorder_attachments", args=[order.pk])
+        attachments_api_url = reverse("core:api_workorder_attachments", args=[order.pk])
     else:
         upload_disabled_reason = _("Save this work order before adding attachments.")
         if request.user.is_authenticated:
@@ -332,22 +332,28 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
         search = (request.GET.get("q") or "").strip()
         status = (request.GET.get("status") or "").strip().upper()
+        priority = (request.GET.get("priority") or "").strip().upper()
         valid_status = {choice[0] for choice in WorkOrder.Status.choices}
+        valid_priority = {choice[0] for choice in WorkOrder.Priority.choices}
         if status and status not in valid_status:
             status = ""
+        if priority and priority not in valid_priority:
+            priority = ""
 
         # Use visibility helper + pull related objects
-        qs = (
+        base_qs = (
             WorkOrder.objects.visible_to(user)
             .filter(archived_at__isnull=True)
-            .select_related("building__owner", "unit")
         )
+        qs = base_qs.select_related("building__owner", "unit")
 
         # Build owner choices for staff (before additional filters)
         self._owner_choices: list[dict[str, str]] = []
         if user.is_staff or user.is_superuser:
-            owner_ids = list(
-                qs.values_list("building__owner_id", flat=True).distinct()
+            owner_ids = (
+                Building.objects.filter(work_orders__in=base_qs)
+                .values_list("owner_id", flat=True)
+                .distinct()
             )
             owner_ids = [oid for oid in owner_ids if oid]
             self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
@@ -370,6 +376,8 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
         if status:
             qs = qs.filter(status=status)
+        if priority:
+            qs = qs.filter(priority=priority)
 
         owner_param = (request.GET.get("owner") or "").strip()
         owner_filter = None
@@ -410,9 +418,9 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
         qs = qs.order_by(*sort_map[sort_param])
 
-        self._total_orders = qs.count()
         self._search = search
         self._status = status
+        self._priority = priority
         self._owner = owner_param
         self._sort = sort_param
 
@@ -426,16 +434,18 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        total_orders = getattr(self, "_total_orders", None)
-        if total_orders is None and ctx.get("paginator") is not None:
-            total_orders = ctx["paginator"].count
-        if total_orders is None:
+        paginator = ctx.get("paginator")
+        total_orders = 0
+        if paginator is not None:
+            total_orders = paginator.count
+        else:
             object_list = getattr(self, "object_list", None)
             total_orders = len(object_list) if object_list is not None else 0
         ctx.update(
             {
                 "q": getattr(self, "_search", ""),
                 "status": getattr(self, "_status", ""),
+                "priority": getattr(self, "_priority", ""),
                 "status_choices": WorkOrder.Status.choices,
                 "per": self.get_paginate_by(self.object_list),
                 "per_choices": self._per_choices,
@@ -518,11 +528,11 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
             ctx["cancel_url"] = safe_next
         else:
             ctx["cancel_url"] = (
-                reverse("building_detail", args=[self.building.pk])
+                reverse("core:building_detail", args=[self.building.pk])
                 if getattr(self, "building", None)
-                else reverse("work_orders_list")
+                else reverse("core:work_orders_list")
             )
-        ctx["units_api_template"] = reverse("api_units", args=[0]).replace("/0/", "/{id}/")
+        ctx["units_api_template"] = reverse("core:api_units", args=[0]).replace("/0/", "/{id}/")
         self._prepare_units_widget(ctx)
         form = ctx.get("form")
         if form is not None:
@@ -545,7 +555,7 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
         next_url = _safe_next_url(self.request)
         if next_url:
             return next_url
-        return reverse("building_detail", args=[self.object.building_id])
+        return reverse("core:building_detail", args=[self.object.building_id])
 
 
 class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, UnitsWidgetMixin, UpdateView):
@@ -573,8 +583,8 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         if safe_next:
             ctx["cancel_url"] = safe_next
         elif building is not None:
-            ctx["cancel_url"] = reverse("building_detail", args=[building.pk])
-        ctx["units_api_template"] = reverse("api_units", args=[0]).replace("/0/", "/{id}/")
+            ctx["cancel_url"] = reverse("core:building_detail", args=[building.pk])
+        ctx["units_api_template"] = reverse("core:api_units", args=[0]).replace("/0/", "/{id}/")
         self._prepare_units_widget(ctx)
         order_obj = ctx.get("object", getattr(self, "object", None))
         form = ctx.get("form")
@@ -605,7 +615,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         next_url = _safe_next_url(self.request)
         if next_url:
             return next_url
-        return reverse("building_detail", args=[self.object.building_id])
+        return reverse("core:building_detail", args=[self.object.building_id])
 
 
 class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
@@ -620,7 +630,7 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         next_url = _safe_next_url(self.request)
         if next_url:
             return next_url
-        return reverse_lazy("building_detail", args=[self.object.building_id])
+        return reverse_lazy("core:building_detail", args=[self.object.building_id])
 
     def post(self, request, *args, **kwargs):
         messages.error(request, _("Work order deleted."))
@@ -637,7 +647,7 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             ctx["next_url"] = next_url
             ctx["cancel_url"] = next_url
         else:
-            ctx.setdefault("cancel_url", reverse("building_detail", args=[obj.building_id]))
+            ctx.setdefault("cancel_url", reverse("core:building_detail", args=[obj.building_id]))
         return ctx
     
 
@@ -675,13 +685,13 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
         next_url = _safe_next_url(request)
         if next_url:
             return redirect(next_url)
-        return redirect("building_detail", wo.building_id)
+        return redirect("core:building_detail", wo.building_id)
 
 
 class MassAssignWorkOrdersView(LoginRequiredMixin, AdminRequiredMixin, FormView):
     template_name = "core/work_orders_mass_assign.html"
     form_class = MassAssignWorkOrdersForm
-    success_url = reverse_lazy("work_orders_mass_assign")
+    success_url = reverse_lazy("core:work_orders_mass_assign")
 
     def get_queryset(self):
         if not hasattr(self, "_building_queryset"):
@@ -1080,7 +1090,7 @@ class ArchivedWorkOrderDetailView(
         detail_params = self.request.GET.copy()
         detail_params.pop("page", None)
         ctx["detail_page_query"] = detail_params.urlencode()
-        ctx["back_url"] = reverse("work_orders_archive")
+        ctx["back_url"] = reverse("core:work_orders_archive")
         ctx["back_query"] = ctx["detail_page_query"]
         ctx["detail_per"] = getattr(self, "_detail_per", self.DETAIL_PER_DEFAULT)
         ctx["detail_per_choices"] = self.DETAIL_PER_CHOICES
@@ -1110,7 +1120,7 @@ class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
     def get_success_url(self):
         if getattr(self, "next_url", None):
             return self.next_url
-        return reverse("work_order_detail", args=[self.work_order.pk])
+        return reverse("core:work_order_detail", args=[self.work_order.pk])
 
     def delete(self, request, *args, **kwargs):
         self.object = self.get_object()

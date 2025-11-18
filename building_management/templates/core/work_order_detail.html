@@ -13,11 +13,11 @@
   <div class="flex flex-wrap items-center gap-3">
     <a class="btn btn-secondary" href="{{ cancel_url|default:request.META.HTTP_REFERER|default:'/' }}">← {% trans "Back" %}</a>
     {% if next_url %}
-      <a class="btn" href="{% url 'work_order_update' order.id %}?next={{ next_url|urlencode }}">{% trans "Edit" %}</a>
-      <a class="btn btn-danger" href="{% url 'work_order_delete' order.id %}?next={{ next_url|urlencode }}">{% trans "Delete" %}</a>
+      <a class="btn" href="{% url 'core:work_order_update' order.id %}?next={{ next_url|urlencode }}">{% trans "Edit" %}</a>
+      <a class="btn btn-danger" href="{% url 'core:work_order_delete' order.id %}?next={{ next_url|urlencode }}">{% trans "Delete" %}</a>
     {% else %}
-      <a class="btn" href="{% url 'work_order_update' order.id %}">{% trans "Edit" %}</a>
-      <a class="btn btn-danger" href="{% url 'work_order_delete' order.id %}">{% trans "Delete" %}</a>
+      <a class="btn" href="{% url 'core:work_order_update' order.id %}">{% trans "Edit" %}</a>
+      <a class="btn btn-danger" href="{% url 'core:work_order_delete' order.id %}">{% trans "Delete" %}</a>
     {% endif %}
   </div>
 

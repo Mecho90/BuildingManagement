@@ -13,7 +13,7 @@ from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
 from ..forms import AdminUserCreateForm, AdminUserPasswordForm, AdminUserUpdateForm
-from ..models import Building, Unit, WorkOrder
+from ..models import WorkOrder
 from .common import AdminRequiredMixin, _querystring_without
 
 User = get_user_model()
@@ -80,49 +80,65 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
                 "archived": 0,
             }
 
-        stats = {uid: _empty_stats() for uid in user_ids}
-
-        for row in (
-            Building.objects.filter(owner_id__in=user_ids)
-            .values("owner_id")
-            .annotate(total=Count("id"))
-        ):
-            stats[row["owner_id"]]["buildings"] = row["total"]
-
-        for row in (
-            Unit.objects.filter(building__owner_id__in=user_ids)
-            .values("building__owner_id")
-            .annotate(total=Count("id"))
-        ):
-            stats[row["building__owner_id"]]["units"] = row["total"]
-
-        active_workorders = (
-            WorkOrder.objects.filter(
-                building__owner_id__in=user_ids,
-                archived_at__isnull=True,
+        aggregated_stats = (
+            User.objects.filter(pk__in=user_ids)
+            .annotate(
+                buildings_total=Count("buildings", distinct=True),
+                units_total=Count("buildings__units", distinct=True),
+                priority_high_total=Count(
+                    "buildings__work_orders",
+                    filter=Q(
+                        buildings__work_orders__archived_at__isnull=True,
+                        buildings__work_orders__priority=WorkOrder.Priority.HIGH,
+                    ),
+                    distinct=True,
+                ),
+                priority_medium_total=Count(
+                    "buildings__work_orders",
+                    filter=Q(
+                        buildings__work_orders__archived_at__isnull=True,
+                        buildings__work_orders__priority=WorkOrder.Priority.MEDIUM,
+                    ),
+                    distinct=True,
+                ),
+                priority_low_total=Count(
+                    "buildings__work_orders",
+                    filter=Q(
+                        buildings__work_orders__archived_at__isnull=True,
+                        buildings__work_orders__priority=WorkOrder.Priority.LOW,
+                    ),
+                    distinct=True,
+                ),
+                archived_total=Count(
+                    "buildings__work_orders",
+                    filter=Q(
+                        buildings__work_orders__archived_at__isnull=False,
+                    ),
+                    distinct=True,
+                ),
             )
-            .values("building__owner_id", "priority")
-            .annotate(total=Count("id"))
+            .values(
+                "pk",
+                "buildings_total",
+                "units_total",
+                "priority_high_total",
+                "priority_medium_total",
+                "priority_low_total",
+                "archived_total",
+            )
         )
-        priority_map = {
-            WorkOrder.Priority.HIGH: "priority_high",
-            WorkOrder.Priority.MEDIUM: "priority_medium",
-            WorkOrder.Priority.LOW: "priority_low",
-        }
-        for row in active_workorders:
-            key = priority_map.get(row["priority"])
-            if key:
-                stats[row["building__owner_id"]][key] = row["total"]
 
-        for row in (
-            WorkOrder.objects.filter(
-                building__owner_id__in=user_ids,
-                archived_at__isnull=False,
-            )
-            .values("building__owner_id")
-            .annotate(total=Count("id"))
-        ):
-            stats[row["building__owner_id"]]["archived"] = row["total"]
+        stats = {
+            row["pk"]: {
+                "buildings": row["buildings_total"],
+                "units": row["units_total"],
+                "priority_high": row["priority_high_total"],
+                "priority_medium": row["priority_medium_total"],
+                "priority_low": row["priority_low_total"],
+                "archived": row["archived_total"],
+            }
+            for row in aggregated_stats
+        }
 
         totals = defaultdict(int)
         overview_rows: list[dict[str, object]] = []
@@ -154,7 +170,7 @@ class AdminUserCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
         return response
 
     def get_success_url(self):
-        return reverse("users_list")
+        return reverse("core:users_list")
 
 
 class AdminUserUpdateView(LoginRequiredMixin, AdminRequiredMixin, UpdateView):
@@ -169,7 +185,7 @@ class AdminUserUpdateView(LoginRequiredMixin, AdminRequiredMixin, UpdateView):
         return response
 
     def get_success_url(self):
-        return reverse("users_list")
+        return reverse("core:users_list")
 
 
 class AdminUserPasswordView(LoginRequiredMixin, AdminRequiredMixin, FormView):
@@ -191,7 +207,7 @@ class AdminUserPasswordView(LoginRequiredMixin, AdminRequiredMixin, FormView):
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
-        return reverse("users_list")
+        return reverse("core:users_list")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -202,7 +218,7 @@ class AdminUserPasswordView(LoginRequiredMixin, AdminRequiredMixin, FormView):
 class AdminUserDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
     model = User
     template_name = "core/user_confirm_delete.html"
-    success_url = reverse_lazy("users_list")
+    success_url = reverse_lazy("core:users_list")
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()

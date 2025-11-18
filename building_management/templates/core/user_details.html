@@ -3,7 +3,7 @@
 {% block title %}{% blocktrans with username=user_obj.username %}User: {{ username }}{% endblocktrans %} · {% trans "Building Management" %}{% endblock %}
 {% block content %}
 {% trans "Yes,No" as yesno_choices %}
-<p><a class="btn" href="{% url 'users_list' %}">← {% trans "Back to Users" %}</a></p>
+<p><a class="btn" href="{% url 'core:users_list' %}">← {% trans "Back to Users" %}</a></p>
 <h2>{% blocktrans with username=user_obj.username %}User: {{ username }}{% endblocktrans %}</h2>
 <ul>
   <li><strong>{% trans "Full name" %}:</strong> {{ user_obj.first_name }} {{ user_obj.last_name }}</li>
@@ -17,7 +17,7 @@
 <p>
   <a class="btn" href="{% url 'user_password_reset' user_obj.id %}">{% trans "Reset Password" %}</a>
   {% if request.user.id != user_obj.id %}
-    <a class="btn" href="{% url 'user_delete' user_obj.id %}">{% trans "Delete" %}</a>
+    <a class="btn" href="{% url 'core:user_delete' user_obj.id %}">{% trans "Delete" %}</a>
   {% endif %}
 </p>
 {% endblock %}

@@ -1,6 +1,9 @@
 # path: core/urls.py
+# path: core/urls.py
 from django.urls import path
 from . import views
+
+app_name = "core"
 
 urlpatterns = [
     # Buildings
@@ -16,10 +19,22 @@ urlpatterns = [
     path("notifications/<str:key>/snooze/", views.NotificationSnoozeView.as_view(), name="notification_snooze"),
 
     # Units
-    path("buildings/<int:pk>/units/new/", views.UnitCreateView.as_view(), name="unit_create"),
-    path("units/<int:pk>/", views.UnitDetailView.as_view(), name="unit_detail"),
-    path("units/<int:pk>/edit/", views.UnitUpdateView.as_view(), name="unit_update"),
-    path("units/<int:pk>/delete/", views.UnitDeleteView.as_view(), name="unit_delete"),
+    path("buildings/<int:building_pk>/units/new/", views.UnitCreateView.as_view(), name="unit_create"),
+    path(
+        "buildings/<int:building_pk>/units/<int:unit_pk>/",
+        views.UnitDetailView.as_view(),
+        name="unit_detail",
+    ),
+    path(
+        "buildings/<int:building_pk>/units/<int:unit_pk>/edit/",
+        views.UnitUpdateView.as_view(),
+        name="unit_update",
+    ),
+    path(
+        "buildings/<int:building_pk>/units/<int:unit_pk>/delete/",
+        views.UnitDeleteView.as_view(),
+        name="unit_delete",
+    ),
     
     
     # Work Orders    

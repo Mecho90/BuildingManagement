@@ -36,9 +36,9 @@
       {% else %}
         {# Sensible defaults if the view didn't pass cancel_url #}
         {% if object_model_name == 'unit' and object.building_id %}
-          <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">{% trans "Cancel" %}</a>
+          <a class="btn btn-secondary" href="{% url 'core:building_detail' object.building_id %}">{% trans "Cancel" %}</a>
         {% else %}
-          <a class="btn btn-secondary" href="{% url 'buildings_list' %}">{% trans "Cancel" %}</a>
+          <a class="btn btn-secondary" href="{% url 'core:buildings_list' %}">{% trans "Cancel" %}</a>
         {% endif %}
       {% endif %}
     </form>

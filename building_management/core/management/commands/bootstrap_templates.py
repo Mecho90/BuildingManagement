@@ -52,7 +52,7 @@ BUILDINGS_LIST = """{% extends "base.html" %}
   <tbody>
   {% for b in buildings %}
     <tr>
-      <td><a href="{% url 'building_detail' b.id %}">{{ b.name }}</a></td>
+      <td><a href="{% url 'core:building_detail' b.id %}">{{ b.name }}</a></td>
       <td>{{ b.address }}</td>
       <td>{{ b.units.count }}</td>
     </tr>

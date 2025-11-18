@@ -10,8 +10,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
-from django.db.models import Count, IntegerField, OuterRef, Q, Subquery, Value
-from django.db.models.functions import Coalesce, Lower
+from django.db.models import Count, Q
+from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -34,30 +34,19 @@ class BuildingQuerySet(models.QuerySet):
           - _units_count: total units
           - _work_orders_count: ACTIVE work orders (OPEN + IN_PROGRESS), non-archived
         """
-        unit_totals = (
-            Unit.objects.filter(building_id=OuterRef("pk"))
-            .order_by()
-            .values("building_id")
-            .annotate(total=Count("pk"))
-            .values("total")
-        )
-        active_workorders = (
-            WorkOrder.objects.filter(
-                building_id=OuterRef("pk"),
-                archived_at__isnull=True,
-                status__in=[
-                    WorkOrder.Status.OPEN,
-                    WorkOrder.Status.IN_PROGRESS,
-                ],
-            )
-            .order_by()
-            .values("building_id")
-            .annotate(total=Count("pk"))
-            .values("total")
-        )
         return self.annotate(
-            _units_count=Coalesce(Subquery(unit_totals[:1]), Value(0), output_field=IntegerField()),
-            _work_orders_count=Coalesce(Subquery(active_workorders[:1]), Value(0), output_field=IntegerField()),
+            _units_count=Count("units", distinct=True),
+            _work_orders_count=Count(
+                "work_orders",
+                filter=Q(
+                    work_orders__archived_at__isnull=True,
+                    work_orders__status__in=[
+                        WorkOrder.Status.OPEN,
+                        WorkOrder.Status.IN_PROGRESS,
+                    ],
+                ),
+                distinct=True,
+            ),
         )
 
 

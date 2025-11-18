@@ -21,10 +21,10 @@ from ..services import validate_work_order_attachment
 from .common import _user_can_access_building, format_attachment_delete_confirm
 
 __all__ = [
-    "api_units",
-    "api_buildings",
-    "api_workorder_attachments",
-    "api_workorder_attachment_detail",
+    "core:api_units",
+    "core:api_buildings",
+    "core:api_workorder_attachments",
+    "core:api_workorder_attachment_detail",
 ]
 
 
@@ -131,7 +131,7 @@ def _attachment_payload(
     delete_url = ""
     if work_order and getattr(work_order, "pk", None):
         delete_url = reverse(
-            "workorder_attachment_delete",
+            "core:workorder_attachment_delete",
             args=[work_order.pk, attachment.pk],
         )
 

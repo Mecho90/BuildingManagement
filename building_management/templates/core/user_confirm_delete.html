@@ -16,7 +16,7 @@
     <form method="post" class="flex flex-col gap-3 sm:flex-row sm:justify-center">
       {% csrf_token %}
       <button class="btn btn-danger min-w-[160px]" type="submit">{% trans "Yes, delete" %}</button>
-      <a class="btn btn-secondary" href="{% url 'users_list' %}">{% trans "Cancel" %}</a>
+      <a class="btn btn-secondary" href="{% url 'core:users_list' %}">{% trans "Cancel" %}</a>
     </form>
   </div>
 </section>

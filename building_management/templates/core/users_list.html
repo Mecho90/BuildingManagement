@@ -14,7 +14,7 @@
       </p>
     </div>
     <div class="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
-      <a class="btn" href="{% url 'user_create' %}">{% trans "Add user" %}</a>
+      <a class="btn" href="{% url 'core:user_create' %}">{% trans "Add user" %}</a>
     </div>
   </header>
 
@@ -31,7 +31,7 @@
     <div class="flex items-center gap-2">
       <button class="btn" type="submit">{% trans "Search" %}</button>
       {% if q %}
-        <a class="btn btn-secondary" href="{% url 'users_list' %}">{% trans "Clear" %}</a>
+        <a class="btn btn-secondary" href="{% url 'core:users_list' %}">{% trans "Clear" %}</a>
       {% endif %}
     </div>
   </form>
@@ -72,9 +72,9 @@
               <td class="px-4 py-3">{{ u.last_login|date:"Y-m-d H:i"|default:"—" }}</td>
               <td class="px-4 py-3 text-right">
                 <div class="flex justify-end gap-2">
-                  <a class="btn btn-secondary btn-sm" href="{% url 'user_update' u.pk %}">{% trans "Edit" %}</a>
-                  <a class="btn btn-secondary btn-sm" href="{% url 'user_password' u.pk %}">{% trans "Reset password" %}</a>
-                  <a class="btn btn-danger btn-sm" href="{% url 'user_delete' u.pk %}">{% trans "Delete" %}</a>
+                  <a class="btn btn-secondary btn-sm" href="{% url 'core:user_update' u.pk %}">{% trans "Edit" %}</a>
+                  <a class="btn btn-secondary btn-sm" href="{% url 'core:user_password' u.pk %}">{% trans "Reset password" %}</a>
+                  <a class="btn btn-danger btn-sm" href="{% url 'core:user_delete' u.pk %}">{% trans "Delete" %}</a>
                 </div>
               </td>
             </tr>

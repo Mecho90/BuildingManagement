@@ -13,12 +13,12 @@
           {% blocktrans with count=buildings_total %}Total buildings: {{ count }}{% endblocktrans %}
         </p>
       </div>
-      <a class="btn self-start md:self-center" href="{% url 'building_create' %}">{% trans "Add new building" %}</a>
+      <a class="btn self-start md:self-center" href="{% url 'core:building_create' %}">{% trans "Add new building" %}</a>
     </div>
 
     <div class="md:sticky md:top-4 md:z-10">
       <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
-        {% url 'buildings_list' as buildings_reset_url %}
+        {% url 'core:buildings_list' as buildings_reset_url %}
         {% with placeholder=_('Search by name, address, owner') %}
           <div class="flex flex-col gap-2 md:flex-row md:items-center">
             <label class="sr-only" for="id_q">{% trans "Search buildings" %}</label>
@@ -48,7 +48,7 @@
         <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
           <div class="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <a href="{% url 'building_detail' b.id %}" class="text-lg font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
+              <a href="{% url 'core:building_detail' b.id %}" class="text-lg font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
               <p class="text-sm text-slate-500 dark:text-slate-400">{{ b.get_role_display }}</p>
             </div>
             {% if show_owner_column %}
@@ -163,7 +163,7 @@
           {% for b in buildings %}
             <tr class="text-sm text-slate-700 dark:text-slate-200">
               <td class="px-4 py-3 font-medium">
-                <a href="{% url 'building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
+                <a href="{% url 'core:building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
               </td>
               {% if show_owner_column %}
                 <td class="px-4 py-3">
@@ -226,8 +226,8 @@
               {% if note.dismissible %}
                 <div class="mt-3 flex sm:mt-0 sm:justify-end">
                   <form method="post"
-                        action="{% url 'notification_snooze' note.id %}"
-                        hx-post="{% url 'notification_snooze' note.id %}"
+                        action="{% url 'core:notification_snooze' note.id %}"
+                        hx-post="{% url 'core:notification_snooze' note.id %}"
                         hx-target="closest li"
                         hx-swap="delete"
                         class="inline-flex">

@@ -2,10 +2,10 @@
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
-from django.views.generic import RedirectView
 from django.conf import settings
 from django.conf.urls.static import static
 from core.auth_views import RoleAwareLoginView
+from core.views import DashboardView
 
 urlpatterns = [
     # Admin
@@ -28,10 +28,8 @@ urlpatterns = [
     ),
 
     # App routes (no namespace so plain names work, but not required by this file)
-    path("", include("core.urls")),
-
-    # Root -> literal URL instead of reversing a name (avoids NoReverseMatch)
-    path("", RedirectView.as_view(url="/buildings/", permanent=False)),
+    path("", DashboardView.as_view(), name="dashboard"),
+    path("", include(("core.urls", "core"), namespace="core")),
 ]
 
 if settings.DEBUG:

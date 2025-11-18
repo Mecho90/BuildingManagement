@@ -15,4 +15,4 @@ def toggle_theme(request: HttpRequest):
         referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
     ):
         return HttpResponseRedirect(referer)
-    return redirect("buildings_list")
+    return redirect("core:buildings_list")

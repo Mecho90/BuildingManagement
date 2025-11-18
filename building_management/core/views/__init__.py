@@ -29,6 +29,7 @@ from .buildings import (
     UnitDetailView,
     UnitUpdateView,
 )
+from .dashboard import DashboardView
 from .notifications import NotificationSnoozeView
 from .work_orders import (
     ArchivedWorkOrderDetailView,
@@ -59,6 +60,7 @@ __all__ = [
     "BuildingDetailView",
     "BuildingListView",
     "BuildingUpdateView",
+    "DashboardView",
     "NotificationSnoozeView",
     "toggle_theme",
     "UnitCreateView",

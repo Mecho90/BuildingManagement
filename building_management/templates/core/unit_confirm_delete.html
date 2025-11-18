@@ -16,9 +16,9 @@
       {% csrf_token %}
       <button class="btn btn-danger min-w-[160px]">{% trans "Yes, delete" %}</button>
       {% if object.building_id %}
-        <a class="btn btn-secondary" href="{% url 'building_detail' object.building_id %}">{% trans "Cancel" %}</a>
+        <a class="btn btn-secondary" href="{% url 'core:building_detail' object.building_id %}">{% trans "Cancel" %}</a>
       {% else %}
-        <a class="btn btn-secondary" href="{% url 'buildings_list' %}">{% trans "Cancel" %}</a>
+        <a class="btn btn-secondary" href="{% url 'core:buildings_list' %}">{% trans "Cancel" %}</a>
       {% endif %}
     </form>
   </div>

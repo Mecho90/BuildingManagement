@@ -6,10 +6,10 @@
 {% block content %}
 <section class="space-y-6">
   <div class="flex flex-wrap items-center gap-3">
-    <a class="btn btn-secondary" href="{% url 'building_detail' unit.building_id %}">← {% blocktrans with name=unit.building.name %}Back to {{ name }}{% endblocktrans %}</a>
+    <a class="btn btn-secondary" href="{% url 'core:building_detail' unit.building_id %}">← {% blocktrans with name=unit.building.name %}Back to {{ name }}{% endblocktrans %}</a>
     {% if user.is_superuser or unit.building.owner_id == user.id %}
-      <a class="btn" href="{% url 'unit_update' unit.id %}">{% trans "Edit" %}</a>
-      <a class="btn btn-danger" href="{% url 'unit_delete' unit.id %}">{% trans "Delete" %}</a>
+      <a class="btn" href="{% url 'core:unit_update' building_pk=unit.building_id unit_pk=unit.id %}">{% trans "Edit" %}</a>
+      <a class="btn btn-danger" href="{% url 'core:unit_delete' building_pk=unit.building_id unit_pk=unit.id %}">{% trans "Delete" %}</a>
     {% endif %}
   </div>
 
