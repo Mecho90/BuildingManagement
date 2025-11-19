@@ -12,12 +12,19 @@
 <section class="space-y-6">
   <div class="flex flex-wrap items-center gap-3">
     <a class="btn btn-secondary" href="{{ cancel_url|default:request.META.HTTP_REFERER|default:'/' }}">← {% trans "Back" %}</a>
-    {% if next_url %}
-      <a class="btn" href="{% url 'core:work_order_update' order.id %}?next={{ next_url|urlencode }}">{% trans "Edit" %}</a>
-      <a class="btn btn-danger" href="{% url 'core:work_order_delete' order.id %}?next={{ next_url|urlencode }}">{% trans "Delete" %}</a>
-    {% else %}
-      <a class="btn" href="{% url 'core:work_order_update' order.id %}">{% trans "Edit" %}</a>
-      <a class="btn btn-danger" href="{% url 'core:work_order_delete' order.id %}">{% trans "Delete" %}</a>
+    {% if can_edit_order %}
+      {% if next_url %}
+        <a class="btn" href="{% url 'core:work_order_update' order.id %}?next={{ next_url|urlencode }}">{% trans "Edit" %}</a>
+      {% else %}
+        <a class="btn" href="{% url 'core:work_order_update' order.id %}">{% trans "Edit" %}</a>
+      {% endif %}
+    {% endif %}
+    {% if can_delete_order %}
+      {% if next_url %}
+        <a class="btn btn-danger" href="{% url 'core:work_order_delete' order.id %}?next={{ next_url|urlencode }}">{% trans "Delete" %}</a>
+      {% else %}
+        <a class="btn btn-danger" href="{% url 'core:work_order_delete' order.id %}">{% trans "Delete" %}</a>
+      {% endif %}
     {% endif %}
   </div>
 
@@ -67,6 +74,20 @@
         {% endif %}
       </div>
     </section>
+
+    {% if replacement_request_note %}
+      <section class="space-y-2">
+        <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Replacement request" %}</h2>
+        <div class="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          <p class="whitespace-pre-line">{{ replacement_request_note }}</p>
+          {% if awaiting_requested_by %}
+            <p class="mt-2 text-xs uppercase tracking-wide text-amber-700 dark:text-amber-200">
+              {% blocktrans with name=awaiting_requested_by.get_full_name|default:awaiting_requested_by.username %}Requested by {{ name }}{% endblocktrans %}
+            </p>
+          {% endif %}
+        </div>
+      </section>
+    {% endif %}
 
     {{ attachment_panel_html|safe }}
   </article>

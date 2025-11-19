@@ -13,7 +13,7 @@ from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
 from ..forms import AdminUserCreateForm, AdminUserPasswordForm, AdminUserUpdateForm
-from ..models import WorkOrder
+from ..models import BuildingMembership, MembershipRole, WorkOrder
 from .common import AdminRequiredMixin, _querystring_without
 
 User = get_user_model()
@@ -31,7 +31,19 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
     model = User
     template_name = "core/users_list.html"
     context_object_name = "users"
-    paginate_by = 20
+    paginate_by = 25
+
+    _per_choices = (25, 50, 100, 200)
+
+    def get_paginate_by(self, queryset):
+        try:
+            per = int(self.request.GET.get("per", self.paginate_by))
+        except (TypeError, ValueError):
+            per = self.paginate_by
+        if per not in self._per_choices:
+            per = self.paginate_by
+        self._per = per
+        return per
 
     def get_queryset(self):
         qs = User.objects.all().order_by("username")
@@ -50,7 +62,9 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         ctx["q"] = getattr(self, "_search", "")
         ctx["pagination_query"] = _querystring_without(self.request, "page")
+        ctx["per"] = getattr(self, "_per", self.paginate_by)
         object_list = list(ctx.get("object_list") or [])
+        self._attach_roles(object_list)
         overview_data = self._build_overview(object_list)
         if overview_data:
             ctx["overview_rows"] = overview_data["rows"]
@@ -61,6 +75,21 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         else:
             ctx["users_total"] = len(object_list)
         return ctx
+
+    def _attach_roles(self, users):
+        user_ids = [user.pk for user in users if user.pk]
+        if not user_ids:
+            return
+        labels = dict(MembershipRole.choices)
+        memberships = BuildingMembership.objects.filter(
+            user_id__in=user_ids,
+            building__isnull=True,
+        ).values("user_id", "role")
+        role_map: dict[int, list[str]] = {user_id: [] for user_id in user_ids}
+        for membership in memberships:
+            role_map.setdefault(membership["user_id"], []).append(labels.get(membership["role"], membership["role"]))
+        for user in users:
+            setattr(user, "global_roles", role_map.get(user.pk, []))
 
     def _build_overview(self, users) -> dict[str, object] | None:
         if not users:

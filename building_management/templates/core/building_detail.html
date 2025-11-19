@@ -21,44 +21,64 @@
     </nav>
 
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-    <div class="space-y-2">
-      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{{ building.name }}</h1>
-      <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
-        {% if building.address %}
+      <div class="space-y-2">
+        <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{{ building.name }}</h1>
+        <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
+          {% if building.address %}
+            <div class="space-y-1">
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Address" %}</dt>
+              <dd>{{ building.address }}</dd>
+            </div>
+          {% endif %}
+          {% if building.owner %}
+            <div class="space-y-1">
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
+              <dd>{{ building.owner.username }}</dd>
+            </div>
+          {% endif %}
+          {% if technician_subrole_label %}
+            <div class="space-y-1">
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "My technician role" %}</dt>
+              <dd>{{ technician_subrole_label }}</dd>
+            </div>
+          {% endif %}
           <div class="space-y-1">
-            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Address" %}</dt>
-            <dd>{{ building.address }}</dd>
+            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Role" %}</dt>
+            <dd>{{ building.get_role_display }}</dd>
           </div>
-        {% endif %}
-        {% if building.owner %}
           <div class="space-y-1">
-            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
-            <dd>{{ building.owner.username }}</dd>
+            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Created" %}</dt>
+            <dd>{{ building.created_at|date:"Y-m-d" }}</dd>
           </div>
+          <div class="space-y-1 sm:col-span-2">
+            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Description" %}</dt>
+            <dd class="whitespace-pre-line">
+              {% if building.description %}
+                {{ building.description }}
+              {% else %}
+                <em>{% trans "No description provided." %}</em>
+              {% endif %}
+            </dd>
+          </div>
+        </dl>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        {% if can_manage_building %}
+          <a class="btn" href="{% url 'core:building_update' building.id %}">{% trans "Edit building" %}</a>
+          <a class="btn btn-danger" href="{% url 'core:building_delete' building.id %}">{% trans "Delete" %}</a>
         {% endif %}
-        <div class="space-y-1">
-          <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Role" %}</dt>
-          <dd>{{ building.get_role_display }}</dd>
-        </div>
-        <div class="space-y-1">
-          <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Created" %}</dt>
-          <dd>{{ building.created_at|date:"Y-m-d" }}</dd>
-        </div>
-      </dl>
-    </div>
-    <div class="flex flex-wrap items-center gap-3">
-      <a class="btn" href="{% url 'core:building_update' building.id %}">{% trans "Edit building" %}</a>
-      {% if request.user.is_superuser %}
-        <a class="btn btn-danger" href="{% url 'core:building_delete' building.id %}">{% trans "Delete" %}</a>
-      {% endif %}
+        {% if show_manage_team_button %}
+          <a class="btn btn-secondary" href="{{ memberships_manage_url }}">{% trans "Manage team" %}</a>
+        {% endif %}
+        {% if technician_subrole_url %}
+          <a class="btn btn-secondary" href="{{ technician_subrole_url }}">{% trans "Edit my sub-role" %}</a>
+        {% endif %}
+      </div>
     </div>
   </header>
 
   <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
     <nav class="flex flex-wrap gap-2 border-b border-slate-200 px-4 pt-4 dark:border-slate-700" aria-label="{% trans 'Building sections' %}">
-      <a href="{{ tab_urls.overview }}" class="rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors {% if active_tab == 'overview' %}bg-emerald-50 text-emerald-700 dark:bg-slate-800 dark:text-emerald-200{% else %}text-slate-600 hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-200{% endif %}">
-        {% trans "Overview" %}
-      </a>
       <a href="{{ tab_urls.units }}" class="rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors {% if active_tab == 'units' %}bg-emerald-50 text-emerald-700 dark:bg-slate-800 dark:text-emerald-200{% else %}text-slate-600 hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-200{% endif %}">
         {% trans "Units" %}
       </a>
@@ -68,58 +88,34 @@
     </nav>
 
     <div class="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      {% if active_tab == 'overview' %}
-        <article class="space-y-6">
-          <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
-            <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Description" %}</h2>
-            <p class="mt-2 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">
-              {% if building.description %}
-                {{ building.description }}
-              {% else %}
-                <em>{% trans "No description provided." %}</em>
-              {% endif %}
-            </p>
-          </section>
-
-          <section class="grid gap-4 sm:grid-cols-2">
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total units" %}</p>
-              <p class="mt-2 text-3xl font-semibold text-brand-foreground dark:text-white">{{ building.units_count }}</p>
-            </div>
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Active work orders" %}</p>
-              <p class="mt-2 text-3xl font-semibold text-brand-foreground dark:text-white">{{ building.work_orders_count }}</p>
-            </div>
-          </section>
-        </article>
-      {% elif active_tab == 'units' %}
+      {% if active_tab == 'units' %}
         <section class="space-y-5">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Units" %}</h2>
-            <a class="btn" href="{% url 'core:unit_create' building_pk=building.id %}">{% trans "Add unit" %}</a>
+            {% if can_manage_units %}
+              <a class="btn" href="{% url 'core:unit_create' building_pk=building.id %}">{% trans "Add unit" %}</a>
+            {% endif %}
           </div>
 
-          <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
+          <form method="get" class="space-y-5 rounded-3xl border border-emerald-100/80 bg-white/90 p-6 shadow-card dark:border-emerald-400/40 dark:bg-slate-900">
             <input type="hidden" name="tab" value="units"/>
-            <div class="flex flex-col gap-2 md:flex-row md:items-center">
-              <label for="id_u_q" class="sr-only">{% trans "Search units" %}</label>
-              <input id="id_u_q" class="input" type="text" name="u_q" value="{{ u_q }}" placeholder="{% trans "Number, floor, owner or contact" %}"/>
-              <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
+            <div class="space-y-2">
+              <label for="id_u_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search units" %}</label>
+              <input id="id_u_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="u_q" value="{{ u_q }}" placeholder="{% trans "Number, floor, owner or contact" %}"/>
             </div>
-
-            <div class="flex items-center gap-2">
+            <div class="space-y-2">
               <label for="id_u_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-              <select id="id_u_per" name="u_per" onchange="this.form.submit()" class="input w-24">
-                <option value="10"  {% if u_per == 10  %}selected{% endif %}>10</option>
-                <option value="20"  {% if u_per == 20  %}selected{% endif %}>20</option>
+              <select id="id_u_per" name="u_per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+                <option value="25"  {% if u_per == 25  %}selected{% endif %}>25</option>
                 <option value="50"  {% if u_per == 50  %}selected{% endif %}>50</option>
                 <option value="100" {% if u_per == 100 %}selected{% endif %}>100</option>
+                <option value="200" {% if u_per == 200 %}selected{% endif %}>200</option>
               </select>
             </div>
-
-            <div class="flex justify-end gap-2">
+            <div class="flex items-center justify-end gap-2">
               <input type="hidden" name="u_sort" value="{{ u_sort }}"/>
-              {% if u_q or u_per != 10 or u_sort != 'number' %}
+              <button class="btn" type="submit">{% trans "Filter" %}</button>
+              {% if u_q or u_per != 25 or u_sort != 'number' %}
                 <a class="btn btn-secondary" href="{{ tab_urls.units }}">{% trans "Reset" %}</a>
               {% endif %}
             </div>
@@ -218,36 +214,38 @@
         <section class="space-y-5">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Work Orders" %}</h2>
-            <a class="btn" href="{% url 'core:work_order_create' %}?building={{ building.id }}">{% trans "Add work order" %}</a>
+            {% if can_manage_work_orders %}
+              <a class="btn" href="{% url 'core:work_order_create' %}?building={{ building.id }}">{% trans "Add work order" %}</a>
+            {% endif %}
           </div>
 
-          <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] md:items-end">
+          <form method="get" class="space-y-5 rounded-3xl border border-emerald-100/80 bg-white/90 p-6 shadow-card dark:border-emerald-400/40 dark:bg-slate-900">
             <input type="hidden" name="tab" value="work_orders"/>
-            <div class="flex flex-col gap-2">
-              <label for="id_w_q" class="sr-only">{% trans "Search work orders" %}</label>
-              <input id="id_w_q" class="input" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
+            <div class="space-y-2">
+              <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search work orders" %}</label>
+              <input id="id_w_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
             </div>
-            <div class="flex flex-col gap-2">
+            <div class="space-y-2">
               <label for="id_w_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
-              <select id="id_w_status" name="w_status" class="input" onchange="this.form.submit()">
+              <select id="id_w_status" name="w_status" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
                 <option value="" {% if not w_status %}selected{% endif %}>{% trans "All" %}</option>
                 {% for value,label in w_status_choices %}
                   <option value="{{ value }}" {% if w_status == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
             </div>
-            <div class="flex flex-col gap-2">
+            <div class="space-y-2">
               <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-              <select id="id_w_per" name="w_per" class="input" onchange="this.form.submit()">
-                <option value="10"  {% if w_per == 10  %}selected{% endif %}>10</option>
-                <option value="20"  {% if w_per == 20  %}selected{% endif %}>20</option>
+              <select id="id_w_per" name="w_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+                <option value="25"  {% if w_per == 25  %}selected{% endif %}>25</option>
                 <option value="50"  {% if w_per == 50  %}selected{% endif %}>50</option>
                 <option value="100" {% if w_per == 100 %}selected{% endif %}>100</option>
+                <option value="200" {% if w_per == 200 %}selected{% endif %}>200</option>
               </select>
             </div>
-            <div class="flex items-end justify-end gap-2 md:justify-start">
+            <div class="flex items-center justify-end gap-2">
               <button class="btn" type="submit">{% trans "Filter" %}</button>
-              {% if w_q or w_status or w_per != 10 %}
+              {% if w_q or w_status or w_per != 25 %}
                 <a class="btn btn-secondary" href="{{ tab_urls.work_orders }}">{% trans "Reset" %}</a>
               {% endif %}
             </div>

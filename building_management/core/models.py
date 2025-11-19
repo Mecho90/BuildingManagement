@@ -12,6 +12,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Count, Q
 from django.db.models.functions import Lower
+from django.utils.functional import cached_property
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -24,9 +25,17 @@ class BuildingQuerySet(models.QuerySet):
     def visible_to(self, user):
         if not user or not user.is_authenticated:
             return self.none()
-        if user.is_staff or user.is_superuser:
+        if user.is_superuser:
             return self
-        return self.filter(owner=user)
+        from .authz import CapabilityResolver
+
+        resolver = CapabilityResolver(user)
+        building_ids = resolver.visible_building_ids()
+        if building_ids is None:
+            return self
+        if not building_ids:
+            return self.none()
+        return self.filter(id__in=building_ids)
 
     def with_unit_stats(self):
         """
@@ -43,6 +52,7 @@ class BuildingQuerySet(models.QuerySet):
                     work_orders__status__in=[
                         WorkOrder.Status.OPEN,
                         WorkOrder.Status.IN_PROGRESS,
+                        WorkOrder.Status.AWAITING_APPROVAL,
                     ],
                 ),
                 distinct=True,
@@ -54,18 +64,34 @@ class UnitQuerySet(models.QuerySet):
     def visible_to(self, user):
         if not user or not user.is_authenticated:
             return self.none()
-        if user.is_staff or user.is_superuser:
+        if user.is_superuser:
             return self
-        return self.filter(building__owner=user)
+        from .authz import CapabilityResolver
+
+        resolver = CapabilityResolver(user)
+        building_ids = resolver.visible_building_ids()
+        if building_ids is None:
+            return self
+        if not building_ids:
+            return self.none()
+        return self.filter(building_id__in=building_ids)
 
 
 class WorkOrderQuerySet(models.QuerySet):
     def visible_to(self, user):
         if not user or not user.is_authenticated:
             return self.none()
-        if user.is_staff or user.is_superuser:
+        if user.is_superuser:
             return self
-        return self.filter(building__owner=user)
+        from .authz import CapabilityResolver
+
+        resolver = CapabilityResolver(user)
+        building_ids = resolver.visible_building_ids()
+        if building_ids is None:
+            return self
+        if not building_ids:
+            return self.none()
+        return self.filter(building_id__in=building_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +157,11 @@ class Building(TimeStampedModel):
             return int(val)
         return self.work_orders.filter(
             archived_at__isnull=True,
-            status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
+            status__in=[
+                WorkOrder.Status.OPEN,
+                WorkOrder.Status.IN_PROGRESS,
+                WorkOrder.Status.AWAITING_APPROVAL,
+            ],
         ).count()
 
 
@@ -209,6 +239,7 @@ class WorkOrder(TimeStampedModel):
     class Status(models.TextChoices):
         OPEN = "OPEN", _("Open")
         IN_PROGRESS = "IN_PROGRESS", _("In progress")
+        AWAITING_APPROVAL = "AWAITING_APPROVAL", _("Awaiting approval")
         DONE = "DONE", _("Done")
 
     class Priority(models.TextChoices):
@@ -231,6 +262,7 @@ class WorkOrder(TimeStampedModel):
 
     title = models.CharField(max_length=255, verbose_name=_("Title"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
+    replacement_request_note = models.TextField(blank=True, verbose_name=_("Replacement request note"))
 
     status = models.CharField(
         max_length=20,
@@ -255,6 +287,14 @@ class WorkOrder(TimeStampedModel):
 
     # Archiving toggle (when done and user archives)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    awaiting_approval_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="work_orders_sent_for_approval",
+        verbose_name=_("Awaiting approval requested by"),
+    )
 
     objects = WorkOrderQuerySet.as_manager()
 
@@ -475,6 +515,199 @@ class Notification(TimeStampedModel):
     def delete(self, *args, **kwargs):
         result = super().delete(*args, **kwargs)
         return result
+
+
+class MembershipRole(models.TextChoices):
+    TECHNICIAN = "TECHNICIAN", _("Technician")
+    BACKOFFICE = "BACKOFFICE", _("Backoffice Employee")
+    ADMINISTRATOR = "ADMINISTRATOR", _("Administrator")
+    AUDITOR = "AUDITOR", _("Read-only auditor")
+
+
+class Capability:
+    VIEW_ALL_BUILDINGS = "view_all_buildings"
+    MANAGE_BUILDINGS = "manage_buildings"
+    CREATE_UNITS = "create_units"
+    CREATE_WORK_ORDERS = "create_work_orders"
+    MASS_ASSIGN = "mass_assign"
+    APPROVE_WORK_ORDERS = "approve_work_orders"
+    VIEW_AUDIT_LOG = "view_audit_log"
+    MANAGE_MEMBERSHIPS = "manage_memberships"
+    VIEW_USERS = "view_users"
+
+
+ROLE_CAPABILITIES: dict[str, set[str]] = {
+    MembershipRole.TECHNICIAN: {
+        Capability.CREATE_WORK_ORDERS,
+    },
+    MembershipRole.BACKOFFICE: {
+        Capability.MANAGE_BUILDINGS,
+        Capability.CREATE_UNITS,
+        Capability.CREATE_WORK_ORDERS,
+        Capability.MASS_ASSIGN,
+        Capability.APPROVE_WORK_ORDERS,
+        Capability.MANAGE_MEMBERSHIPS,
+    },
+    MembershipRole.ADMINISTRATOR: {
+        Capability.VIEW_ALL_BUILDINGS,
+        Capability.MANAGE_BUILDINGS,
+        Capability.CREATE_UNITS,
+        Capability.CREATE_WORK_ORDERS,
+        Capability.MASS_ASSIGN,
+        Capability.APPROVE_WORK_ORDERS,
+        Capability.VIEW_AUDIT_LOG,
+        Capability.MANAGE_MEMBERSHIPS,
+        Capability.VIEW_USERS,
+    },
+    MembershipRole.AUDITOR: {
+        Capability.VIEW_ALL_BUILDINGS,
+        Capability.VIEW_AUDIT_LOG,
+    },
+}
+
+
+def _normalize_capability_list(values):
+    normalized = []
+    seen = set()
+    for value in values or []:
+        if not value:
+            continue
+        if value in seen:
+            continue
+        normalized.append(value)
+        seen.add(value)
+    return normalized
+
+
+class BuildingMembership(TimeStampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="memberships",
+    )
+    role = models.CharField(max_length=32, choices=MembershipRole.choices)
+    capabilities_override = models.JSONField(default=dict, blank=True)
+    technician_subrole = models.CharField(
+        max_length=32,
+        choices=Building.Role.choices,
+        blank=True,
+        verbose_name=_("Technician sub-role"),
+    )
+
+    class Meta:
+        ordering = ["user_id", "building_id", "role"]
+        unique_together = ("user", "building", "role")
+        indexes = [
+            models.Index(fields=("user", "building")),
+        ]
+        verbose_name = _("Building membership")
+        verbose_name_plural = _("Building memberships")
+
+    def __str__(self) -> str:  # pragma: no cover
+        target = self.building.name if self.building else _("All buildings")
+        return f"{self.user} → {target} ({self.get_role_display()})"
+
+    @cached_property
+    def resolved_capabilities(self) -> set[str]:
+        defaults = ROLE_CAPABILITIES.get(self.role, set())
+        overrides = self.capabilities_override or {}
+        add = set(overrides.get("add", []))
+        remove = set(overrides.get("remove", []))
+        return (set(defaults) | add) - remove
+
+    def save(self, *args, **kwargs):
+        overrides = self.capabilities_override or {}
+        overrides["add"] = _normalize_capability_list(overrides.get("add"))
+        overrides["remove"] = _normalize_capability_list(overrides.get("remove"))
+        self.capabilities_override = overrides
+        if self.role != MembershipRole.TECHNICIAN:
+            self.technician_subrole = ""
+        super().save(*args, **kwargs)
+
+    @property
+    def is_global(self) -> bool:
+        return self.building_id is None
+
+
+class RoleAuditLog(TimeStampedModel):
+    class Action(models.TextChoices):
+        ROLE_ADDED = "role_added", _("Role added")
+        ROLE_REMOVED = "role_removed", _("Role removed")
+        CAPABILITY_UPDATED = "capability_updated", _("Capabilities updated")
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="role_actions",
+    )
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="role_audit_entries",
+    )
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    role = models.CharField(max_length=32, choices=MembershipRole.choices)
+    action = models.CharField(max_length=32, choices=Action.choices)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = _("Role audit log entry")
+        verbose_name_plural = _("Role audit log entries")
+
+    def __str__(self) -> str:  # pragma: no cover
+        actor = self.actor or _("System")
+        return f"{actor} {self.get_action_display()} {self.target_user}"
+
+
+class WorkOrderAuditLog(TimeStampedModel):
+    class Action(models.TextChoices):
+        STATUS_CHANGED = "status_changed", _("Status changed")
+        APPROVAL = "approval", _("Approval decision" )
+        REASSIGNED = "reassigned", _("Reassigned")
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="workorder_actions",
+    )
+    work_order = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name="audit_entries",
+    )
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    action = models.CharField(max_length=32, choices=Action.choices)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = _("Work order audit log entry")
+        verbose_name_plural = _("Work order audit log entries")
+
+    def __str__(self) -> str:  # pragma: no cover
+        return f"{self.get_action_display()} {self.work_order}"
 
 
 class UserSecurityProfile(models.Model):

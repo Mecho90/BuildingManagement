@@ -6,12 +6,20 @@ from . import views
 app_name = "core"
 
 urlpatterns = [
+    path("", views.DashboardView.as_view(), name="dashboard"),
     # Buildings
     path("buildings/", views.BuildingListView.as_view(), name="buildings_list"),
     path("buildings/new/", views.BuildingCreateView.as_view(), name="building_create"),
     path("buildings/<int:pk>/", views.BuildingDetailView.as_view(), name="building_detail"),
     path("buildings/<int:pk>/edit/", views.BuildingUpdateView.as_view(), name="building_update"),
     path("buildings/<int:pk>/delete/", views.BuildingDeleteView.as_view(), name="building_delete"),
+    path("buildings/<int:pk>/members/", views.BuildingMembershipManageView.as_view(), name="building_memberships"),
+    path(
+        "buildings/<int:building_pk>/members/<int:membership_pk>/remove/",
+        views.BuildingMembershipDeleteView.as_view(),
+        name="building_membership_remove",
+    ),
+    path("buildings/<int:pk>/my-role/", views.TechnicianSubroleUpdateView.as_view(), name="technician_subrole"),
 
     path("toggle-theme/", views.toggle_theme, name="toggle_theme"),
 
@@ -56,6 +64,8 @@ urlpatterns = [
         views.WorkOrderAttachmentDeleteView.as_view(),
         name="workorder_attachment_delete",
     ),
+
+    path("audit/", views.AuditTrailView.as_view(), name="audit_trail"),
 
     # Admin user management (superuser-only dashboard)
     path("manage/users/", views.AdminUserListView.as_view(), name="users_list"),

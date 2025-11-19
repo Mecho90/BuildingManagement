@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Dashboard" %}{% endblock %}
+
+{% block content %}
+<section class="space-y-6">
+  <header>
+    <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">{% trans "Dashboard" %}</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">
+      {% if dashboard_label %}{{ dashboard_label }}{% else %}{% trans "At-a-glance widgets tailored to your role." %}{% endif %}
+    </p>
+  </header>
+
+  {% if technician_cards %}
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "My jobs today" %}</h2>
+      <div class="grid gap-4 lg:grid-cols-2">
+        {% for job in technician_cards %}
+          <article class="rounded-2xl border border-emerald-100 bg-white/80 p-4 shadow-card dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ job.building }}</p>
+                <h3 class="text-lg font-semibold text-brand-foreground dark:text-white">{{ job.title }}</h3>
+              </div>
+              <span class="priority-badge {% if job.priority == 'HIGH' %}priority-badge--high{% elif job.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">
+                {{ job.priority_label }}
+              </span>
+            </div>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ job.description|default:_('No description provided.') }}</p>
+            <div class="mt-3 flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <span>{% trans "Deadline" %}: {{ job.deadline }}</span>
+              <span>{% trans "Status" %}: {{ job.status_label }}</span>
+            </div>
+            <div class="mt-4 flex gap-2">
+              <a class="btn btn-sm" href="{% url 'core:work_order_detail' job.id %}">{% trans "View" %}</a>
+              {% if job.can_update %}
+                <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_update' job.id %}">{% trans "Update" %}</a>
+              {% endif %}
+            </div>
+          </article>
+        {% empty %}
+          <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No work orders assigned for today." %}</p>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {% if backoffice_cards %}
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Awaiting approval" %}</h2>
+      <div class="grid gap-4 lg:grid-cols-2">
+        {% for card in backoffice_cards %}
+          <article class="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 shadow-card dark:border-amber-800/60 dark:bg-amber-900/30">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-200">{{ card.building }}</p>
+                <h3 class="text-lg font-semibold text-amber-900 dark:text-amber-100">{{ card.title }}</h3>
+              </div>
+              <span class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-100">
+                {{ card.awaiting_since }}
+              </span>
+            </div>
+            <p class="mt-2 text-sm text-amber-900 dark:text-amber-100">{{ card.note|default:_('No replacement request note provided.') }}</p>
+            <div class="mt-3 flex flex-wrap gap-3 text-xs text-amber-700 dark:text-amber-200">
+              <span>{% trans "Requested by" %}: {{ card.requested_by|default:_('Unknown') }}</span>
+              <span>{% trans "Deadline" %}: {{ card.deadline }}</span>
+            </div>
+            <div class="mt-4 flex gap-2">
+              <a class="btn btn-sm" href="{% url 'core:work_order_detail' card.id %}">{% trans "Review" %}</a>
+              <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_update' card.id %}">{% trans "Update" %}</a>
+            </div>
+          </article>
+        {% empty %}
+          <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No work orders are awaiting approval." %}</p>
+        {% endfor %}
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-card dark:border-slate-800 dark:bg-slate-900" aria-live="polite">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          {% blocktrans with load=assignment_load %}You currently have {{ load }} open assignments across your buildings.{% endblocktrans %}
+        </p>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="space-y-4">
+    <div class="flex items-center justify-between gap-2">
+      <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Notifications" %}</h2>
+      {% if notifications_page and notifications_page.paginator.count %}
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {% blocktrans count total=notifications_page.paginator.count %}{{ total }} alert{% plural %}{{ total }} alerts{% endblocktrans %}
+        </span>
+      {% endif %}
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-card dark:border-slate-800 dark:bg-slate-900">
+      {% if notifications_page and notifications_page.object_list %}
+        <ul class="space-y-3">
+          {% for note in notifications_page %}
+            <li class="rounded-2xl border p-4 text-sm shadow-sm transition sm:flex sm:items-start sm:justify-between{% if note.level == 'danger' %} border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-900/40 dark:text-rose-100{% elif note.level == 'warning' %} border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-100{% else %} border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200{% endif %}" data-notification-key="{{ note.id }}" data-is-new="{{ note.is_new|yesno:'true,false' }}">
+              <div class="flex flex-col gap-2 sm:max-w-3xl">
+                {% if note.level %}
+                  <div class="flex items-center gap-2">
+                    {% if note.level == 'danger' %}
+                      <span class="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-900/60 dark:text-rose-200">{{ note.level_label|default:note.level }}</span>
+                    {% elif note.level == 'warning' %}
+                      <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-900/60 dark:text-amber-200">{{ note.level_label|default:note.level }}</span>
+                    {% else %}
+                      <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200">{{ note.level_label|default:note.level }}</span>
+                    {% endif %}
+                  </div>
+                {% endif %}
+                <span class="leading-snug">{{ note.message }}</span>
+              </div>
+              {% if note.dismissible %}
+                <div class="mt-3 flex sm:mt-0 sm:justify-end">
+                  <form method="post"
+                        action="{% url 'core:notification_snooze' note.id %}"
+                        hx-post="{% url 'core:notification_snooze' note.id %}"
+                        hx-target="closest li"
+                        hx-swap="delete"
+                        class="inline-flex">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-secondary btn-sm">{% trans "Read" %}</button>
+                  </form>
+                </div>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if notifications_page %}
+          <div class="mt-4">
+            {% include "core/includes/pagination.html" with page_obj=notifications_page paginator=notifications_page.paginator query_string=note_page_query page_param="note_page" %}
+          </div>
+        {% endif %}
+      {% else %}
+        <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No notifications right now." %}</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if not technician_cards and not backoffice_cards and not notifications %}
+    <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No dashboard data available for your role yet." %}</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Audit Trail" %}{% endblock %}
+
+{% block content %}
+<section class="space-y-6">
+  <header class="space-y-2">
+    <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">{% trans "Audit Trail" %}</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Role changes, approvals, and reassignments." %}</p>
+  </header>
+
+  <form class="grid gap-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-card dark:border-slate-800 dark:bg-slate-900" method="get">
+    <div class="grid gap-4 sm:grid-cols-3">
+      <label class="space-y-1 text-sm" for="id_q">
+        <span class="font-medium text-slate-600 dark:text-slate-300">{% trans "Search" %}</span>
+        <input id="id_q" class="input" type="search" name="q" value="{{ q }}" placeholder="{% trans 'User, building, role...' %}"/>
+      </label>
+      <label class="space-y-1 text-sm" for="id_action">
+        <span class="font-medium text-slate-600 dark:text-slate-300">{% trans "Action" %}</span>
+        <select id="id_action" class="input" name="action">
+          <option value="">{% trans "All" %}</option>
+          {% for value,label in role_actions %}
+            <option value="{{ value }}" {% if action == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+          {% for value,label in workorder_actions %}
+            <option value="{{ value }}" {% if action == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="space-y-1 text-sm" for="id_kind">
+        <span class="font-medium text-slate-600 dark:text-slate-300">{% trans "Entry type" %}</span>
+        <select id="id_kind" class="input" name="kind">
+          <option value="all" {% if kind == 'all' %}selected{% endif %}>{% trans "All" %}</option>
+          <option value="role" {% if kind == 'role' %}selected{% endif %}>{% trans "Role changes" %}</option>
+          <option value="workorder" {% if kind == 'workorder' %}selected{% endif %}>{% trans "Work-order actions" %}</option>
+        </select>
+      </label>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <label class="space-y-1 text-sm" for="id_per">
+        <span class="font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</span>
+        <select id="id_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" name="per" onchange="this.form.submit()">
+          {% for opt in per_choices %}
+            <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" class="btn">{% trans "Filter" %}</button>
+      <a class="btn btn-secondary" href="?">{% trans "Reset" %}</a>
+      <a class="btn btn-secondary" href="?{{ request.GET.urlencode }}&amp;export=role">{% trans "Export roles" %}</a>
+      <a class="btn btn-secondary" href="?{{ request.GET.urlencode }}&amp;export=workorder">{% trans "Export work orders" %}</a>
+    </div>
+  </form>
+
+  {% if kind == 'all' or kind == 'role' %}
+    <section class="space-y-3">
+      <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Role changes" %}</h2>
+      <div class="rounded-2xl border border-slate-200 bg-white/80 shadow-card dark:border-slate-800 dark:bg-slate-900">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <tr>
+              <th class="px-4 py-3">{% trans "Timestamp" %}</th>
+              <th class="px-4 py-3">{% trans "Actor" %}</th>
+              <th class="px-4 py-3">{% trans "Target" %}</th>
+              <th class="px-4 py-3">{% trans "Role" %}</th>
+              <th class="px-4 py-3">{% trans "Action" %}</th>
+              <th class="px-4 py-3">{% trans "Building" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+            {% for entry in role_entries %}
+              <tr>
+                <td class="px-4 py-3">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-4 py-3">{{ entry.actor|default:_('System') }}</td>
+                <td class="px-4 py-3">{{ entry.target_user }}</td>
+                <td class="px-4 py-3">{{ entry.get_role_display }}</td>
+                <td class="px-4 py-3">{{ entry.get_action_display }}</td>
+                <td class="px-4 py-3">{{ entry.building|default:_('All buildings') }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-500 dark:text-slate-400">{% trans "No entries." %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if kind == 'all' or kind == 'workorder' %}
+    <section class="space-y-3">
+      <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Work-order actions" %}</h2>
+      <div class="rounded-2xl border border-slate-200 bg-white/80 shadow-card dark:border-slate-800 dark:bg-slate-900">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <tr>
+              <th class="px-4 py-3">{% trans "Timestamp" %}</th>
+              <th class="px-4 py-3">{% trans "Actor" %}</th>
+              <th class="px-4 py-3">{% trans "Work order" %}</th>
+              <th class="px-4 py-3">{% trans "Action" %}</th>
+              <th class="px-4 py-3">{% trans "Building" %}</th>
+              <th class="px-4 py-3">{% trans "Details" %}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+            {% for entry in workorder_entries %}
+              <tr>
+                <td class="px-4 py-3">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-4 py-3">{{ entry.actor|default:_('System') }}</td>
+                <td class="px-4 py-3">{{ entry.work_order.title }}</td>
+                <td class="px-4 py-3">{{ entry.get_action_display }}</td>
+                <td class="px-4 py-3">{{ entry.building|default:_('N/A') }}</td>
+                <td class="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">{{ entry.payload }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="px-4 py-6 text-center text-slate-500 dark:text-slate-400">{% trans "No entries." %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+</section>
+{% endblock %}

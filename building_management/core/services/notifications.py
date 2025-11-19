@@ -5,11 +5,12 @@ from datetime import date, datetime, timedelta
 from typing import Iterable, Sequence
 
 from django.db import transaction
-from django.db.models import Case, IntegerField, Value, When
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils import formats, timezone
 from django.utils.translation import gettext as _, ngettext
 
-from core.models import Notification, WorkOrder
+from core.authz import Capability, CapabilityResolver
+from core.models import BuildingMembership, MembershipRole, Notification, WorkOrder
 
 
 @dataclass
@@ -184,7 +185,11 @@ class NotificationService:
             WorkOrder.objects.visible_to(user)
             .filter(
                 archived_at__isnull=True,
-                status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
+                status__in=[
+                    WorkOrder.Status.OPEN,
+                    WorkOrder.Status.IN_PROGRESS,
+                    WorkOrder.Status.AWAITING_APPROVAL,
+                ],
                 deadline__gte=today,
                 deadline__lte=today + timedelta(days=max_window),
             )
@@ -349,4 +354,84 @@ class NotificationService:
 
         return list(
             Notification.objects.filter(user=user, category="mass_assign").active(on=today)
+        )
+
+
+def notify_approvers_of_pending_order(order: WorkOrder, *, exclude_user_id: int | None = None) -> None:
+    """Send notifications to users who can approve work orders for the given building."""
+    if not order.building_id:
+        return
+
+    memberships = BuildingMembership.objects.filter(
+        Q(building=order.building) | Q(building__isnull=True)
+    ).select_related("user")
+
+    recipients: dict[int, object] = {}
+    for membership in memberships:
+        user = membership.user
+        if not user or not user.is_active:
+            continue
+        if exclude_user_id and user.id == exclude_user_id:
+            continue
+        resolver = CapabilityResolver(user)
+        if resolver.has(Capability.APPROVE_WORK_ORDERS, building_id=order.building_id):
+            recipients[user.id] = user
+
+    if not recipients:
+        return
+
+    building_name = getattr(order.building, "name", _("their building"))
+    note = (order.replacement_request_note or "").strip()
+    note_section = ""
+    if note:
+        note_section = "\n\n" + _("Technician request:") + f" {note}"
+
+    body = _(
+        'Work order "%(title)s" in %(building)s is awaiting approval.'
+    ) % {
+        "title": order.title,
+        "building": building_name,
+    }
+    body += note_section
+
+    for user in recipients.values():
+        NotificationService(user).upsert(
+            NotificationPayload(
+                key=f"wo-awaiting-{order.pk}",
+                category="approval",
+                title=order.title,
+                body=body,
+                level=Notification.Level.WARNING,
+            )
+        )
+
+
+def notify_building_technicians_of_mass_assignment(order: WorkOrder) -> None:
+    if not order.building_id:
+        return
+    technicians = BuildingMembership.objects.filter(
+        building=order.building,
+        role=MembershipRole.TECHNICIAN,
+    ).select_related("user")
+    if not technicians:
+        return
+    body = _(
+        'New work order "%(title)s" was created for %(building)s with deadline %(deadline)s.'
+    ) % {
+        "title": order.title,
+        "building": getattr(order.building, "name", _("your building")),
+        "deadline": formats.date_format(order.deadline, "DATE_FORMAT"),
+    }
+    for membership in technicians:
+        user = membership.user
+        if not user or not user.is_active:
+            continue
+        NotificationService(user).upsert(
+            NotificationPayload(
+                key=f"wo-mass-{order.pk}",
+                category="mass_assign",
+                title=order.title,
+                body=body,
+                level=Notification.Level.INFO,
+            )
         )

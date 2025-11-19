@@ -19,6 +19,9 @@
         <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <nav class="flex flex-1 flex-wrap items-center gap-4" aria-label="Primary">
             {% block topbar_left %}
+              <a href="{% url 'core:dashboard' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/' %}">
+                {% trans "Dashboard" %}
+              </a>
               <a href="{% url 'core:buildings_list' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/buildings/' %}">
                 {% trans "Buildings" %}
               </a>
@@ -37,8 +40,13 @@
                   {% trans "Mass Assign" %}
                 </a>
               {% endif %}
-              {% if user.is_superuser %}
-                <a href="{% url 'core:users_list' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/manage/users/' %}">
+              {% if role_audit_enabled and role_audit_url %}
+                <a href="{{ role_audit_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav role_audit_url %}">
+                  {% trans "Audit Log" %}
+                </a>
+              {% endif %}
+              {% if can_view_user_management and user_management_url %}
+                <a href="{{ user_management_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/manage/users/' %}">
                   {% trans "User Management" %}
                 </a>
               {% elif user.is_staff %}

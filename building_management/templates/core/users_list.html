@@ -18,19 +18,31 @@
     </div>
   </header>
 
-  <form method="get" class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center">
-    <label class="sr-only" for="id_search">{% trans "Search users" %}</label>
-    <input
-      id="id_search"
-      class="input flex-1"
-      type="text"
-      name="q"
-      value="{{ q }}"
-      placeholder="{% trans "Search username, email, or name" %}"
-    />
-    <div class="flex items-center gap-2">
+  <form method="get" class="space-y-4 rounded-3xl border border-emerald-100/80 bg-white/90 p-6 shadow-card dark:border-emerald-400/40 dark:bg-slate-900">
+    <div class="space-y-2">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_search">{% trans "Search users" %}</label>
+      <input
+        id="id_search"
+        class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+        type="text"
+        name="q"
+        value="{{ q }}"
+        placeholder="{% trans "Search username, email, or name" %}"
+        autocomplete="off"
+      />
+    </div>
+    <div class="space-y-2">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_per">{% trans "Page size" %}</label>
+      <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+        <option value="25" {% if per == 25 %}selected{% endif %}>25</option>
+        <option value="50" {% if per == 50 %}selected{% endif %}>50</option>
+        <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
+        <option value="200" {% if per == 200 %}selected{% endif %}>200</option>
+      </select>
+    </div>
+    <div class="flex justify-end gap-2">
       <button class="btn" type="submit">{% trans "Search" %}</button>
-      {% if q %}
+      {% if q or per != 25 %}
         <a class="btn btn-secondary" href="{% url 'core:users_list' %}">{% trans "Clear" %}</a>
       {% endif %}
     </div>
@@ -45,7 +57,6 @@
             <th class="px-4 py-3">{% trans "Name" %}</th>
             <th class="px-4 py-3">{% trans "Email" %}</th>
             <th class="px-4 py-3">{% trans "Active" %}</th>
-            <th class="px-4 py-3">{% trans "Administrator" %}</th>
             <th class="px-4 py-3">{% trans "Roles" %}</th>
             <th class="px-4 py-3">{% trans "Last login" %}</th>
             <th class="px-4 py-3 text-right">{% trans "Actions" %}</th>
@@ -65,9 +76,12 @@
               </td>
               {% trans "Yes,No" as yesno_choices %}
               <td class="px-4 py-3">{{ u.is_active|yesno:yesno_choices }}</td>
-              <td class="px-4 py-3">{{ u.is_superuser|yesno:yesno_choices }}</td>
               <td class="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
-                {% trans "Coming soon" %}
+                {% if u.global_roles %}
+                  {{ u.global_roles|join:", " }}
+                {% else %}
+                  —
+                {% endif %}
               </td>
               <td class="px-4 py-3">{{ u.last_login|date:"Y-m-d H:i"|default:"—" }}</td>
               <td class="px-4 py-3 text-right">
@@ -90,12 +104,12 @@
     </div>
   </div>
 
-{% if is_paginated %}
-  {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
-{% endif %}
-</section>
+  {% if is_paginated %}
+    {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
+  {% endif %}
+
   {% if overview_rows %}
-    <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 mt-6">
       <div class="flex flex-col gap-1">
         <h2 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "User overview" %}</h2>
         <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Summary of buildings, units, and tasks per user." %}</p>

@@ -9,19 +9,35 @@ from django.utils.html import format_html
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
 
+from ..authz import Capability, CapabilityResolver
+
 __all__ = [
     "AdminRequiredMixin",
     "CachedObjectMixin",
     "_safe_next_url",
     "_querystring_without",
     "_user_can_access_building",
+    "_user_has_capability",
+    "_user_has_building_capability",
+    "CapabilityRequiredMixin",
     "format_attachment_delete_confirm",
 ]
 
 
 def _user_can_access_building(user, building) -> bool:
-    """Staff can access everything; others only their own buildings."""
-    return user.is_staff or building.owner_id == user.id
+    """Use membership visibility rules to determine access to a building."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    resolver = CapabilityResolver(user)
+    building_id = getattr(building, "pk", None)
+    if building_id is None:
+        return False
+    visible_ids = resolver.visible_building_ids()
+    if visible_ids is None:
+        return True
+    return building_id in visible_ids
 
 
 def _safe_next_url(request: HttpRequest) -> str | None:
@@ -102,3 +118,63 @@ class AdminRequiredMixin(UserPassesTestMixin):
             self.get_login_url(),
             self.get_redirect_field_name(),
         )
+
+
+def _user_has_capability(user, capability: str) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    resolver = CapabilityResolver(user)
+    return resolver.has(capability)
+
+
+def _user_has_building_capability(user, building, *capabilities: str) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    if building is None:
+        return False
+    building_id = getattr(building, "pk", None)
+    if building_id is None:
+        return False
+    resolver = CapabilityResolver(user)
+    for capability in capabilities or (Capability.MANAGE_BUILDINGS,):
+        if resolver.has(capability, building_id=building_id):
+            return True
+    return False
+
+
+class CapabilityRequiredMixin(UserPassesTestMixin):
+    """Require at least one capability (optionally scoped to a building)."""
+
+    required_capabilities: tuple[str, ...] = tuple()
+    capability_building_kwarg: str | None = None
+    raise_exception = True
+    permission_denied_message = _("You do not have permission to access this page.")
+
+    def get_required_capabilities(self) -> tuple[str, ...]:
+        return tuple(self.required_capabilities or ())
+
+    def get_capability_building_id(self):
+        kwarg = self.capability_building_kwarg
+        if kwarg and kwarg in self.kwargs:
+            try:
+                return int(self.kwargs[kwarg])
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    def test_func(self) -> bool:
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        resolver = CapabilityResolver(user)
+        building_id = self.get_capability_building_id()
+        capabilities = self.get_required_capabilities()
+        if not capabilities:
+            return True
+        return any(resolver.has(cap, building_id=building_id) for cap in capabilities)

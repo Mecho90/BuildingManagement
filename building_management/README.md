@@ -2,6 +2,8 @@
 
 Responsive Django/Tailwind UI for managing buildings, units, and work orders.
 
+Role-based access control (RBAC) is described in [docs/rbac.md](docs/rbac.md).
+
 ## Dependencies
 
 The Python stack stays lean but now ships with everything needed for production:

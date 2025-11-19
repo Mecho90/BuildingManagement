@@ -8,7 +8,15 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
-from core.models import Building, Unit, WorkOrder
+from core.authz import Capability, CapabilityResolver
+from core.models import (
+    Building,
+    BuildingMembership,
+    MembershipRole,
+    RoleAuditLog,
+    Unit,
+    WorkOrder,
+)
 
 
 class BuildingQuerySetTests(TestCase):
@@ -57,6 +65,13 @@ class BuildingQuerySetTests(TestCase):
             status=WorkOrder.Status.IN_PROGRESS,
             deadline=today + timedelta(days=10),
         )
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Awaiting parts",
+            priority=WorkOrder.Priority.MEDIUM,
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            deadline=today + timedelta(days=5),
+        )
         archived = WorkOrder.objects.create(
             building=self.building,
             title="Replace bulbs",
@@ -77,9 +92,19 @@ class BuildingQuerySetTests(TestCase):
         beta = annotated[self.other_building.pk]
 
         self.assertEqual(alpha.units_count, 2)
-        self.assertEqual(alpha.work_orders_count, 2)  # archived order excluded
+        self.assertEqual(alpha.work_orders_count, 3)  # awaiting approval counted
         self.assertEqual(beta.units_count, 1)
         self.assertEqual(beta.work_orders_count, 0)
+
+    def test_visible_to_uses_memberships(self):
+        BuildingMembership.objects.create(
+            user=self.other_owner,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+        )
+
+        visible = list(Building.objects.visible_to(self.other_owner))
+        self.assertEqual(visible, [self.building])
 
 
 class WorkOrderSaveTests(TestCase):
@@ -151,3 +176,39 @@ class UnitConstraintTests(TestCase):
             "Apartment number must be unique within this building.",
         ):
             dupe.full_clean()
+
+
+class CapabilityResolverTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="resolver",
+            email="resolver@example.com",
+            password="pass1234",
+        )
+        self.building = Building.objects.create(
+            owner=self.user,
+            name="Resolver Complex",
+            address="5 Main Street",
+        )
+
+    def test_membership_override_applies(self):
+        membership = BuildingMembership.objects.create(
+            user=self.user,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+            capabilities_override={"add": [Capability.MANAGE_BUILDINGS], "remove": [Capability.CREATE_WORK_ORDERS]},
+        )
+        caps = membership.resolved_capabilities
+        self.assertIn(Capability.MANAGE_BUILDINGS, caps)
+        self.assertNotIn(Capability.CREATE_WORK_ORDERS, caps)
+
+    def test_resolver_with_global_membership_allows_all_buildings(self):
+        BuildingMembership.objects.create(
+            user=self.user,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+        )
+        resolver = CapabilityResolver(self.user)
+        self.assertIsNone(resolver.visible_building_ids())
+        self.assertTrue(resolver.has(Capability.VIEW_ALL_BUILDINGS))

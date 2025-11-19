@@ -8,8 +8,9 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from core.models import Building, Notification, WorkOrder
+from core.models import Building, BuildingMembership, MembershipRole, Notification, WorkOrder
 from core.services import NotificationPayload, NotificationService
+from core.services.notifications import notify_approvers_of_pending_order
 
 
 class NotificationModelTests(TestCase):
@@ -175,3 +176,23 @@ class NotificationServiceTests(TestCase):
         note.refresh_from_db()
         self.assertEqual(note.snoozed_until, next_day)
         self.assertTrue(note.is_active(on=next_day))
+
+    def test_notify_approvers_of_pending_order(self):
+        approver = get_user_model().objects.create_user(
+            username="approver",
+            email="approver@example.com",
+            password="pass1234",
+        )
+        BuildingMembership.objects.create(
+            user=approver,
+            building=self.building,
+            role=MembershipRole.BACKOFFICE,
+        )
+        order = self._create_work_order(
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            replacement_request_note="Need valves",
+        )
+        notify_approvers_of_pending_order(order)
+        note = Notification.objects.get(user=approver, key=f"wo-awaiting-{order.pk}")
+        self.assertEqual(note.category, "approval")
+        self.assertIn("Need valves", note.body)

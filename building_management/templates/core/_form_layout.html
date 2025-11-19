@@ -26,27 +26,12 @@
     {% endfor %}
 
     <div class="grid gap-5">
+      {% if form.owner %}
+        {% include "core/includes/form_field.html" with field=form.owner only %}
+      {% endif %}
       {% for field in form.visible_fields %}
-        {% if field.field.widget.input_type == 'checkbox' %}
-          <div class="space-y-1">
-            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ field }}
-              <span>{{ field.label }}</span>
-            </label>
-            {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
-            {% if field.errors %}
-              <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
-            {% endif %}
-          </div>
-        {% else %}
-          <div class="space-y-1">
-            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
-            {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
-            {% if field.errors %}
-              <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
-            {% endif %}
-          </div>
+        {% if not form.owner or field.name != 'owner' %}
+          {% include "core/includes/form_field.html" with field=field %}
         {% endif %}
       {% endfor %}
     </div>

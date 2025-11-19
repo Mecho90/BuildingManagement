@@ -22,13 +22,17 @@ from .buildings import (
     BuildingCreateView,
     BuildingDeleteView,
     BuildingDetailView,
+    BuildingMembershipManageView,
+    BuildingMembershipDeleteView,
     BuildingListView,
     BuildingUpdateView,
+    TechnicianSubroleUpdateView,
     UnitCreateView,
     UnitDeleteView,
     UnitDetailView,
     UnitUpdateView,
 )
+from .audit import AuditTrailView
 from .dashboard import DashboardView
 from .notifications import NotificationSnoozeView
 from .work_orders import (
@@ -58,8 +62,12 @@ __all__ = [
     "BuildingCreateView",
     "BuildingDeleteView",
     "BuildingDetailView",
+    "BuildingMembershipManageView",
+    "BuildingMembershipDeleteView",
+    "TechnicianSubroleUpdateView",
     "BuildingListView",
     "BuildingUpdateView",
+    "AuditTrailView",
     "DashboardView",
     "NotificationSnoozeView",
     "toggle_theme",

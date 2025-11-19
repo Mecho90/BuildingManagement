@@ -93,11 +93,24 @@
         </div>
       </div>
 
+      <div class="grid gap-6 lg:grid-cols-2">
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="{{ form.priority.id_for_label }}">{% trans "Priority" %}</label>
+          {{ form.priority }}
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="{{ form.deadline.id_for_label }}">{% trans "Deadline" %}</label>
+          {{ form.deadline }}
+          {% if form.deadline.errors %}
+            <p class="text-sm text-rose-600">{{ form.deadline.errors|join:", " }}</p>
+          {% endif %}
+        </div>
+      </div>
+
       <div class="rounded-xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
         <ul class="list-disc space-y-1 pl-5">
-          <li>{% trans "The priority is set to Low." %}</li>
-          <li>{% trans "The deadline is automatically one month from the creation date." %}</li>
-          <li>{% trans "Affected users will see a notification about the new work order." %}</li>
+          <li>{% trans "Priority and deadline come from the fields above." %}</li>
+          <li>{% trans "Technicians assigned to the building receive a notification for each mass-assigned job." %}</li>
         </ul>
       </div>
 

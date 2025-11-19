@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}
   {% if form.instance.pk %}{% trans "Edit Building" %}{% else %}{% trans "New Building" %}{% endif %} · {% trans "Building Management" %}
@@ -10,5 +10,33 @@
     {% include "core/_form_layout.html" with form=form title=_('Edit Building') subtitle="" cancel_url=cancel_url %}
   {% else %}
     {% include "core/_form_layout.html" with form=form title=_('New Building') subtitle="" cancel_url=cancel_url %}
+  {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  {% if form.owner %}
+    <script>
+      (function() {
+        const ownerField = document.getElementById("{{ form.owner.auto_id }}");
+        const roleField = document.getElementById("{{ form.role.auto_id }}");
+        if (!ownerField || !roleField) {
+          return;
+        }
+        const techSetRaw = ownerField.dataset.technicianUsers || "";
+        const technicianIds = techSetRaw.split(",").filter(Boolean);
+
+        function toggleRoleField() {
+          if (!ownerField.value) {
+            roleField.disabled = true;
+            return;
+          }
+          roleField.disabled = !technicianIds.includes(ownerField.value);
+        }
+
+        ownerField.addEventListener("change", toggleRoleField);
+        toggleRoleField();
+      })();
+    </script>
   {% endif %}
 {% endblock %}

@@ -161,12 +161,8 @@ def api_units(request, building_id: int | None = None):
     if not request.user.is_authenticated:
         raise Http404()
 
-    if request.user.is_staff:
-        qs = Unit.objects.select_related("building").all()
-        bld_qs = Building.objects.all()
-    else:
-        qs = Unit.objects.select_related("building").filter(building__owner=request.user)
-        bld_qs = Building.objects.filter(owner=request.user)
+    qs = Unit.objects.visible_to(request.user).select_related("building")
+    bld_qs = Building.objects.visible_to(request.user)
 
     param = building_id if building_id is not None else request.GET.get("building")
     if param is not None:

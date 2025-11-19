@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Select sub-role" %}{% endblock %}
+
+{% block content %}
+<section class="space-y-6">
+  <header>
+    <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">{% blocktrans with name=building.name %}My role at {{ name }}{% endblocktrans %}</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Choose how you'll appear to property managers." %}</p>
+  </header>
+
+  <form method="post" class="space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-card dark:border-slate-800 dark:bg-slate-900">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert--danger">
+        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+      </div>
+    {% endif %}
+    <div class="space-y-2">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-200" for="{{ form.technician_subrole.id_for_label }}">{{ form.technician_subrole.label }}</label>
+      {{ form.technician_subrole }}
+      {% if form.technician_subrole.errors %}
+        <p class="text-sm text-rose-600">{{ form.technician_subrole.errors|join:", " }}</p>
+      {% endif %}
+    </div>
+    <div class="flex gap-3">
+      <button type="submit" class="btn">{% trans "Save" %}</button>
+      <a class="btn btn-secondary" href="{% url 'core:building_detail' building.pk %}">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

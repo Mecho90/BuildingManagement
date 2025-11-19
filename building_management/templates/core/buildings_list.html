@@ -13,33 +13,37 @@
           {% blocktrans with count=buildings_total %}Total buildings: {{ count }}{% endblocktrans %}
         </p>
       </div>
-      <a class="btn self-start md:self-center" href="{% url 'core:building_create' %}">{% trans "Add new building" %}</a>
+      {% if can_manage_buildings %}
+        <a class="btn self-start md:self-center" href="{% url 'core:building_create' %}">{% trans "Add new building" %}</a>
+      {% endif %}
     </div>
 
-    <div class="md:sticky md:top-4 md:z-10">
-      <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
+    <div>
+      <form method="get" class="space-y-5 rounded-3xl border border-emerald-100/80 bg-white/90 p-6 shadow-card backdrop-blur dark:border-emerald-400/40 dark:bg-slate-900">
         {% url 'core:buildings_list' as buildings_reset_url %}
         {% with placeholder=_('Search by name, address, owner') %}
-          <div class="flex flex-col gap-2 md:flex-row md:items-center">
-            <label class="sr-only" for="id_q">{% trans "Search buildings" %}</label>
-            <input id="id_q" class="input flex-1" type="text" name="q" value="{{ q }}" placeholder="{{ placeholder }}" autocomplete="off" />
-            <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
-            {% if q or sort != 'name' or per != 10 %}
-              <a class="btn btn-secondary md:mt-0" href="{{ buildings_reset_url }}">{% trans "Reset" %}</a>
-            {% endif %}
+          <div class="space-y-2">
+            <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search buildings" %}</label>
+            <input id="id_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="q" value="{{ q }}" placeholder="{{ placeholder }}" autocomplete="off" />
           </div>
         {% endwith %}
 
-        <div class="flex items-center gap-2 md:justify-end">
+        <div class="space-y-2">
           <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-          <select id="id_per" name="per" onchange="this.form.submit()" class="input w-28">
-            <option value="10"  {% if per == 10  %}selected{% endif %}>10</option>
-            <option value="20"  {% if per == 20  %}selected{% endif %}>20</option>
+          <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            <option value="25"  {% if per == 25  %}selected{% endif %}>25</option>
             <option value="50"  {% if per == 50  %}selected{% endif %}>50</option>
             <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
+            <option value="200" {% if per == 200 %}selected{% endif %}>200</option>
           </select>
         </div>
 
+        <div class="flex justify-end gap-2">
+          <button class="btn" type="submit">{% trans "Filter" %}</button>
+          {% if q or sort != 'name' or per != 25 %}
+            <a class="btn btn-secondary" href="{{ buildings_reset_url }}">{% trans "Reset" %}</a>
+          {% endif %}
+        </div>
       </form>
     </div>
 
@@ -195,56 +199,5 @@
     {% if is_paginated %}
       {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
     {% endif %}
-
-    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <div class="flex items-center justify-between gap-2">
-        <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Notifications" %}</h2>
-        {% if notifications_page and notifications_page.paginator.count %}
-          <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-            {% blocktrans count total=notifications_page.paginator.count %}{{ total }} alert{% plural %}{{ total }} alerts{% endblocktrans %}
-          </span>
-        {% endif %}
-      </div>
-      {% if notifications_page and notifications_page.object_list %}
-        <ul class="mt-3 space-y-3">
-          {% for note in notifications_page %}
-            <li class="rounded-2xl border p-4 text-sm shadow-sm transition sm:flex sm:items-start sm:justify-between{% if note.level == 'danger' %} border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-900/40 dark:text-rose-100{% elif note.level == 'warning' %} border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-100{% else %} border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200{% endif %}" data-notification-key="{{ note.id }}" data-is-new="{{ note.is_new|yesno:'true,false' }}">
-              <div class="flex flex-col gap-2 sm:max-w-3xl">
-                {% if note.level %}
-                  <div class="flex items-center gap-2">
-                    {% if note.level == 'danger' %}
-                      <span class="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-900/60 dark:text-rose-200">{{ note.level_label|default:note.level }}</span>
-                    {% elif note.level == 'warning' %}
-                      <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-900/60 dark:text-amber-200">{{ note.level_label|default:note.level }}</span>
-                    {% else %}
-                      <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200">{{ note.level_label|default:note.level }}</span>
-                    {% endif %}
-                  </div>
-                {% endif %}
-                <span class="leading-snug">{{ note.message }}</span>
-              </div>
-              {% if note.dismissible %}
-                <div class="mt-3 flex sm:mt-0 sm:justify-end">
-                  <form method="post"
-                        action="{% url 'core:notification_snooze' note.id %}"
-                        hx-post="{% url 'core:notification_snooze' note.id %}"
-                        hx-target="closest li"
-                        hx-swap="delete"
-                        class="inline-flex">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-secondary btn-sm">{% trans "Read" %}</button>
-                  </form>
-                </div>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
-        {% if notifications_page %}
-          {% include "core/includes/pagination.html" with page_obj=notifications_page paginator=notifications_page.paginator query_string=note_page_query page_param="note_page" %}
-        {% endif %}
-      {% else %}
-        <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">{% trans "No notifications right now." %}</p>
-      {% endif %}
-    </section>
   </section>
 {% endblock %}

@@ -35,10 +35,10 @@
     </header>
 
     {% if orders %}
-      <form method="get" class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-        <div class="flex flex-wrap items-center gap-2">
+      <form method="get" class="space-y-3 rounded-3xl border border-emerald-100/80 bg-white/90 p-4 text-sm text-slate-600 shadow-card dark:border-emerald-400/40 dark:bg-slate-900 dark:text-slate-300">
+        <div class="space-y-2">
           <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-200">{% trans "Page size" %}</label>
-          <select id="id_per" name="per" onchange="this.form.submit()" class="input w-24">
+          <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             {% for option in detail_per_choices %}
               <option value="{{ option }}" {% if detail_per == option %}selected{% endif %}>{{ option }}</option>
             {% endfor %}
@@ -49,6 +49,9 @@
             <input type="hidden" name="{{ key }}" value="{{ value }}" />
           {% endif %}
         {% endfor %}
+        <div class="flex justify-end">
+          <button class="btn btn-sm" type="submit">{% trans "Apply" %}</button>
+        </div>
       </form>
 
       {% if pagination_object %}

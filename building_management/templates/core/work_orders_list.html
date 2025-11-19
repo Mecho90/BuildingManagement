@@ -16,36 +16,33 @@
     <a class="btn self-start md:self-center" href="{% url 'core:work_order_create' %}?next={{ request.get_full_path|urlencode }}">{% trans "Add work order" %}</a>
   </div>
 
-  <form method="get" class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-    <div class="grid gap-4 md:grid-cols-5 md:items-end">
-      <input type="hidden" name="priority" value="{{ priority }}"/>
-      <div class="md:col-span-2 flex flex-col gap-2">
-        <label class="sr-only" for="id_q">{% trans "Search work orders" %}</label>
-        <div class="flex flex-col gap-2 md:flex-row md:items-center">
-          <input
-            id="id_q"
-            class="input flex-1"
-            type="text"
-            name="q"
-            value="{{ q }}"
-            placeholder="{% trans "Title or description" %}"
-          />
-          <button class="btn md:ml-2 md:mt-0" type="submit">{% trans "Filter" %}</button>
-        </div>
-      </div>
+  <form method="get" class="space-y-5 rounded-3xl border border-emerald-100/80 bg-white/90 p-6 shadow-card dark:border-emerald-400/40 dark:bg-slate-900">
+    <div class="space-y-2">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search work orders" %}</label>
+      <input
+        id="id_q"
+        class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+        type="text"
+        name="q"
+        value="{{ q }}"
+        placeholder="{% trans "Title or description" %}"
+        autocomplete="off"
+      />
+    </div>
 
-      <div class="flex flex-col gap-2 md:col-span-1">
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div class="space-y-2">
         <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-        <select id="id_per" name="per" onchange="this.form.submit()" class="input">
+        <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           {% for opt in per_choices %}
             <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
           {% endfor %}
         </select>
       </div>
 
-      <div class="flex flex-col gap-2 md:col-span-1">
+      <div class="space-y-2">
         <label for="id_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
-        <select id="id_status" name="status" onchange="this.form.submit()" class="input">
+        <select id="id_status" name="status" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           <option value="" {% if not status %}selected{% endif %}>{% trans "All" %}</option>
           {% for val, label in status_choices %}
             <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
@@ -53,23 +50,31 @@
         </select>
       </div>
 
+      <div class="space-y-2">
+        <label for="id_priority" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Priority" %}</label>
+        <select id="id_priority" name="priority" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+          <option value="" {% if not priority %}selected{% endif %}>{% trans "All priorities" %}</option>
+          <option value="HIGH" {% if priority == 'HIGH' %}selected{% endif %}>{% trans "High" %}</option>
+          <option value="MEDIUM" {% if priority == 'MEDIUM' %}selected{% endif %}>{% trans "Medium" %}</option>
+          <option value="LOW" {% if priority == 'LOW' %}selected{% endif %}>{% trans "Low" %}</option>
+        </select>
+      </div>
+
       {% if owner_choices %}
-        <div class="flex flex-col gap-2 md:col-span-1">
+        <div class="space-y-2">
           <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
-          <select id="id_owner" name="owner" onchange="this.form.submit()" class="input">
+          <select id="id_owner" name="owner" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             <option value="" {% if not owner %}selected{% endif %}>{% trans "All" %}</option>
             {% for opt in owner_choices %}
               <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
             {% endfor %}
           </select>
         </div>
-      {% else %}
-        <div class="hidden md:col-span-1 md:block"></div>
       {% endif %}
 
-      <div class="flex flex-col gap-2 md:col-span-1">
+      <div class="space-y-2">
         <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
-        <select id="id_sort" name="sort" onchange="this.form.submit()" class="input">
+        <select id="id_sort" name="sort" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           {% for value, label in sort_choices %}
             <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
@@ -77,31 +82,10 @@
       </div>
     </div>
 
-    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Quick filters" %}</span>
-        <a href="?status=OPEN{% if priority %}&priority={{ priority }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if status == 'OPEN' %}badge--active{% else %}badge--ghost{% endif %}">
-          {% trans "Open" %}
-        </a>
-        <a href="?status=IN_PROGRESS{% if priority %}&priority={{ priority }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if status == 'IN_PROGRESS' %}badge--active{% else %}badge--ghost{% endif %}">
-          {% trans "In progress" %}
-        </a>
-        <a href="?status=DONE{% if priority %}&priority={{ priority }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if status == 'DONE' %}badge--active{% else %}badge--ghost{% endif %}">
-          {% trans "Done" %}
-        </a>
-        <span class="mx-2 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true"></span>
-        <a href="?priority=HIGH{% if status %}&status={{ status }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if priority == 'HIGH' %}badge--active{% else %}badge--ghost{% endif %}">
-          {% trans "High priority" %}
-        </a>
-        <a href="?priority=MEDIUM{% if status %}&status={{ status }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if priority == 'MEDIUM' %}badge--active{% else %}badge--ghost{% endif %}">
-          {% trans "Medium priority" %}
-        </a>
-        <a href="?priority=LOW{% if status %}&status={{ status }}{% endif %}{% if owner %}&owner={{ owner }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}{% if per %}&per={{ per }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}" class="badge {% if priority == 'LOW' %}badge--active{% else %}badge--ghost{% endif %}">
-          {% trans "Low priority" %}
-        </a>
-      </div>
-      {% if q or status or owner or sort != 'priority' or per != 10 or priority %}
-        <a class="btn btn-secondary btn-sm" href="{% url 'core:work_orders_list' %}">{% trans "Reset" %}</a>
+    <div class="flex justify-end gap-2">
+      <button class="btn" type="submit">{% trans "Filter" %}</button>
+      {% if q or status or owner or sort != 'priority' or per != 25 or priority %}
+        <a class="btn btn-secondary" href="{% url 'core:work_orders_list' %}">{% trans "Reset" %}</a>
       {% endif %}
     </div>
   </form>
@@ -258,7 +242,7 @@
               <p class="text-sm">{% trans "No work orders found with the current filters." %}</p>
               <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <a class="btn" href="{% url 'core:work_order_create' %}?next={{ request.get_full_path|urlencode }}">{% trans "Create work order" %}</a>
-                {% if q or status or owner or sort != 'priority' or per != 10 or priority %}
+                {% if q or status or owner or sort != 'priority' or per != 25 or priority %}
                   <a class="btn btn-secondary" href="{% url 'core:work_orders_list' %}">{% trans "Clear filters" %}</a>
                 {% endif %}
               </div>

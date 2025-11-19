@@ -23,15 +23,20 @@ from django.template.loader import render_to_string
 from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, UpdateView
 
+from ..authz import Capability, CapabilityResolver, log_workorder_action
 from ..forms import MassAssignWorkOrdersForm, WorkOrderForm
-from ..models import Building, Notification, Unit, WorkOrder, WorkOrderAttachment
-from ..services import NotificationService
+from ..models import Building, BuildingMembership, WorkOrder, WorkOrderAttachment, WorkOrderAuditLog
+from ..services.notifications import (
+    notify_approvers_of_pending_order,
+    notify_building_technicians_of_mass_assignment,
+)
 from .common import (
-    AdminRequiredMixin,
     CachedObjectMixin,
+    CapabilityRequiredMixin,
     _querystring_without,
     _safe_next_url,
     _user_can_access_building,
+    _user_has_building_capability,
     format_attachment_delete_confirm,
 )
 
@@ -192,7 +197,12 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
             )
 
         if request.user.is_authenticated and order.building_id:
-            can_manage = _user_can_access_building(request.user, order.building)
+            can_manage = _user_has_building_capability(
+                request.user,
+                order.building,
+                Capability.MANAGE_BUILDINGS,
+                Capability.CREATE_WORK_ORDERS,
+            )
 
         attachments_api_url = reverse("core:api_workorder_attachments", args=[order.pk])
     else:
@@ -315,13 +325,15 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
     model = WorkOrder
     template_name = "core/work_orders_list.html"
     context_object_name = "orders"
-    paginate_by = 10
+    paginate_by = 25
 
-    _per_choices = (10, 20, 50, 100)
+    _per_choices = (25, 50, 100, 200)
 
     def get_queryset(self):
         request = self.request
         user = request.user
+        resolver = CapabilityResolver(user) if user.is_authenticated else None
+        self._can_view_all = resolver.has(Capability.VIEW_ALL_BUILDINGS) if resolver else False
 
         # Page size (validated later in get_paginate_by)
         try:
@@ -349,7 +361,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
         # Build owner choices for staff (before additional filters)
         self._owner_choices: list[dict[str, str]] = []
-        if user.is_staff or user.is_superuser:
+        if self._can_view_all:
             owner_ids = (
                 Building.objects.filter(work_orders__in=base_qs)
                 .values_list("owner_id", flat=True)
@@ -389,7 +401,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 owner_filter = None
 
         if owner_filter:
-            if user.is_staff or user.is_superuser:
+            if self._can_view_all:
                 qs = qs.filter(building__owner_id=owner_filter)
             elif owner_filter == user.id:
                 qs = qs.filter(building__owner_id=owner_filter)
@@ -413,7 +425,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         if sort_param not in sort_map:
             sort_param = "priority"
 
-        if sort_param in {"owner", "owner_desc"} and not (user.is_staff or user.is_superuser):
+        if sort_param in {"owner", "owner_desc"} and not self._can_view_all:
             sort_param = "priority"
 
         qs = qs.order_by(*sort_map[sort_param])
@@ -464,12 +476,12 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                     ("owner", _("Owner (A → Z)")),
                     ("owner_desc", _("Owner (Z → A)")),
                 ],
-                "show_owner_info": self.request.user.is_staff or self.request.user.is_superuser,
+                "show_owner_info": getattr(self, "_can_view_all", False),
                 "pagination_query": _querystring_without(self.request, "page"),
                 "total_orders": total_orders,
             }
         )
-        if not (self.request.user.is_staff or self.request.user.is_superuser):
+        if not getattr(self, "_can_view_all", False):
             ctx["sort_choices"] = [
                 choice for choice in ctx["sort_choices"]
                 if not choice[0].startswith("owner")
@@ -492,6 +504,19 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         if next_url:
             ctx["cancel_url"] = next_url
         ctx.update(_render_attachment_panel(self.request, order=self.object))
+        ctx["can_edit_order"] = _user_has_building_capability(
+            self.request.user,
+            self.object.building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        )
+        ctx["can_delete_order"] = _user_has_building_capability(
+            self.request.user,
+            self.object.building,
+            Capability.MANAGE_BUILDINGS,
+        )
+        ctx["replacement_request_note"] = self.object.replacement_request_note
+        ctx["awaiting_requested_by"] = self.object.awaiting_approval_by
         return ctx
 
     def test_func(self):
@@ -514,10 +539,20 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
         if building_id:
             try:
                 self.building = Building.objects.visible_to(self.request.user).get(pk=int(building_id))
+                if not self._user_can_modify(self.building):
+                    raise Http404()
                 kwargs["building"] = self.building
             except (ValueError, Building.DoesNotExist):
                 pass
         return kwargs
+
+    def _user_can_modify(self, building):
+        return _user_has_building_capability(
+            self.request.user,
+            building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -544,6 +579,8 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
     def form_valid(self, form):
         prospective = form.save(commit=False)
         if not _user_can_access_building(self.request.user, prospective.building):
+            raise Http404()
+        if not self._user_can_modify(prospective.building):
             raise Http404()
         with transaction.atomic():
             response = super().form_valid(form)
@@ -596,11 +633,24 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
 
     def test_func(self):
         wo = self.get_object()
-        return _user_can_access_building(self.request.user, wo.building)
+        return _user_has_building_capability(
+            self.request.user,
+            wo.building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        )
 
     def form_valid(self, form):
+        previous_status = form.instance.status if form.instance.pk else WorkOrder.Status.OPEN
         obj = form.save(commit=False)
         if not _user_can_access_building(self.request.user, obj.building):
+            raise Http404()
+        if not _user_has_building_capability(
+            self.request.user,
+            obj.building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        ):
             raise Http404()
         if obj.archived_at and obj.status != WorkOrder.Status.DONE:
             obj.archived_at = None
@@ -608,6 +658,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             obj.save()
             form.save_attachments(obj)
         self.object = obj
+        self._after_status_change(previous_status)
         messages.warning(self.request, _("Work order updated."))
         return HttpResponseRedirect(self.get_success_url())
 
@@ -617,6 +668,29 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             return next_url
         return reverse("core:building_detail", args=[self.object.building_id])
 
+    def _after_status_change(self, previous_status):
+        obj = getattr(self, "object", None)
+        if not obj:
+            return
+        actor = self.request.user if self.request.user.is_authenticated else None
+        if previous_status != obj.status:
+            action = WorkOrderAuditLog.Action.STATUS_CHANGED
+            if previous_status == WorkOrder.Status.AWAITING_APPROVAL and obj.status == WorkOrder.Status.DONE:
+                action = WorkOrderAuditLog.Action.APPROVAL
+            elif previous_status != WorkOrder.Status.AWAITING_APPROVAL and obj.status == WorkOrder.Status.AWAITING_APPROVAL:
+                action = WorkOrderAuditLog.Action.STATUS_CHANGED
+            log_workorder_action(
+                actor=actor,
+                work_order=obj,
+                action=action,
+                payload={"from": previous_status, "to": obj.status},
+            )
+        if (
+            previous_status != WorkOrder.Status.AWAITING_APPROVAL
+            and obj.status == WorkOrder.Status.AWAITING_APPROVAL
+        ):
+            notify_approvers_of_pending_order(obj, exclude_user_id=getattr(self.request.user, "id", None))
+
 
 class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
     model = WorkOrder
@@ -624,7 +698,11 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
 
     def test_func(self):
         wo = self.get_object()
-        return _user_can_access_building(self.request.user, wo.building)
+        return _user_has_building_capability(
+            self.request.user,
+            wo.building,
+            Capability.MANAGE_BUILDINGS,
+        )
 
     def get_success_url(self):
         next_url = _safe_next_url(self.request)
@@ -670,7 +748,11 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def test_func(self):
         wo = self.get_object()
-        return _user_can_access_building(self.request.user, wo.building)
+        return _user_has_building_capability(
+            self.request.user,
+            wo.building,
+            Capability.APPROVE_WORK_ORDERS,
+        )
 
     def post(self, request, *args, **kwargs):
         wo = self.get_object()
@@ -688,23 +770,40 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
         return redirect("core:building_detail", wo.building_id)
 
 
-class MassAssignWorkOrdersView(LoginRequiredMixin, AdminRequiredMixin, FormView):
+class MassAssignWorkOrdersView(CapabilityRequiredMixin, LoginRequiredMixin, FormView):
     template_name = "core/work_orders_mass_assign.html"
     form_class = MassAssignWorkOrdersForm
     success_url = reverse_lazy("core:work_orders_mass_assign")
+    required_capabilities = (Capability.MASS_ASSIGN,)
 
     def get_queryset(self):
-        if not hasattr(self, "_building_queryset"):
-            self._building_queryset = (
-                Building.objects.filter(role=Building.Role.TECH_SUPPORT)
-                .select_related("owner")
-                .order_by("name", "id")
-            )
+        if hasattr(self, "_building_queryset"):
+            return self._building_queryset
+        qs = (
+            Building.objects.filter(role=Building.Role.TECH_SUPPORT)
+            .select_related("owner")
+            .order_by("name", "id")
+        )
+        resolver = CapabilityResolver(self.request.user)
+        visible_ids = resolver.visible_building_ids()
+        if visible_ids is not None:
+            qs = qs.filter(pk__in=visible_ids or [])
+
+        if resolver.has(Capability.MANAGE_BUILDINGS):
+            self._building_queryset = qs
+            return self._building_queryset
+
+        manageable_ids = []
+        for pk in qs.values_list("pk", flat=True):
+            if resolver.has(Capability.MANAGE_BUILDINGS, building_id=pk):
+                manageable_ids.append(pk)
+        self._building_queryset = qs.filter(pk__in=manageable_ids)
         return self._building_queryset
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["buildings_queryset"] = self.get_queryset()
+        kwargs["user"] = self.request.user
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -754,7 +853,8 @@ class MassAssignWorkOrdersView(LoginRequiredMixin, AdminRequiredMixin, FormView)
 
         title = form.cleaned_data["title"].strip()
         description = (form.cleaned_data.get("description") or "").strip()
-        deadline = timezone.localdate() + timedelta(days=30)
+        deadline = form.cleaned_data["deadline"]
+        priority = form.cleaned_data["priority"]
 
         created = 0
         skipped = 0
@@ -767,7 +867,11 @@ class MassAssignWorkOrdersView(LoginRequiredMixin, AdminRequiredMixin, FormView)
                         building=building,
                         title=title,
                         mass_assigned=True,
-                        status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
+                        status__in=[
+                            WorkOrder.Status.OPEN,
+                            WorkOrder.Status.IN_PROGRESS,
+                            WorkOrder.Status.AWAITING_APPROVAL,
+                        ],
                         archived_at__isnull=True,
                     )
                     .order_by("-created_at")
@@ -777,17 +881,18 @@ class MassAssignWorkOrdersView(LoginRequiredMixin, AdminRequiredMixin, FormView)
                     skipped += 1
                     continue
 
-                WorkOrder.objects.create(
+                order = WorkOrder.objects.create(
                     building=building,
                     title=title,
                     description=description,
                     status=WorkOrder.Status.OPEN,
-                    priority=WorkOrder.Priority.LOW,
+                    priority=priority,
                     deadline=deadline,
                     mass_assigned=True,
                 )
                 created += 1
                 created_names.append(building.name)
+                notify_building_technicians_of_mass_assignment(order)
 
         if created:
             building_list = ", ".join(created_names[:5])
@@ -825,10 +930,10 @@ class ArchivedWorkOrderFilterMixin:
     Shared filtering helpers for archived work order views.
     """
 
-    SUMMARY_PER_CHOICES = (10, 20, 50, 100)
-    SUMMARY_PER_DEFAULT = 10
-    DETAIL_PER_CHOICES = (10, 20, 50, 100)
-    DETAIL_PER_DEFAULT = 10
+    SUMMARY_PER_CHOICES = (25, 50, 100, 200)
+    SUMMARY_PER_DEFAULT = 25
+    DETAIL_PER_CHOICES = (25, 50, 100, 200)
+    DETAIL_PER_DEFAULT = 25
 
     _sort_choices = [
         ("archived_desc", _lazy("Archived (Newest first)")),
@@ -1021,9 +1126,9 @@ class ArchivedWorkOrderFilterMixin:
 
 
 class ArchivedWorkOrderListView(
-    ArchivedWorkOrderFilterMixin,
+    CapabilityRequiredMixin,
     LoginRequiredMixin,
-    UserPassesTestMixin,
+    ArchivedWorkOrderFilterMixin,
     ListView,
 ):
     """
@@ -1033,6 +1138,8 @@ class ArchivedWorkOrderListView(
     template_name = "core/work_orders_archive_list.html"
     paginate_by = None
 
+    required_capabilities = (Capability.VIEW_ALL_BUILDINGS,)
+
     def get_queryset(self):
         # Pre-compute filters but avoid fetching the full order list.
         self.get_filtered_queryset()
@@ -1040,9 +1147,9 @@ class ArchivedWorkOrderListView(
 
 
 class ArchivedWorkOrderDetailView(
-    ArchivedWorkOrderFilterMixin,
+    CapabilityRequiredMixin,
     LoginRequiredMixin,
-    UserPassesTestMixin,
+    ArchivedWorkOrderFilterMixin,
     ListView,
 ):
     """
@@ -1051,6 +1158,7 @@ class ArchivedWorkOrderDetailView(
 
     template_name = "core/work_orders_archive_detail.html"
     paginate_by = None
+    required_capabilities = (Capability.VIEW_ALL_BUILDINGS,)
 
     def get_paginate_by(self, queryset):
         per = self._parse_per_param(

@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% load i18n form_helpers %}
+
+{% block title %}{{ building.name }} · {% trans "Team" %}{% endblock %}
+
+{% block content %}
+<section class="space-y-6">
+  <header>
+    <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">{% blocktrans with name=building.name %}Team for {{ name }}{% endblocktrans %}</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Grant or revoke access to this building." %}</p>
+    <a class="btn btn-secondary mt-3" href="{% url 'core:building_detail' building.id %}">{% trans "Back to building" %}</a>
+  </header>
+
+  <section class="space-y-6">
+    <div class="space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Current members" %}</h2>
+        {% if can_add_members %}
+          {% if show_add_form %}
+            <a class="btn btn-secondary" href="{{ request.path }}">{% trans "Cancel" %}</a>
+          {% else %}
+            <a class="btn" href="{{ add_member_url }}">{% trans "Add" %}</a>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="rounded-2xl border border-slate-200 bg-white/80 shadow-card dark:border-slate-800 dark:bg-slate-900">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <tr>
+              <th class="px-4 py-3">{% trans "User" %}</th>
+              <th class="px-4 py-3">{% trans "Role" %}</th>
+              <th class="px-4 py-3">{% trans "Sub-role" %}</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+            {% for membership in memberships %}
+              <tr>
+                <td class="px-4 py-3">
+                  {{ membership.user.get_full_name|default:membership.user.username }}
+                </td>
+                <td class="px-4 py-3">{{ membership.get_role_display }}</td>
+                <td class="px-4 py-3">
+                  {% if membership.role == 'TECHNICIAN' %}
+                    {{ membership.get_technician_subrole_display|default:'—' }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <a class="btn btn-danger btn-sm" href="{% url 'core:building_membership_remove' building.pk membership.pk %}?next={{ request.get_full_path|urlencode }}">
+                    {% trans "Remove" %}
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="3" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">{% trans "No members assigned yet." %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if show_add_form and form %}
+      <div class="space-y-4">
+        <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Assign building roles" %}</h2>
+        <form method="post" class="space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-card dark:border-slate-800 dark:bg-slate-900" id="manage-members-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add"/>
+          {% if form.non_field_errors %}
+            <div class="alert alert--danger">
+              {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
+          {% endif %}
+          <div class="space-y-2">
+            <label for="{{ form.role.id_for_label }}" class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ form.role.label }}</label>
+            {{ form.role }}
+            {% if form.role.help_text %}<p class="text-xs text-slate-500 dark:text-slate-400">{{ form.role.help_text }}</p>{% endif %}
+            {% if form.role.errors %}
+              <div class="text-xs text-red-600">
+                {% for error in form.role.errors %}<div>{{ error }}</div>{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ form.user.label }}</label>
+            <p class="text-xs text-slate-500 dark:text-slate-400" data-role-hint>{% trans "Select a role above to display the available users." %}</p>
+            {% with role_labels=form.user.field.widget.role_labels role_map=form.user.field.widget.role_map %}
+              <div class="grid gap-3 sm:grid-cols-2" data-user-picker>
+                {% for checkbox in form.user %}
+                  {% with choice_val=checkbox|choice_value %}
+                    {% with role_codes=role_map|dict_get:choice_val role_label_list=role_labels|dict_get:choice_val %}
+                      <label class="user-option relative flex cursor-pointer rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm transition" data-user-option data-roles="{% if role_codes %}{{ role_codes|join:',' }}{% endif %}">
+                        <span class="flex items-start gap-3">
+                          <span class="mt-1">{{ checkbox.tag }}</span>
+                          <div class="flex flex-col">
+                            <span class="font-semibold text-slate-800 dark:text-white">{{ checkbox.choice_label }}</span>
+                            {% if role_label_list %}
+                              <span class="mt-1 inline-flex flex-wrap gap-1">
+                                {% for label in role_label_list %}
+                                  <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ label }}</span>
+                                {% endfor %}
+                              </span>
+                            {% endif %}
+                          </div>
+                        </span>
+                      </label>
+                    {% endwith %}
+                  {% endwith %}
+                {% empty %}
+                  <p class="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">{% trans "No eligible users available." %}</p>
+                {% endfor %}
+              </div>
+              <div class="space-y-3" data-technician-subroles>
+                {% for checkbox in form.user %}
+                  {% with choice_val=checkbox|choice_value %}
+                    {% with role_codes=role_map|dict_get:choice_val %}
+                      {% if role_codes and "TECHNICIAN" in role_codes %}
+                        <div class="hidden rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm" data-subrole-user="{{ choice_val }}">
+                          <label for="{% subrole_field_name form choice_val %}" class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {% blocktrans with name=checkbox.choice_label %}Sub-role for {{ name }}{% endblocktrans %}
+                          </label>
+                          <select class="input mt-2" name="{% subrole_field_name form choice_val %}" id="{% subrole_field_name form choice_val %}">
+                            <option value="">{% trans "Select sub-role" %}</option>
+                            {% for value,label in form.technician_subrole_choices %}
+                              <option value="{{ value }}" {% if value == form.selected_subroles|dict_get:choice_val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                      {% endif %}
+                    {% endwith %}
+                  {% endwith %}
+                {% endfor %}
+              </div>
+            {% endwith %}
+            {% if form.user.help_text %}<p class="text-xs text-slate-500 dark:text-slate-400">{{ form.user.help_text }}</p>{% endif %}
+            {% if form.user.errors %}
+              <div class="text-xs text-red-600">
+                {% for error in form.user.errors %}<div>{{ error }}</div>{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+          <button type="submit" class="btn">{% trans "Save" %}</button>
+        </form>
+        <script>
+          (function () {
+            const form = document.getElementById("manage-members-form");
+            if (!form) return;
+            const roleSelect = form.querySelector("#{{ form.role.id_for_label }}");
+            const roleHint = form.querySelector("[data-role-hint]");
+            const optionWrappers = Array.from(form.querySelectorAll("[data-user-option]"));
+            const userInputs = optionWrappers
+              .map((wrapper) => wrapper.querySelector("input[name='user']"))
+              .filter(Boolean);
+            const subroleBlocks = Array.from(form.querySelectorAll("[data-subrole-user]"));
+
+            function setSubroleVisibility() {
+              if (!roleSelect) return;
+              subroleBlocks.forEach((block) => {
+                const userId = block.dataset.subroleUser;
+                const input = form.querySelector(`input[name='user'][value='${userId}']`);
+                const selectEl = block.querySelector("select");
+                const shouldShow =
+                  roleSelect.value === "TECHNICIAN" && input && input.checked && !input.disabled;
+                block.classList.toggle("hidden", !shouldShow);
+                if (selectEl) {
+                  selectEl.required = shouldShow;
+                  if (!shouldShow) {
+                    selectEl.value = "";
+                  }
+                }
+              });
+            }
+
+            function updateSelectionStyles() {
+              optionWrappers.forEach((wrapper) => {
+                const input = wrapper.querySelector("input[name='user']");
+                if (!input) return;
+                const active = input.checked && !input.disabled;
+                wrapper.classList.toggle("border-emerald-500", active);
+                wrapper.classList.toggle("bg-emerald-50", active);
+              });
+            }
+
+            function filterUsersByRole() {
+              const selectedRole = roleSelect.value;
+              const hasRole = Boolean(selectedRole);
+              roleHint?.classList.toggle("hidden", hasRole);
+              optionWrappers.forEach((wrapper) => {
+                const input = wrapper.querySelector("input[name='user']");
+                if (!input) return;
+                const userRoles = (wrapper.dataset.roles || "").split(",").filter(Boolean);
+                if (!hasRole) {
+                  wrapper.classList.add("hidden");
+                  input.checked = false;
+                  input.disabled = true;
+                } else if (userRoles.includes(selectedRole)) {
+                  wrapper.classList.remove("hidden");
+                  input.disabled = false;
+                } else {
+                  wrapper.classList.add("hidden");
+                  input.checked = false;
+                  input.disabled = true;
+                }
+              });
+              updateSelectionStyles();
+              setSubroleVisibility();
+            }
+
+            optionWrappers.forEach((wrapper) => {
+              wrapper.addEventListener("click", (event) => {
+                const input = wrapper.querySelector("input[name='user']");
+                if (!input || input.disabled) {
+                  event.preventDefault();
+                  return;
+                }
+                if (event.target === input) {
+                  return;
+                }
+                event.preventDefault();
+                input.checked = !input.checked;
+                input.dispatchEvent(new Event("change", { bubbles: true }));
+              });
+            });
+
+            userInputs.forEach((input) => {
+              input.addEventListener("change", () => {
+                updateSelectionStyles();
+                setSubroleVisibility();
+              });
+            });
+
+            roleSelect?.addEventListener("change", filterUsersByRole);
+            filterUsersByRole();
+          })();
+        </script>
+      </div>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}
+
+{% block extra_js %}{{ block.super }}{% endblock %}

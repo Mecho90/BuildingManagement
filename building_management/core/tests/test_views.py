@@ -8,7 +8,17 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.auth_views import RoleAwareLoginView
-from core.models import Building, Notification, Unit, WorkOrder, UserSecurityProfile
+from core.models import (
+    Building,
+    BuildingMembership,
+    MembershipRole,
+    Notification,
+    RoleAuditLog,
+    Unit,
+    WorkOrder,
+    WorkOrderAuditLog,
+    UserSecurityProfile,
+)
 from core.services import NotificationService
 
 
@@ -164,3 +174,354 @@ class NotificationSnoozeViewTests(TestCase):
         note = Notification.objects.get(user=self.user, key=key)
         self.assertIsNotNone(note.acknowledged_at)
         self.assertFalse(note.is_active(on=self.today))
+
+
+class AuditLogViewTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="audit-admin",
+            email="audit-admin@example.com",
+            password="pass1234",
+        )
+        BuildingMembership.objects.create(
+            user=self.admin,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+        )
+        self.other_user = User.objects.create_user(
+            username="audit-target",
+            email="audit-target@example.com",
+            password="pass1234",
+        )
+        self.entry = RoleAuditLog.objects.create(
+            actor=self.admin,
+            target_user=self.other_user,
+            role=MembershipRole.TECHNICIAN,
+            action=RoleAuditLog.Action.ROLE_ADDED,
+            payload={"reason": "test"},
+        )
+
+    def test_admin_can_view_audit_log(self):
+        self.client.login(username="audit-admin", password="pass1234")
+        response = self.client.get(reverse("core:role_audit_log"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Role Audit Log")
+        self.assertContains(response, "audit-target")
+
+    def test_non_privileged_user_denied(self):
+        self.client.login(username="audit-target", password="pass1234")
+        response = self.client.get(reverse("core:role_audit_log"))
+        self.assertEqual(response.status_code, 403)
+
+
+class CapabilityEnforcementTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.technician = User.objects.create_user(
+            username="tech-user",
+            email="tech@example.com",
+            password="pass1234",
+        )
+        self.backoffice = User.objects.create_user(
+            username="backoffice-user",
+            email="backoffice@example.com",
+            password="pass1234",
+        )
+        self.auditor = User.objects.create_user(
+            username="auditor-user",
+            email="auditor@example.com",
+            password="pass1234",
+        )
+        self.building = Building.objects.create(
+            owner=self.backoffice,
+            name="Capability Plaza",
+            address="77 Capability Rd",
+        )
+        self.work_order = WorkOrder.objects.create(
+            building=self.building,
+            title="Fix plumbing",
+            status=WorkOrder.Status.OPEN,
+            priority=WorkOrder.Priority.MEDIUM,
+            deadline=timezone.localdate() + timedelta(days=3),
+        )
+        BuildingMembership.objects.create(
+            user=self.technician,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+        )
+        BuildingMembership.objects.create(
+            user=self.backoffice,
+            building=None,
+            role=MembershipRole.BACKOFFICE,
+        )
+        BuildingMembership.objects.create(
+            user=self.auditor,
+            building=None,
+            role=MembershipRole.AUDITOR,
+        )
+
+    def test_building_create_requires_manage_capability(self):
+        self.client.login(username="tech-user", password="pass1234")
+        response = self.client.get(reverse("core:building_create"))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.login(username="backoffice-user", password="pass1234")
+        response = self.client.get(reverse("core:building_create"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_mass_assign_requires_capability(self):
+        self.client.login(username="tech-user", password="pass1234")
+        response = self.client.get(reverse("core:work_orders_mass_assign"))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.login(username="backoffice-user", password="pass1234")
+        response = self.client.get(reverse("core:work_orders_mass_assign"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_archive_requires_admin(self):
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Archived",
+            status=WorkOrder.Status.DONE,
+            priority=WorkOrder.Priority.LOW,
+            deadline=timezone.localdate(),
+            archived_at=timezone.now(),
+        )
+        self.client.login(username="backoffice-user", password="pass1234")
+        response = self.client.get(reverse("core:work_orders_archive"))
+        self.assertEqual(response.status_code, 403)
+
+        admin = get_user_model().objects.create_superuser("admin", "admin@example.com", "pass1234")
+        self.client.login(username="admin", password="pass1234")
+        response = self.client.get(reverse("core:work_orders_archive"))
+        self.assertEqual(response.status_code, 200)
+
+    def test_auditor_cannot_edit_work_order(self):
+        self.client.login(username="auditor-user", password="pass1234")
+        response = self.client.get(reverse("core:work_order_update", args=[self.work_order.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_auditor_has_read_only_detail(self):
+        self.client.login(username="auditor-user", password="pass1234")
+        response = self.client.get(reverse("core:work_order_detail", args=[self.work_order.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["can_edit_order"])
+
+
+class DashboardViewTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.building = Building.objects.create(
+            owner=User.objects.create_user("dash-owner", "dash-owner@example.com", "pass1234"),
+            name="Dash Plaza",
+            address="Dash St",
+        )
+        self.tech = User.objects.create_user("dash-tech", "dash-tech@example.com", "pass1234")
+        BuildingMembership.objects.create(user=self.tech, building=self.building, role=MembershipRole.TECHNICIAN)
+        self.backoffice = User.objects.create_user("dash-back", "dash-back@example.com", "pass1234")
+        BuildingMembership.objects.create(user=self.backoffice, building=self.building, role=MembershipRole.BACKOFFICE)
+
+    def test_technician_cards_present(self):
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Due today",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate(),
+        )
+        self.client.login(username="dash-tech", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["technician_cards"])
+
+    def test_backoffice_sees_awaiting(self):
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Awaiting",
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            deadline=timezone.localdate() + timedelta(days=2),
+            replacement_request_note="Need bulbs",
+        )
+        self.client.login(username="dash-back", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        cards, load = response.context["backoffice_cards"], response.context["assignment_load"]
+        self.assertGreaterEqual(len(cards), 1)
+        self.assertIsInstance(load, int)
+
+    def test_dashboard_shows_notifications(self):
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Deadline soon",
+            status=WorkOrder.Status.OPEN,
+            priority=WorkOrder.Priority.HIGH,
+            deadline=timezone.localdate() + timedelta(days=1),
+        )
+        self.client.login(username="dash-back", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["notifications"])
+
+
+class MassAssignEnhancedTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.backoffice = User.objects.create_user("ma-back", "ma-back@example.com", "pass1234")
+        self.tech = User.objects.create_user("ma-tech", "ma-tech@example.com", "pass1234")
+        self.building = Building.objects.create(
+            owner=self.backoffice,
+            name="Mass One",
+            address="1 Mass",
+        )
+        BuildingMembership.objects.create(user=self.backoffice, building=self.building, role=MembershipRole.BACKOFFICE)
+        BuildingMembership.objects.create(user=self.tech, building=self.building, role=MembershipRole.TECHNICIAN)
+
+    def test_mass_assign_custom_deadline(self):
+        deadline = timezone.localdate() + timedelta(days=5)
+        self.client.login(username="ma-back", password="pass1234")
+        response = self.client.post(
+            reverse("core:work_orders_mass_assign"),
+            data={
+                "title": "Bulk",
+                "description": "Do tasks",
+                "buildings": [self.building.pk],
+                "priority": WorkOrder.Priority.HIGH,
+                "deadline": deadline.isoformat(),
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        order = WorkOrder.objects.get(title="Bulk")
+        self.assertEqual(order.deadline, deadline)
+        self.assertEqual(order.priority, WorkOrder.Priority.HIGH)
+        self.assertIsNone(order.unit)
+        self.assertTrue(Notification.objects.filter(user=self.tech, key=f"wo-mass-{order.pk}").exists())
+
+
+class BuildingMembershipManageViewTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_user("bm-admin", "bm-admin@example.com", "pass1234")
+        self.target = User.objects.create_user("bm-target", "bm-target@example.com", "pass1234")
+        self.building = Building.objects.create(
+            owner=self.admin,
+            name="BM Complex",
+            address="BM St",
+        )
+        BuildingMembership.objects.create(user=self.admin, building=None, role=MembershipRole.ADMINISTRATOR)
+
+    def test_add_and_remove_membership(self):
+        self.client.login(username="bm-admin", password="pass1234")
+        url = reverse("core:building_memberships", args=[self.building.pk])
+        response = self.client.post(
+            url,
+            data={"action": "add", "user": self.target.pk, "role": MembershipRole.TECHNICIAN},
+        )
+        self.assertEqual(response.status_code, 302)
+        membership = BuildingMembership.objects.get(user=self.target, building=self.building)
+
+        response = self.client.post(url, data={"action": "delete", "membership_id": membership.pk})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(BuildingMembership.objects.filter(user=self.target, building=self.building).exists())
+
+    def test_forbidden_without_capability(self):
+        outsider = get_user_model().objects.create_user("bm-out", "bm-out@example.com", "pass1234")
+        self.client.login(username="bm-out", password="pass1234")
+        response = self.client.get(reverse("core:building_memberships", args=[self.building.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_technician_updates_subrole(self):
+        tech = get_user_model().objects.create_user("bm-tech", "bm-tech@example.com", "pass1234")
+        membership = BuildingMembership.objects.create(
+            user=tech,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+            technician_subrole=Building.Role.TECH_SUPPORT,
+        )
+        self.client.login(username="bm-tech", password="pass1234")
+        url = reverse("core:technician_subrole", args=[self.building.pk])
+        response = self.client.post(
+            url,
+            data={"technician_subrole": Building.Role.PROPERTY_MANAGER},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        membership.refresh_from_db()
+        self.assertEqual(membership.technician_subrole, Building.Role.PROPERTY_MANAGER)
+
+
+class WorkOrderAuditLogTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.backoffice = User.objects.create_user("log-back", "log-back@example.com", "pass1234")
+        self.building = Building.objects.create(
+            owner=self.backoffice,
+            name="Log Tower",
+            address="Log St",
+        )
+        BuildingMembership.objects.create(user=self.backoffice, building=self.building, role=MembershipRole.BACKOFFICE)
+        self.order = WorkOrder.objects.create(
+            building=self.building,
+            title="Needs approval",
+            status=WorkOrder.Status.IN_PROGRESS,
+            priority=WorkOrder.Priority.MEDIUM,
+            deadline=timezone.localdate() + timedelta(days=5),
+        )
+
+    def test_status_change_creates_log(self):
+        self.client.login(username="log-back", password="pass1234")
+        url = reverse("core:work_order_update", args=[self.order.pk])
+        payload = {
+            "title": self.order.title,
+            "building": self.building.pk,
+            "unit": "",
+            "priority": self.order.priority,
+            "status": WorkOrder.Status.AWAITING_APPROVAL,
+            "deadline": self.order.deadline,
+            "description": self.order.description,
+            "replacement_request_note": "Need pump",
+        }
+        response = self.client.post(url, data=payload, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            WorkOrderAuditLog.objects.filter(work_order=self.order, action=WorkOrderAuditLog.Action.STATUS_CHANGED).exists()
+        )
+
+
+class AuditTrailViewTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_user("audit-admin", "audit-admin@example.com", "pass1234")
+        BuildingMembership.objects.create(user=self.admin, building=None, role=MembershipRole.ADMINISTRATOR)
+        self.building = Building.objects.create(owner=self.admin, name="Audit HQ", address="Audit")
+        self.order = WorkOrder.objects.create(
+            building=self.building,
+            title="Audit job",
+            status=WorkOrder.Status.OPEN,
+            priority=WorkOrder.Priority.LOW,
+            deadline=timezone.localdate() + timedelta(days=2),
+        )
+        WorkOrderAuditLog.objects.create(
+            actor=self.admin,
+            work_order=self.order,
+            building=self.building,
+            action=WorkOrderAuditLog.Action.STATUS_CHANGED,
+            payload={"from": "OPEN", "to": "IN_PROGRESS"},
+        )
+
+    def test_audit_trail_access(self):
+        self.client.login(username="audit-admin", password="pass1234")
+        response = self.client.get(reverse("core:audit_trail"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["workorder_entries"])
+
+    def test_export_workorders(self):
+        self.client.login(username="audit-admin", password="pass1234")
+        response = self.client.get(reverse("core:audit_trail") + "?export=workorder")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+
+    def test_forbidden_without_capability(self):
+        outsider = get_user_model().objects.create_user("audit-out", "audit-out@example.com", "pass1234")
+        self.client.login(username="audit-out", password="pass1234")
+        response = self.client.get(reverse("core:audit_trail"))
+        self.assertEqual(response.status_code, 403)
