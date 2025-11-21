@@ -247,6 +247,10 @@ class WorkOrder(TimeStampedModel):
         MEDIUM = "MEDIUM", _("Medium")
         HIGH = "HIGH", _("High")
 
+    class Kind(models.TextChoices):
+        MAINTENANCE = "MAINTENANCE", _("Maintenance")
+        MASS_ASSIGN = "MASS_ASSIGN", _("Mass assignment")
+
     building = models.ForeignKey(
         Building,
         on_delete=models.CASCADE,
@@ -274,6 +278,12 @@ class WorkOrder(TimeStampedModel):
         max_length=10,
         choices=Priority.choices,
         default=Priority.MEDIUM,
+        db_index=True,
+    )
+    kind = models.CharField(
+        max_length=32,
+        choices=Kind.choices,
+        default=Kind.MAINTENANCE,
         db_index=True,
     )
     # Mandatory deadline (non-nullable at DB level)
@@ -538,6 +548,8 @@ class Capability:
 
 ROLE_CAPABILITIES: dict[str, set[str]] = {
     MembershipRole.TECHNICIAN: {
+        Capability.MANAGE_BUILDINGS,
+        Capability.CREATE_UNITS,
         Capability.CREATE_WORK_ORDERS,
     },
     MembershipRole.BACKOFFICE: {

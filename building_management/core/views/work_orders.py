@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.conf import settings
 from django.utils import formats, timezone
+from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _, gettext_lazy as _lazy, ngettext
 from django.template.defaultfilters import filesizeformat
 from django.template.loader import render_to_string
@@ -345,6 +346,16 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         search = (request.GET.get("q") or "").strip()
         status = (request.GET.get("status") or "").strip().upper()
         priority = (request.GET.get("priority") or "").strip().upper()
+        deadline_range_raw = (request.GET.get("deadline_range") or "").strip()
+        deadline_from = None
+        deadline_to = None
+        if deadline_range_raw:
+            normalized = deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
+            parts = [part.strip() for part in normalized.split("/") if part.strip()]
+            if parts:
+                deadline_from = parse_date(parts[0])
+                if len(parts) > 1:
+                    deadline_to = parse_date(parts[1])
         valid_status = {choice[0] for choice in WorkOrder.Status.choices}
         valid_priority = {choice[0] for choice in WorkOrder.Priority.choices}
         if status and status not in valid_status:
@@ -390,6 +401,12 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
             qs = qs.filter(status=status)
         if priority:
             qs = qs.filter(priority=priority)
+        if deadline_from:
+            qs = qs.filter(deadline__gte=deadline_from)
+        if deadline_to:
+            qs = qs.filter(deadline__lte=deadline_to)
+        if (deadline_from is None) and (deadline_to is None):
+            deadline_range_raw = ""
 
         owner_param = (request.GET.get("owner") or "").strip()
         owner_filter = None
@@ -435,6 +452,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         self._priority = priority
         self._owner = owner_param
         self._sort = sort_param
+        self._deadline_range = deadline_range_raw
 
         return qs
 
@@ -458,6 +476,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 "q": getattr(self, "_search", ""),
                 "status": getattr(self, "_status", ""),
                 "priority": getattr(self, "_priority", ""),
+                "deadline_range": getattr(self, "_deadline_range", ""),
                 "status_choices": WorkOrder.Status.choices,
                 "per": self.get_paginate_by(self.object_list),
                 "per_choices": self._per_choices,
@@ -592,7 +611,7 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
         next_url = _safe_next_url(self.request)
         if next_url:
             return next_url
-        return reverse("core:building_detail", args=[self.object.building_id])
+        return f"{reverse('core:building_detail', args=[self.object.building_id])}?tab=work_orders"
 
 
 class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, UnitsWidgetMixin, UpdateView):

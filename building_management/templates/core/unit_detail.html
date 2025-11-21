@@ -14,8 +14,8 @@
   </div>
 
   <article class="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
-    <header class="flex flex-col gap-1">
-      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{{ unit.number }}</h1>
+    <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 flex flex-col gap-1">
+      <h1 class="page-heading break-words hyphens-auto">{{ unit.number }}</h1>
       <p class="text-sm text-slate-500 dark:text-slate-400">{% blocktrans with name=unit.building.name %}Building: {{ name }}{% endblocktrans %}</p>
     </header>
 

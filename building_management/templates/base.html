@@ -42,7 +42,7 @@
               {% endif %}
               {% if role_audit_enabled and role_audit_url %}
                 <a href="{{ role_audit_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav role_audit_url %}">
-                  {% trans "Audit Log" %}
+                  Одит дневник
                 </a>
               {% endif %}
               {% if can_view_user_management and user_management_url %}

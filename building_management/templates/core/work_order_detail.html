@@ -29,8 +29,8 @@
   </div>
 
   <article class="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
-    <header class="space-y-2">
-      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{{ order.title }}</h1>
+    <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-2">
+      <h1 class="page-heading break-words hyphens-auto">{{ order.title }}</h1>
       <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
         <span class="priority-badge {% if order.priority == 'HIGH' %}priority-badge--high{% elif order.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">
           {{ order.get_priority_display }}

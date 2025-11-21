@@ -342,11 +342,128 @@ class DashboardViewTests(TestCase):
             deadline=timezone.localdate() + timedelta(days=2),
             replacement_request_note="Need bulbs",
         )
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Open ticket",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate(),
+        )
         self.client.login(username="dash-back", password="pass1234")
         response = self.client.get(reverse("core:dashboard"))
-        cards, load = response.context["backoffice_cards"], response.context["assignment_load"]
+        cards = response.context["backoffice_cards"]
+        load = response.context["assignment_load"]
         self.assertGreaterEqual(len(cards), 1)
-        self.assertIsInstance(load, int)
+        self.assertEqual(load, 1)
+
+    def test_assignment_load_for_technician(self):
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Tech open",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate(),
+        )
+        self.client.login(username="dash-tech", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["assignment_load"], 1)
+
+    def test_assignment_load_excludes_future_tasks(self):
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Future",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate() + timedelta(days=2),
+        )
+        self.client.login(username="dash-tech", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        self.assertEqual(response.context["assignment_load"], 0)
+
+    def test_admin_my_jobs_scoped_to_memberships(self):
+        User = get_user_model()
+        admin = User.objects.create_user("dash-admin", "dash-admin@example.com", "pass1234")
+        BuildingMembership.objects.create(user=admin, building=None, role=MembershipRole.ADMINISTRATOR)
+        BuildingMembership.objects.create(user=admin, building=self.building, role=MembershipRole.TECHNICIAN)
+        other_building = Building.objects.create(
+            owner=self.building.owner,
+            name="Other Plaza",
+            address="Elsewhere",
+        )
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Allowed",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate(),
+        )
+        WorkOrder.objects.create(
+            building=other_building,
+            title="Hidden",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate(),
+        )
+        self.client.login(username="dash-admin", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        cards = response.context["technician_cards"]
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["title"], "Allowed")
+
+    def test_backoffice_membership_allows_jobs(self):
+        User = get_user_model()
+        manager = User.objects.create_user("dash-manager", "dash-manager@example.com", "pass1234")
+        BuildingMembership.objects.create(user=manager, building=None, role=MembershipRole.ADMINISTRATOR)
+        BuildingMembership.objects.create(user=manager, building=self.building, role=MembershipRole.BACKOFFICE)
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Manager should not see",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate(),
+        )
+        self.client.login(username="dash-manager", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        cards = response.context["technician_cards"]
+        self.assertEqual(len(cards), 1)
+
+    def test_admin_sees_owned_buildings(self):
+        User = get_user_model()
+        owner_admin = User.objects.create_user("owner-admin", "owner-admin@example.com", "pass1234")
+        BuildingMembership.objects.create(user=owner_admin, building=None, role=MembershipRole.ADMINISTRATOR)
+        owned_building = Building.objects.create(
+            owner=owner_admin,
+            name="Owned Plaza",
+            address="Owned St",
+        )
+        WorkOrder.objects.create(
+            building=owned_building,
+            title="Owner task",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate(),
+        )
+        self.client.login(username="owner-admin", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        cards = response.context["technician_cards"]
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["title"], "Owner task")
+
+    def test_my_jobs_include_pending_approvals(self):
+        User = get_user_model()
+        approver = User.objects.create_user("dash-approver", "dash-approver@example.com", "pass1234")
+        BuildingMembership.objects.create(user=approver, building=None, role=MembershipRole.ADMINISTRATOR)
+        other_building = Building.objects.create(
+            owner=self.building.owner,
+            name="Approval Plaza",
+            address="Approve St",
+        )
+        WorkOrder.objects.create(
+            building=other_building,
+            title="Needs approval",
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            awaiting_approval_by=approver,
+            deadline=timezone.localdate() + timedelta(days=2),
+        )
+        self.client.login(username="dash-approver", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        cards = response.context["technician_cards"]
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["title"], "Needs approval")
 
     def test_dashboard_shows_notifications(self):
         WorkOrder.objects.create(
@@ -395,6 +512,32 @@ class MassAssignEnhancedTests(TestCase):
         self.assertEqual(order.priority, WorkOrder.Priority.HIGH)
         self.assertIsNone(order.unit)
         self.assertTrue(Notification.objects.filter(user=self.tech, key=f"wo-mass-{order.pk}").exists())
+
+
+class BuildingDeletePermissionTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.tech = User.objects.create_user("bd-tech", "bd-tech@example.com", "pass1234")
+        self.backoffice = User.objects.create_user("bd-back", "bd-back@example.com", "pass1234")
+        self.building = Building.objects.create(
+            owner=self.tech,
+            name="DeleteMe",
+            address="123 Delete",
+        )
+        BuildingMembership.objects.create(user=self.tech, building=self.building, role=MembershipRole.TECHNICIAN)
+        BuildingMembership.objects.create(user=self.backoffice, building=self.building, role=MembershipRole.BACKOFFICE)
+
+    def test_technician_cannot_delete_building(self):
+        self.client.login(username="bd-tech", password="pass1234")
+        response = self.client.post(reverse("core:building_delete", args=[self.building.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Building.objects.filter(pk=self.building.pk).exists())
+
+    def test_backoffice_can_delete_building(self):
+        self.client.login(username="bd-back", password="pass1234")
+        response = self.client.post(reverse("core:building_delete", args=[self.building.pk]), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Building.objects.filter(pk=self.building.pk).exists())
 
 
 class BuildingMembershipManageViewTests(TestCase):

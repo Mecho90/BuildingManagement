@@ -91,6 +91,87 @@ msgstr "Статус"
 msgid "Deadline"
 msgstr "Краен срок"
 
+msgid "Deadline range"
+msgstr "Диапазон на срока"
+
+msgid "YYYY-MM-DD / YYYY-MM-DD"
+msgstr "ГГГГ-ММ-ДД / ГГГГ-ММ-ДД"
+
+# Audit log
+msgid "Audit Trail"
+msgstr "Одит дневник"
+
+#: templates/core/audit_trail.html:12
+#, python-format
+msgid "Total audit logs: %(total)s"
+msgstr "Общо записи в одита: %(total)s"
+
+msgid "Role added"
+msgstr "Роля добавена"
+
+msgid "Role removed"
+msgstr "Роля премахната"
+
+msgid "Capabilities updated"
+msgstr "Актуализирани права"
+
+msgid "Technician"
+msgstr "Техник"
+
+msgid "Backoffice Employee"
+msgstr "Служител бек офис"
+
+msgid "Read-only auditor"
+msgstr "Одитор (само за четене)"
+
+msgid "Status changed"
+msgstr "Статусът е променен"
+
+msgid "Approval decision"
+msgstr "Решение за одобрение"
+
+msgid "Reassigned"
+msgstr "Преприсвоено"
+
+msgid "Entry type"
+msgstr "Тип запис"
+
+msgid "Role changes"
+msgstr "Промени на роли"
+
+msgid "Work-order actions"
+msgstr "Действия по задачи"
+
+msgid "Export roles"
+msgstr "Експорт на роли"
+
+msgid "Export work orders"
+msgstr "Експорт на поръчки"
+
+msgid "Timestamp"
+msgstr "Време"
+
+msgid "Actor"
+msgstr "Извършил"
+
+msgid "Target"
+msgstr "Цел"
+
+msgid "All buildings"
+msgstr "Всички сгради"
+
+msgid "No entries."
+msgstr "Няма записи."
+
+msgid "Work order"
+msgstr "Работна поръчка"
+
+msgid "Details"
+msgstr "Детайли"
+
+msgid "N/A"
+msgstr "Няма"
+
 #: templates/core/buildings_list.html:20
 msgid "Total buildings: %(count)s"
 msgstr "Общо сгради: %(count)s"
@@ -955,10 +1036,6 @@ msgstr "Редакция на сграда"
 msgid "New Building"
 msgstr "Нова сграда"
 
-#: templates/core/buildings_list.html:11
-msgid "Browse and manage your properties."
-msgstr "Преглеждайте и управлявайте вашите имоти."
-
 #: templates/core/buildings_list.html:13
 msgid "Add new building"
 msgstr "Добавяне на нова сграда"
@@ -977,24 +1054,73 @@ msgstr "Търсене"
 msgid "No buildings found."
 msgstr "Няма намерени сгради."
 
-#: templates/core/buildings_list.html:198
+#: templates/core/dashboard.html:4 templates/core/dashboard.html:10
+msgid "Dashboard"
+msgstr "Табло"
+
+#: templates/core/dashboard.html:16
+msgid "My jobs today"
+msgstr "Моите задачи днес"
+
+#: templates/core/dashboard.html:27
+msgid "View"
+msgstr "Преглед"
+
+#: templates/core/dashboard.html:29 templates/core/dashboard.html:58
+msgid "Update"
+msgstr "Обновяване"
+
+#: templates/core/dashboard.html:34
+msgid "No work orders assigned for today."
+msgstr "Няма възложени работни поръчки за днес."
+
+#: templates/core/dashboard.html:40
+msgid "Awaiting approval"
+msgstr "Очаква одобрение"
+
+#: templates/core/dashboard.html:51
+msgid "No replacement request note provided."
+msgstr "Няма бележка към заявката за подмяна."
+
+#: templates/core/dashboard.html:54
+msgid "Requested by"
+msgstr "Заявено от"
+
+#: templates/core/dashboard.html:57
+msgid "Review"
+msgstr "Преглед"
+
+#: templates/core/dashboard.html:63
+msgid "No work orders are awaiting approval."
+msgstr "Няма работни поръчки, които да очакват одобрение."
+
+#: templates/core/dashboard.html:68
+#, python-format
+msgid "You currently have %(load)s open assignments across your buildings."
+msgstr "В момента имате %(load)s отворени задачи във вашите сгради."
+
+#: templates/core/dashboard.html:73 templates/core/buildings_list.html:198
 msgid "Notifications"
 msgstr "Известия"
 
-#: templates/core/buildings_list.html:201
+#: templates/core/dashboard.html:96 templates/core/buildings_list.html:201
 #, python-format
-msgid "%(total)s alert"
-msgid_plural "%(total)s alerts"
-msgstr[0] "%(total)s предупреждение"
-msgstr[1] "%(total)s предупреждения"
+msgid "%(total)s notifications"
+msgid_plural "%(total)s notifications"
+msgstr[0] "%(total)s известие"
+msgstr[1] "%(total)s известия"
 
-#: templates/core/buildings_list.html:232
+#: templates/core/dashboard.html:105 templates/core/buildings_list.html:232
 msgid "Read"
 msgstr "Прочетено"
 
-#: templates/core/buildings_list.html:243
+#: templates/core/dashboard.html:118 templates/core/buildings_list.html:243
 msgid "No notifications right now."
 msgstr "В момента няма известия."
+
+#: templates/core/dashboard.html:122
+msgid "No dashboard data available for your role yet."
+msgstr "Няма данни за таблото за вашата роля."
 
 #: templates/core/includes/pagination.html:17
 #: templates/core/includes/pagination.html:20
@@ -1231,12 +1357,6 @@ msgid "Save new password"
 msgstr "Запазване на новата парола"
 
 #: templates/core/users_list.html:10
-msgid ""
-"Administrators can create, edit, remove users or reset passwords from here."
-msgstr ""
-"Администраторите могат да създават, редактират, изтриват потребители и да "
-"нулират пароли оттук."
-
 #: templates/core/users_list.html:19
 msgid "Search users"
 msgstr "Търсене на потребители"
@@ -1342,10 +1462,6 @@ msgstr "Архивирани"
 msgid "No archived work orders match the selected filters for this building."
 msgstr "Няма поръчки за тази сграда."
 
-#: templates/core/work_orders_archive_list.html:11
-msgid "Review completed and archived work orders grouped by building."
-msgstr "Прегледайте приключените и архивирани поръчки, групирани по сграда."
-
 #: templates/core/work_orders_archive_list.html:17
 msgid "Title, description, or building"
 msgstr "Заглавие, описание или сграда"
@@ -1379,10 +1495,6 @@ msgstr "%(total)s архивирани"
 msgid "No archived work orders yet."
 msgstr "Все още няма архивирани поръчки."
 
-#: templates/core/work_orders_list.html:11
-msgid "Track maintenance and tasks across your portfolio."
-msgstr "Следете поддръжката и задачите във вашето портфолио."
-
 #: templates/core/work_orders_list.html:142
 #: templates/core/work_orders_list.html:218
 msgid "No work orders."
@@ -1392,29 +1504,6 @@ msgstr "Няма работни поръчки."
 #: templates/core/work_orders_mass_assign.html:9
 msgid "Mass Assign Work Orders"
 msgstr "Масово възлагане на поръчки"
-
-#: templates/core/work_orders_mass_assign.html:11
-#, python-format
-msgid ""
-"\n"
-"        This action will create identical work orders for %(total)s building "
-"that uses the Technical Support role.\n"
-"      "
-msgid_plural ""
-"\n"
-"        This action will create identical work orders for %(total)s "
-"buildings that use the Technical Support role.\n"
-"      "
-msgstr[0] ""
-"\n"
-"        Това действие ще създаде идентични поръчки за %(total)s сграда с "
-"роля „Техническа поддръжка“.\n"
-"      "
-msgstr[1] ""
-"\n"
-"        Това действие ще създаде идентични поръчки за %(total)s сгради с "
-"роля „Техническа поддръжка“.\n"
-"      "
 
 #: templates/core/work_orders_mass_assign.html:18
 msgid ""
@@ -1555,3 +1644,11 @@ msgstr "Архивирани (най-нови първо)"
 #: core/views/work_orders.py:593
 msgid "Archived (Oldest first)"
 msgstr "Архивирани (най-стари първо)"
+#: templates/core/work_orders_mass_assign.html:10
+#: templates/core/work_orders_mass_assign.html:10
+#, python-format
+msgid "Total orders for mass assignment: %(total)s"
+msgstr "Общо поръчки за масово разпределение: %(total)s"
+#: templates/base.html:45
+msgid "Audit Log"
+msgstr "Одитен дневник"

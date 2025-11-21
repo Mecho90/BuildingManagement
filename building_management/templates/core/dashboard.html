@@ -4,13 +4,18 @@
 {% block title %}{% trans "Dashboard" %}{% endblock %}
 
 {% block content %}
-<section class="space-y-6">
-  <header>
-    <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white">{% trans "Dashboard" %}</h1>
-    <p class="text-sm text-slate-500 dark:text-slate-400">
-      {% if dashboard_label %}{{ dashboard_label }}{% else %}{% trans "At-a-glance widgets tailored to your role." %}{% endif %}
-    </p>
-  </header>
+<section class="space-y-8">
+    <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+      <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Dashboard" %}</h1>
+      <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
+        {% blocktrans with load=assignment_load %}You currently have {{ load }} open assignments across your buildings.{% endblocktrans %}
+      </p>
+    {% if dashboard_label %}
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        {{ dashboard_label }}
+      </p>
+    {% endif %}
+    </header>
 
   {% if technician_cards %}
     <section class="space-y-4">
@@ -43,6 +48,11 @@
           <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No work orders assigned for today." %}</p>
         {% endfor %}
       </div>
+      {% if technician_cards_page %}
+        <div class="mt-4">
+          {% include "core/includes/pagination.html" with page_obj=technician_cards_page paginator=technician_cards_page.paginator query_string=technician_page_query page_param="jobs_page" show_single_page=True %}
+        </div>
+      {% endif %}
     </section>
   {% endif %}
 
@@ -75,11 +85,6 @@
           <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No work orders are awaiting approval." %}</p>
         {% endfor %}
       </div>
-      <div class="rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-card dark:border-slate-800 dark:bg-slate-900" aria-live="polite">
-        <p class="text-sm text-slate-600 dark:text-slate-300">
-          {% blocktrans with load=assignment_load %}You currently have {{ load }} open assignments across your buildings.{% endblocktrans %}
-        </p>
-      </div>
     </section>
   {% endif %}
 
@@ -88,7 +93,7 @@
       <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Notifications" %}</h2>
       {% if notifications_page and notifications_page.paginator.count %}
         <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-          {% blocktrans count total=notifications_page.paginator.count %}{{ total }} alert{% plural %}{{ total }} alerts{% endblocktrans %}
+          {% blocktrans count total=notifications_page.paginator.count %}{{ total }} notifications{% plural %}{{ total }} notifications{% endblocktrans %}
         </span>
       {% endif %}
     </div>
@@ -96,17 +101,11 @@
       {% if notifications_page and notifications_page.object_list %}
         <ul class="space-y-3">
           {% for note in notifications_page %}
-            <li class="rounded-2xl border p-4 text-sm shadow-sm transition sm:flex sm:items-start sm:justify-between{% if note.level == 'danger' %} border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-900/40 dark:text-rose-100{% elif note.level == 'warning' %} border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-100{% else %} border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200{% endif %}" data-notification-key="{{ note.id }}" data-is-new="{{ note.is_new|yesno:'true,false' }}">
+            <li class="rounded-2xl border p-4 text-sm shadow-sm transition sm:flex sm:items-start sm:justify-between {{ note.card_classes|default:'' }}" style="{{ note.card_style|default:'' }}" data-notification-key="{{ note.id }}" data-is-new="{{ note.is_new|yesno:'true,false' }}">
               <div class="flex flex-col gap-2 sm:max-w-3xl">
                 {% if note.level %}
                   <div class="flex items-center gap-2">
-                    {% if note.level == 'danger' %}
-                      <span class="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-700 dark:bg-rose-900/60 dark:text-rose-200">{{ note.level_label|default:note.level }}</span>
-                    {% elif note.level == 'warning' %}
-                      <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-900/60 dark:text-amber-200">{{ note.level_label|default:note.level }}</span>
-                    {% else %}
-                      <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200">{{ note.level_label|default:note.level }}</span>
-                    {% endif %}
+                    <span class="rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide {{ note.badge_classes|default:'' }}" style="{{ note.badge_style|default:'' }}">{{ note.level_label|default:note.level }}</span>
                   </div>
                 {% endif %}
                 <span class="leading-snug">{{ note.message }}</span>

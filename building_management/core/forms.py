@@ -424,7 +424,7 @@ class WorkOrderForm(forms.ModelForm):
         self.fields["status"].choices = [
             choice for choice in WorkOrder.Status.choices if choice[0] in self._allowed_status_values
         ]
-        self.fields["replacement_request_note"].label = _("Request for replacements")
+        self.fields["replacement_request_note"].label = "Заявка за подмяна"
         self.fields["replacement_request_note"].widget = forms.Textarea(attrs={"rows": 3})
         self.fields["replacement_request_note"].help_text = _(
             "Explain what replacements or supplies are needed when sending for approval."
@@ -616,22 +616,23 @@ class WorkOrderForm(forms.ModelForm):
             return {current}
 
         transitions = {
-            WorkOrder.Status.OPEN: {WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS},
+            WorkOrder.Status.OPEN: {WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS, WorkOrder.Status.DONE},
             WorkOrder.Status.IN_PROGRESS: {
                 WorkOrder.Status.IN_PROGRESS,
                 WorkOrder.Status.AWAITING_APPROVAL,
+                WorkOrder.Status.DONE,
             },
-            WorkOrder.Status.AWAITING_APPROVAL: {WorkOrder.Status.AWAITING_APPROVAL},
+            WorkOrder.Status.AWAITING_APPROVAL: {WorkOrder.Status.AWAITING_APPROVAL, WorkOrder.Status.DONE},
             WorkOrder.Status.DONE: {WorkOrder.Status.DONE},
         }
         allowed = transitions.get(current, {current})
         if can_approve:
-            if current == WorkOrder.Status.IN_PROGRESS:
-                allowed = allowed | {WorkOrder.Status.OPEN}
-            if current == WorkOrder.Status.AWAITING_APPROVAL:
-                allowed = allowed | {WorkOrder.Status.IN_PROGRESS, WorkOrder.Status.DONE}
-            if current == WorkOrder.Status.DONE:
-                allowed = allowed | {WorkOrder.Status.IN_PROGRESS}
+            allowed |= {
+                WorkOrder.Status.OPEN,
+                WorkOrder.Status.IN_PROGRESS,
+                WorkOrder.Status.AWAITING_APPROVAL,
+                WorkOrder.Status.DONE,
+            }
         return allowed
 
     def _build_approver_queryset(self, building: Building | None):
@@ -639,7 +640,10 @@ class WorkOrderForm(forms.ModelForm):
             return User.objects.none()
         user_ids: set[int] = set()
         user_ids.update(
-            BuildingMembership.objects.filter(building=building).values_list("user_id", flat=True)
+            BuildingMembership.objects.filter(
+                building=building,
+                role=MembershipRole.BACKOFFICE,
+            ).values_list("user_id", flat=True)
         )
         user_ids.update(
             BuildingMembership.objects.filter(
@@ -647,8 +651,16 @@ class WorkOrderForm(forms.ModelForm):
                 role=MembershipRole.ADMINISTRATOR,
             ).values_list("user_id", flat=True)
         )
+        # include owner only if they have an approver role (non-technician)
         if building.owner_id:
-            user_ids.add(building.owner_id)
+            owner_roles = list(
+                BuildingMembership.objects.filter(
+                    building=building,
+                    user_id=building.owner_id,
+                ).values_list("role", flat=True)
+            )
+            if owner_roles and MembershipRole.TECHNICIAN not in owner_roles:
+                user_ids.add(building.owner_id)
         user_ids.discard(None)
         if not user_ids:
             return User.objects.none()

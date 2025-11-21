@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Case, IntegerField, Q, When
 from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
+from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
@@ -268,6 +270,16 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         w_q = (self.request.GET.get("w_q") or "").strip()
         w_per = self._get_int("w_per", 25)
         w_status = (self.request.GET.get("w_status") or "").strip().upper()
+        w_deadline_range_raw = (self.request.GET.get("w_deadline_range") or "").strip()
+        w_deadline_from = None
+        w_deadline_to = None
+        if w_deadline_range_raw:
+            normalized = w_deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
+            parts = [part.strip() for part in normalized.split("/") if part.strip()]
+            if parts:
+                w_deadline_from = parse_date(parts[0])
+                if len(parts) > 1:
+                    w_deadline_to = parse_date(parts[1])
 
         wo_qs = (
             WorkOrder.objects.visible_to(self.request.user)
@@ -290,6 +302,12 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         valid_status = {choice[0] for choice in WorkOrder.Status.choices}
         if w_status and w_status in valid_status:
             wo_qs = wo_qs.filter(status=w_status)
+        if w_deadline_from:
+            wo_qs = wo_qs.filter(deadline__gte=w_deadline_from)
+        if w_deadline_to:
+            wo_qs = wo_qs.filter(deadline__lte=w_deadline_to)
+        if not (w_deadline_from or w_deadline_to):
+            w_deadline_range_raw = ""
 
         wo_qs = wo_qs.order_by("priority_order", "deadline", "-id")
         workorders_page = Paginator(wo_qs, w_per).get_page(self.request.GET.get("w_page"))
@@ -301,6 +319,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 "w_per": w_per,
                 "w_status": w_status,
                 "w_status_choices": WorkOrder.Status.choices,
+                "w_deadline_range": w_deadline_range_raw,
                 "w_active": active_tab == "work_orders",
             }
         )
@@ -362,6 +381,24 @@ class BuildingDeleteView(CapabilityRequiredMixin, LoginRequiredMixin, CachedObje
 
     def get_queryset(self):
         return Building.objects.visible_to(self.request.user)
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        if not self._user_can_delete(obj):
+            raise PermissionDenied(_("Only backoffice employees or administrators can delete buildings."))
+        return obj
+
+    def _user_can_delete(self, building):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        allowed_roles = (MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR)
+        return BuildingMembership.objects.filter(
+            user=user,
+            role__in=allowed_roles,
+        ).filter(Q(building=building) | Q(building__isnull=True)).exists()
 
     def post(self, request, *args, **kwargs):
         messages.error(request, _("Building deleted."))

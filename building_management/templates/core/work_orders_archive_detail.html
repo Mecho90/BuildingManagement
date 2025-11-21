@@ -35,7 +35,7 @@
     </header>
 
     {% if orders %}
-      <form method="get" class="space-y-3 rounded-3xl border border-emerald-100/80 bg-white/90 p-4 text-sm text-slate-600 shadow-card dark:border-emerald-400/40 dark:bg-slate-900 dark:text-slate-300">
+      <form method="get" class="filter-panel space-y-3 text-sm text-slate-600 dark:text-slate-300">
         <div class="space-y-2">
           <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-200">{% trans "Page size" %}</label>
           <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
@@ -64,7 +64,7 @@
         </div>
       {% endif %}
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+        <table class="min-w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
           <thead class="bg-slate-50 dark:bg-slate-800">
             <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               <th class="px-4 py-3">{% trans "Title" %}</th>

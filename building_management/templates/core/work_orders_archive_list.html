@@ -5,17 +5,16 @@
 
 {% block content %}
 <section class="space-y-8">
-  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
-      <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{% trans "Archived Work Orders" %}</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Review completed and archived work orders grouped by building." %}</p>
+      <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Archived Work Orders" %}</h1>
       <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
         {% blocktrans with count=building_summary_total %}Total archived buildings: {{ count }}{% endblocktrans %}
       </p>
     </div>
   </div>
 
-  <form method="get" class="space-y-5 rounded-3xl border border-emerald-100/80 bg-white/90 p-6 shadow-card dark:border-emerald-400/40 dark:bg-slate-900">
+  <form method="get" class="filter-panel space-y-5">
     {% url 'core:work_orders_archive' as archive_reset_url %}
     {% with placeholder=_('Title, description, or building') %}
       <div class="space-y-2">
@@ -67,7 +66,7 @@
   {% if building_summary_page %}
     <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Buildings with archived work orders" %}</h2>
+
         <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
           {% blocktrans count total=building_summary_total %}{{ total }} building{% plural %}{{ total }} buildings{% endblocktrans %}
         </span>

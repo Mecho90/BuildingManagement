@@ -5,7 +5,7 @@
 
 {% block content %}
 <section class="space-y-10">
-  <header class="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+  <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-4">
     <nav aria-label="{% trans 'Breadcrumb' %}">
       <ol class="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <li>
@@ -22,7 +22,7 @@
 
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div class="space-y-2">
-        <h1 class="text-3xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">{{ building.name }}</h1>
+        <h1 class="page-heading break-words hyphens-auto">{{ building.name }}</h1>
         <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
           {% if building.address %}
             <div class="space-y-1">
@@ -97,10 +97,10 @@
             {% endif %}
           </div>
 
-          <form method="get" class="space-y-5 rounded-3xl border border-emerald-100/80 bg-white/90 p-6 shadow-card dark:border-emerald-400/40 dark:bg-slate-900">
+          <form method="get" class="filter-panel space-y-5">
             <input type="hidden" name="tab" value="units"/>
             <div class="space-y-2">
-              <label for="id_u_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search units" %}</label>
+              <label for="id_u_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">Търсене на апартаменти</label>
               <input id="id_u_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="u_q" value="{{ u_q }}" placeholder="{% trans "Number, floor, owner or contact" %}"/>
             </div>
             <div class="space-y-2">
@@ -219,10 +219,10 @@
             {% endif %}
           </div>
 
-          <form method="get" class="space-y-5 rounded-3xl border border-emerald-100/80 bg-white/90 p-6 shadow-card dark:border-emerald-400/40 dark:bg-slate-900">
+          <form method="get" class="filter-panel space-y-5">
             <input type="hidden" name="tab" value="work_orders"/>
             <div class="space-y-2">
-              <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search work orders" %}</label>
+              <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">Търсене на работни поръчки</label>
               <input id="id_w_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
             </div>
             <div class="space-y-2">
@@ -243,9 +243,19 @@
                 <option value="200" {% if w_per == 200 %}selected{% endif %}>200</option>
               </select>
             </div>
+            <div class="space-y-2">
+              <label for="id_w_deadline_range" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Deadline range" %}</label>
+              <input id="id_w_deadline_range"
+                     name="w_deadline_range"
+                     type="text"
+                     value="{{ w_deadline_range }}"
+                     placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}"
+                     class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+                     onchange="this.form.submit()"/>
+            </div>
             <div class="flex items-center justify-end gap-2">
               <button class="btn" type="submit">{% trans "Filter" %}</button>
-              {% if w_q or w_status or w_per != 25 %}
+              {% if w_q or w_status or w_per != 25 or w_deadline_range %}
                 <a class="btn btn-secondary" href="{{ tab_urls.work_orders }}">{% trans "Reset" %}</a>
               {% endif %}
             </div>

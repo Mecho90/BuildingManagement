@@ -32,8 +32,13 @@ class AuditTrailView(LoginRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         filters = self._filters()
         ctx.update(filters)
-        ctx["role_entries"] = self._role_queryset(filters)
-        ctx["workorder_entries"] = self._workorder_queryset(filters)
+        role_qs = self._role_queryset(filters)
+        workorder_qs = self._workorder_queryset(filters)
+        ctx["role_entries"] = role_qs[:filters["per"]]
+        ctx["workorder_entries"] = workorder_qs[:filters["per"]]
+        ctx["role_total"] = role_qs.count()
+        ctx["workorder_total"] = workorder_qs.count()
+        ctx["total_audit_logs"] = ctx["role_total"] + ctx["workorder_total"]
         ctx["role_actions"] = RoleAuditLog.Action.choices
         ctx["workorder_actions"] = WorkOrderAuditLog.Action.choices
         ctx["per"] = filters["per"]
@@ -72,7 +77,7 @@ class AuditTrailView(LoginRequiredMixin, TemplateView):
         action = filters["action"]
         if action:
             qs = qs.filter(action=action)
-        return qs[:filters["per"]]
+        return qs
 
     def _workorder_queryset(self, filters):
         qs = WorkOrderAuditLog.objects.select_related("actor", "work_order", "building").order_by("-created_at")
@@ -86,7 +91,7 @@ class AuditTrailView(LoginRequiredMixin, TemplateView):
         action = filters["action"]
         if action:
             qs = qs.filter(action=action)
-        return qs[:filters["per"]]
+        return qs
 
     def _export(self, kind: str):
         kind = (kind or "").lower()
@@ -94,7 +99,7 @@ class AuditTrailView(LoginRequiredMixin, TemplateView):
             return HttpResponseForbidden()
         filters = self._filters()
         if kind == "role":
-            rows = self._role_queryset(filters)
+            rows = self._role_queryset(filters)[:filters["per"]]
             header = ["timestamp", "actor", "user", "role", "action", "building"]
             data = [
                 [
@@ -109,7 +114,7 @@ class AuditTrailView(LoginRequiredMixin, TemplateView):
             ]
             filename = "role-audit.csv"
         else:
-            rows = self._workorder_queryset(filters)
+            rows = self._workorder_queryset(filters)[:filters["per"]]
             header = ["timestamp", "actor", "work_order", "action", "building", "payload"]
             data = [
                 [
