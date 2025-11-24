@@ -1,6 +1,17 @@
 from django.db import migrations, models
 
 
+def set_kind_defaults(apps, schema_editor):
+    schema_editor.execute("UPDATE core_workorder SET kind = 'MAINTENANCE' WHERE kind IS NULL;")
+    if schema_editor.connection.vendor != "sqlite":
+        schema_editor.execute("ALTER TABLE core_workorder ALTER COLUMN kind SET DEFAULT 'MAINTENANCE';")
+
+
+def unset_kind_defaults(apps, schema_editor):
+    if schema_editor.connection.vendor != "sqlite":
+        schema_editor.execute("ALTER TABLE core_workorder ALTER COLUMN kind DROP DEFAULT;")
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,14 +21,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.SeparateDatabaseAndState(
             database_operations=[
-                migrations.RunSQL(
-                    "ALTER TABLE core_workorder ALTER COLUMN kind SET DEFAULT 'MAINTENANCE';",
-                    "ALTER TABLE core_workorder ALTER COLUMN kind DROP DEFAULT;",
-                ),
-                migrations.RunSQL(
-                    "UPDATE core_workorder SET kind = 'MAINTENANCE' WHERE kind IS NULL;",
-                    migrations.RunSQL.noop,
-                ),
+                migrations.RunPython(set_kind_defaults, unset_kind_defaults),
             ],
             state_operations=[
                 migrations.AddField(
