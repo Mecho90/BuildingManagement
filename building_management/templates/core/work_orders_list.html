@@ -17,7 +17,7 @@
 
   <form method="get" class="filter-panel space-y-5">
     <div class="space-y-2">
-      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">Search working orders</label>
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search working orders" %}</label>
       <input
         id="id_q"
         class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
@@ -135,7 +135,7 @@
               </p>
             {% endif %}
             <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
-              {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
+              <span class="text-slate-600 dark:text-slate-300">{{ w.get_status_display }}</span>
               <span class="priority-badge {% if w.priority == 'HIGH' %}priority-badge--high{% elif w.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">{{ w.get_priority_display }}</span>
             </div>
           </div>
@@ -229,7 +229,9 @@
                 {{ w.get_priority_display }}
               </span>
             </td>
-            <td class="px-4 py-3">{% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}</td>
+            <td class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+              {{ w.get_status_display }}
+            </td>
             <td class="px-4 py-3">{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
             <td class="px-4 py-3">{{ w.created_at|date:"Y-m-d H:i" }}</td>
             <td class="px-4 py-3">

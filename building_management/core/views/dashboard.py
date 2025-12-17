@@ -30,6 +30,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["technician_cards_page"] = tech_page
         ctx["technician_cards"] = tech_page.object_list if tech_page else []
         ctx["technician_page_query"] = tech_query
+        ctx["technician_section_title"] = self._technician_section_title(user)
         ctx["backoffice_cards"] = self._backoffice_cards(user, resolver)
         ctx["assignment_load"] = self._assignment_load(user)
         ctx.update(self._notifications_context())
@@ -52,17 +53,24 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             return empty_page, query
 
         today = timezone.localdate()
-        assigned_ids = self._assigned_building_ids(user)
-        filters = Q(
-            building_id__in=assigned_ids or [],
-            status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
-            deadline=today,
-        )
+        show_all_today = self._has_global_staff_role(user)
+        filter_kwargs = {}
+        visible_statuses = self._statuses_for_today(user)
+        if not show_all_today:
+            assigned_ids = self._assigned_building_ids(user)
+            if not assigned_ids:
+                empty_page = Paginator([], 1).get_page(1)
+                return empty_page, query
+            filter_kwargs["building_id__in"] = assigned_ids
 
         qs = (
             WorkOrder.objects.visible_to(user)
-            .filter(archived_at__isnull=True)
-            .filter(filters)
+            .filter(
+                archived_at__isnull=True,
+                status__in=visible_statuses,
+                deadline=today,
+                **filter_kwargs,
+            )
             .select_related("building")
             .order_by("deadline", "priority", "-id")
         )
@@ -139,12 +147,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         if not building_ids:
             return 0
         today = timezone.localdate()
+        statuses = self._statuses_for_today(user)
         return (
             WorkOrder.objects.visible_to(user)
             .filter(
                 archived_at__isnull=True,
                 building_id__in=building_ids,
-                status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS],
+                status__in=statuses,
                 deadline=today,
             )
             .count()
@@ -163,6 +172,34 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             "notifications": notifications_page.object_list,
             "note_page_query": _querystring_without(self.request, "note_page"),
         }
+
+    # ------------------------------------------------------------------ roles & labels
+
+    def _global_roles(self, user):
+        if not user or not user.is_authenticated:
+            return set()
+        if not hasattr(self, "_global_roles_cache"):
+            roles = set(
+                user.memberships.filter(building__isnull=True).values_list("role", flat=True)
+            )
+            self._global_roles_cache = roles
+        return self._global_roles_cache
+
+    def _has_global_staff_role(self, user):
+        roles = self._global_roles(user)
+        return bool(roles & {MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR})
+
+    def _technician_section_title(self, user):
+        if self._has_global_staff_role(user):
+            return _("Today's Open Jobs")
+        return _("My Today's Jobs")
+
+    def _statuses_for_today(self, user):
+        return [
+            code
+            for code in (choice[0] for choice in WorkOrder.Status.choices)
+            if code != WorkOrder.Status.AWAITING_APPROVAL
+        ]
 
     def _build_notifications(self):
         user = self.request.user

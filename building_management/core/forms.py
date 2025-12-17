@@ -453,9 +453,6 @@ class WorkOrderForm(forms.ModelForm):
                 )
         self.fields["replacement_request_note"].label = "Заявка за подмяна"
         self.fields["replacement_request_note"].widget = forms.Textarea(attrs={"rows": 3})
-        self.fields["replacement_request_note"].help_text = _(
-            "Explain what replacements or supplies are needed when sending for approval."
-        )
         self._approver_queryset = self._build_approver_queryset(self._effective_building)
         self._approvers_available = self._approver_queryset.exists()
 

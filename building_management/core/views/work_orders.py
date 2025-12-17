@@ -532,7 +532,7 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
     def get_queryset(self):
         base = WorkOrder.objects.visible_to(self.request.user)
         return (
-            base.select_related("building", "unit")
+            base.select_related("building__owner", "unit")
             .prefetch_related("attachments", "audit_entries__actor")
         )
 

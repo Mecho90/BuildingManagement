@@ -46,6 +46,12 @@
         <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Building" %}</dt>
         <dd>{{ order.building.name }}</dd>
       </div>
+      {% if order.building.owner %}
+        <div>
+          <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
+          <dd>{{ order.building.owner.get_full_name|default:order.building.owner.username }}</dd>
+        </div>
+      {% endif %}
       <div>
         <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Unit" %}</dt>
         <dd>{% if order.unit_id %}#{{ order.unit.number }}{% else %}—{% endif %}</dd>

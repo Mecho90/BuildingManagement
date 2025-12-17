@@ -67,9 +67,6 @@
           <a class="btn" href="{% url 'core:building_update' building.id %}">{% trans "Edit building" %}</a>
           <a class="btn btn-danger" href="{% url 'core:building_delete' building.id %}">{% trans "Delete" %}</a>
         {% endif %}
-        {% if show_manage_team_button %}
-          <a class="btn btn-secondary" href="{{ memberships_manage_url }}">{% trans "Manage team" %}</a>
-        {% endif %}
       </div>
     </div>
   </header>
@@ -219,7 +216,7 @@
           <form method="get" class="filter-panel space-y-5">
             <input type="hidden" name="tab" value="work_orders"/>
             <div class="space-y-2">
-              <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">Search working orders</label>
+              <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search working orders" %}</label>
               <input id="id_w_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
             </div>
             <div class="space-y-2">
@@ -338,7 +335,9 @@
                           {{ w.get_priority_display }}
                         </span>
                       </td>
-                      <td class="px-4 py-3">{% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}</td>
+                      <td class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        {{ w.get_status_display }}
+                      </td>
                       <td class="px-4 py-3">{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
                       <td class="px-4 py-3">{{ w.created_at|date:"Y-m-d" }}</td>
                       <td class="px-4 py-3 text-right space-x-2">

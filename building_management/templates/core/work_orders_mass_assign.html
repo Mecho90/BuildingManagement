@@ -101,13 +101,6 @@
         </div>
       </div>
 
-      <div class="rounded-xl bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-        <ul class="list-disc space-y-1 pl-5">
-          <li>{% trans "Priority and deadline come from the fields above." %}</li>
-          <li>{% trans "Technicians assigned to the building receive a notification for each mass-assigned job." %}</li>
-        </ul>
-      </div>
-
       <div class="flex flex-wrap gap-3">
         <button type="submit" class="btn">{% trans "Create work orders" %}</button>
         <a class="btn btn-secondary" href="{% url 'core:work_orders_list' %}">{% trans "Back to Work Orders" %}</a>

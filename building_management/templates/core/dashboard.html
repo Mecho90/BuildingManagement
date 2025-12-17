@@ -19,7 +19,7 @@
 
   {% if technician_cards %}
     <section class="space-y-4">
-      <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "My jobs today" %}</h2>
+      <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{{ technician_section_title }}</h2>
       <div class="grid gap-4 lg:grid-cols-2">
         {% for job in technician_cards %}
           <article class="rounded-2xl border border-emerald-100 bg-white/80 p-4 shadow-card dark:border-slate-800 dark:bg-slate-900">
