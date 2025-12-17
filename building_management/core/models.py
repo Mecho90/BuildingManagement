@@ -340,6 +340,11 @@ class WorkOrder(TimeStampedModel):
         if self.title:
             self.title = self.title.strip()
 
+        # Older data may include outdated `kind` values (e.g. REACTIVE); coerce them.
+        valid_kinds = {choice[0] for choice in self.Kind.choices}
+        if not self.kind or self.kind not in valid_kinds:
+            self.kind = self.Kind.MAINTENANCE
+
         # Align building with unit if unit is present
         if self.unit_id and self.building_id != self.unit.building_id:
             self.building_id = self.unit.building_id

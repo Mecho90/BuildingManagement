@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from .authz import log_role_action
@@ -31,6 +31,43 @@ def _owner_capability_overrides(current_override=None):
     remove = override.get("remove") or []
     override["remove"] = list(dict.fromkeys(remove))
     return override, updated
+
+
+def _assign_backoffice_membership(user, building):
+    if not user or not building:
+        return
+    membership, created = BuildingMembership.objects.get_or_create(
+        user=user,
+        building=building,
+        role=MembershipRole.BACKOFFICE,
+    )
+    if created:
+        log_role_action(
+            actor=None,
+            target_user=user,
+            building=building,
+            role=MembershipRole.BACKOFFICE,
+            action=RoleAuditLog.Action.ROLE_ADDED,
+            payload={"reason": "backoffice_auto_assign"},
+        )
+
+
+def ensure_backoffice_memberships_for_user(user):
+    if not user or not getattr(user, "pk", None):
+        return
+    for building in Building.objects.all():
+        _assign_backoffice_membership(user, building)
+
+
+def ensure_backoffice_memberships_for_building(building):
+    if not building or not getattr(building, "pk", None):
+        return
+    backoffice_memberships = BuildingMembership.objects.filter(
+        building__isnull=True,
+        role=MembershipRole.BACKOFFICE,
+    ).select_related("user")
+    for membership in backoffice_memberships:
+        _assign_backoffice_membership(membership.user, building)
 
 
 @receiver(post_save, sender=get_user_model())
@@ -83,3 +120,28 @@ def ensure_owner_membership(sender, instance: Building, created, **kwargs):
             action=RoleAuditLog.Action.ROLE_ADDED,
             payload={"reason": "owner_auto_assign"},
         )
+    ensure_backoffice_memberships_for_building(instance)
+
+
+@receiver(post_save, sender=BuildingMembership)
+def ensure_backoffice_membership_entries(sender, instance: BuildingMembership, created, **kwargs):
+    if not created:
+        return
+    if instance.role != MembershipRole.BACKOFFICE:
+        return
+    if instance.building_id is not None:
+        return
+    ensure_backoffice_memberships_for_user(instance.user)
+
+
+@receiver(post_delete, sender=BuildingMembership)
+def cleanup_backoffice_memberships(sender, instance: BuildingMembership, **kwargs):
+    if instance.role != MembershipRole.BACKOFFICE:
+        return
+    if instance.building_id is not None:
+        return
+    BuildingMembership.objects.filter(
+        user=instance.user,
+        role=MembershipRole.BACKOFFICE,
+        building__isnull=False,
+    ).delete()

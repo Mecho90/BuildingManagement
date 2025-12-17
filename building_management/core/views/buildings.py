@@ -199,10 +199,10 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             params = set(request.GET.keys())
             if params & work_keys:
                 return "work_orders"
-            return "units"
+            return "work_orders"
 
         if active_tab == "overview":
-            active_tab = "units"
+            active_tab = "work_orders"
 
         if active_tab not in {"units", "work_orders"}:
             active_tab = _tab_hint_from_params()

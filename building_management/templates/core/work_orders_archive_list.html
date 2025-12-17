@@ -23,7 +23,7 @@
       </div>
     {% endwith %}
 
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {% if owner_choices %}
         <div class="space-y-2">
           <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
@@ -53,11 +53,16 @@
           {% endfor %}
         </select>
       </div>
+
+      <div class="space-y-2">
+        <label for="id_archived_range" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Archived range" %}</label>
+        <input id="id_archived_range" name="archived_range" type="text" value="{{ archived_range }}" placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" />
+      </div>
     </div>
 
     <div class="flex justify-end gap-2">
       <button class="btn" type="submit">{% trans "Filter" %}</button>
-      {% if q or owner or sort != 'archived_desc' %}
+      {% if q or owner or sort != 'archived_desc' or archived_range %}
         <a class="btn btn-secondary" href="{{ archive_reset_url }}">{% trans "Reset" %}</a>
       {% endif %}
     </div>

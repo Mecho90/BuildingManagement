@@ -1026,6 +1026,26 @@ class ArchivedWorkOrderFilterMixin:
             )
         self._search = search
 
+        archived_range_raw = (request.GET.get("archived_range") or "").strip()
+        archived_from = None
+        archived_to = None
+        if archived_range_raw:
+            normalized = archived_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
+            parts = [part.strip() for part in normalized.split("/") if part.strip()]
+            if parts:
+                archived_from = parse_date(parts[0])
+                if len(parts) > 1:
+                    archived_to = parse_date(parts[1])
+        if archived_from and archived_to and archived_to < archived_from:
+            archived_from, archived_to = archived_to, archived_from
+        if archived_from:
+            qs = qs.filter(archived_at__date__gte=archived_from)
+        if archived_to:
+            qs = qs.filter(archived_at__date__lte=archived_to)
+        if not (archived_from or archived_to):
+            archived_range_raw = ""
+        self._archived_range = archived_range_raw
+
         owner_ids = list(qs.values_list("building__owner_id", flat=True).distinct())
         owner_ids = [oid for oid in owner_ids if oid]
         self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
@@ -1103,6 +1123,7 @@ class ArchivedWorkOrderFilterMixin:
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["q"] = getattr(self, "_search", "")
+        ctx["archived_range"] = getattr(self, "_archived_range", "")
         ctx["owner"] = getattr(self, "_owner", "")
         ctx["owner_choices"] = getattr(self, "_owner_choices", [])
         ctx["sort"] = getattr(self, "_sort", "archived_desc")
