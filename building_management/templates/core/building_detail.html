@@ -235,6 +235,14 @@
               </select>
             </div>
             <div class="space-y-2">
+              <label for="id_w_scope" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Show" %}</label>
+              <select id="id_w_scope" name="w_scope" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+                {% for value,label in w_scope_choices %}
+                  <option value="{{ value }}" {% if w_scope == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="space-y-2">
               <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
               <select id="id_w_per" name="w_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
                 <option value="25"  {% if w_per == 25  %}selected{% endif %}>25</option>
@@ -255,7 +263,7 @@
             </div>
             <div class="flex items-center justify-end gap-2">
               <button class="btn" type="submit">{% trans "Filter" %}</button>
-              {% if w_q or w_status or w_per != 25 or w_deadline_range %}
+              {% if w_q or w_status or w_per != 25 or w_deadline_range or w_scope != 'active' %}
                 <a class="btn btn-secondary" href="{{ tab_urls.work_orders }}">{% trans "Reset" %}</a>
               {% endif %}
             </div>
