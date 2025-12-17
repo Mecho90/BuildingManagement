@@ -79,20 +79,6 @@
             <div class="mt-4 flex flex-wrap gap-2">
               <a class="btn btn-sm" href="{% url 'core:work_order_detail' card.id %}">{% trans "Review" %}</a>
               <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_update' card.id %}">{% trans "Update" %}</a>
-              {% if card.can_take_action %}
-                <form method="post" action="{% url 'core:work_order_approval_decide' card.id %}" class="inline-flex">
-                  {% csrf_token %}
-                  <input type="hidden" name="decision" value="approve">
-                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                  <button type="submit" class="btn btn-sm">{% trans "Approve" %}</button>
-                </form>
-                <form method="post" action="{% url 'core:work_order_approval_decide' card.id %}" class="inline-flex">
-                  {% csrf_token %}
-                  <input type="hidden" name="decision" value="reject">
-                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                  <button type="submit" class="btn btn-danger btn-sm">{% trans "Reject" %}</button>
-                </form>
-              {% endif %}
             </div>
           </article>
         {% empty %}

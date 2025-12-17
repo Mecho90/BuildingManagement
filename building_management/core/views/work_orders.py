@@ -27,6 +27,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, FormView, L
 from ..authz import Capability, CapabilityResolver, log_workorder_action
 from ..forms import MassAssignWorkOrdersForm, WorkOrderForm
 from ..models import Building, BuildingMembership, WorkOrder, WorkOrderAttachment, WorkOrderAuditLog
+from ..utils.roles import user_can_approve_work_orders
 from ..services.notifications import (
     notify_approvers_of_pending_order,
     notify_building_technicians_of_mass_assignment,
@@ -962,7 +963,7 @@ class WorkOrderApprovalDecisionView(LoginRequiredMixin, View):
             WorkOrder.objects.visible_to(request.user).select_related("building"),
             pk=kwargs["pk"],
         )
-        if not _user_has_building_capability(request.user, order.building, Capability.APPROVE_WORK_ORDERS):
+        if not user_can_approve_work_orders(request.user, order.building_id):
             raise Http404()
         if order.status != WorkOrder.Status.AWAITING_APPROVAL:
             messages.error(request, _("This work order is no longer awaiting approval."))

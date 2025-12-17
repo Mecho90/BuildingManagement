@@ -12,6 +12,7 @@ from django.views.generic import TemplateView
 
 from ..authz import Capability, CapabilityResolver
 from ..models import Building, MembershipRole, Notification, UserSecurityProfile, WorkOrder
+from ..utils.roles import user_can_approve_work_orders
 from ..services import NotificationService
 from .common import _querystring_without
 
@@ -101,7 +102,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return list({*membership_ids, *owned_ids})
 
     def _backoffice_cards(self, user, resolver):
-        if not resolver.has(Capability.MANAGE_BUILDINGS):
+        if not user or not user.is_authenticated:
             return []
         qs = (
             WorkOrder.objects.visible_to(user)
@@ -117,10 +118,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             requester = None
             if wo.awaiting_approval_by:
                 requester = wo.awaiting_approval_by.get_full_name() or wo.awaiting_approval_by.username
-            can_take_action = resolver.has(
-                Capability.APPROVE_WORK_ORDERS,
-                building_id=getattr(wo.building, "pk", None),
-            )
+            can_take_action = user_can_approve_work_orders(user, getattr(wo.building, "pk", None))
             cards.append(
                 {
                     "id": wo.pk,

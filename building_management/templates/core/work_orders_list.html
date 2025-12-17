@@ -135,7 +135,7 @@
               </p>
             {% endif %}
             <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
-              <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ w.get_status_display }}</span>
+              {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
               <span class="priority-badge {% if w.priority == 'HIGH' %}priority-badge--high{% elif w.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">{{ w.get_priority_display }}</span>
             </div>
           </div>
@@ -229,11 +229,7 @@
                 {{ w.get_priority_display }}
               </span>
             </td>
-            <td class="px-4 py-3">
-              <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                {{ w.get_status_display }}
-              </span>
-            </td>
+            <td class="px-4 py-3">{% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}</td>
             <td class="px-4 py-3">{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
             <td class="px-4 py-3">{{ w.created_at|date:"Y-m-d H:i" }}</td>
             <td class="px-4 py-3">

@@ -24,6 +24,7 @@ from .models import (
     WorkOrderAttachment,
     UserSecurityProfile,
 )
+from .utils.roles import user_can_approve_work_orders
 
 ROLE_DESCRIPTIONS = {
     MembershipRole.TECHNICIAN: _("Technician – access to assigned buildings."),
@@ -428,12 +429,11 @@ class WorkOrderForm(forms.ModelForm):
         self.fields["status"].label = _("Status")
         self.fields["deadline"].label = _("Deadline")
         self._current_status = self.instance.status if self.instance.pk else WorkOrder.Status.OPEN
-        self._allowed_status_values = self._compute_allowed_statuses(b_id, current_status=self._current_status)
-        if (
-            self._current_status == WorkOrder.Status.AWAITING_APPROVAL
-            and self._resolver
-            and self._resolver.has(Capability.APPROVE_WORK_ORDERS, building_id=b_id)
-        ):
+        self._can_user_approve = user_can_approve_work_orders(self._user, b_id)
+        self._allowed_status_values = self._compute_allowed_statuses(
+            b_id, current_status=self._current_status, can_user_approve=self._can_user_approve
+        )
+        if self._current_status == WorkOrder.Status.AWAITING_APPROVAL and self._can_user_approve:
             self._allowed_status_values = {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
             self.fields["status"].choices = [
                 (WorkOrder.Status.REJECTED, WorkOrder.Status.REJECTED.label),
@@ -443,6 +443,14 @@ class WorkOrderForm(forms.ModelForm):
             self.fields["status"].choices = [
                 choice for choice in WorkOrder.Status.choices if choice[0] in self._allowed_status_values
             ]
+            if self._current_status == WorkOrder.Status.AWAITING_APPROVAL:
+                self.fields["status"].disabled = True
+                self.fields["status"].widget.attrs["class"] = (
+                    self.fields["status"].widget.attrs.get("class", "") + " cursor-not-allowed opacity-70"
+                ).strip()
+                self.fields["status"].help_text = _(
+                    "Awaiting approval. Only backoffice users can change this status."
+                )
         self.fields["replacement_request_note"].label = "Заявка за подмяна"
         self.fields["replacement_request_note"].widget = forms.Textarea(attrs={"rows": 3})
         self.fields["replacement_request_note"].help_text = _(
@@ -529,7 +537,11 @@ class WorkOrderForm(forms.ModelForm):
             self.add_error("deadline", _("Deadline cannot be in the past."))
 
         status_value = cleaned.get("status")
-        allowed_statuses = self._compute_allowed_statuses(building_id, current_status=self._current_status)
+        allowed_statuses = self._compute_allowed_statuses(
+            building_id,
+            current_status=self._current_status,
+            can_user_approve=self._can_user_approve,
+        )
         self._allowed_status_values = allowed_statuses
         if status_value and status_value not in allowed_statuses:
             self.add_error("status", _("You cannot select this status."))
@@ -542,12 +554,7 @@ class WorkOrderForm(forms.ModelForm):
             original_status == WorkOrder.Status.AWAITING_APPROVAL
             and status_value in {WorkOrder.Status.DONE, WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
         ):
-            can_approve = (
-                self._resolver.has(Capability.APPROVE_WORK_ORDERS, building_id=building_id)
-                if self._resolver
-                else False
-            )
-            if not can_approve:
+            if not self._can_user_approve:
                 self.add_error("status", _("You do not have permission to complete this approval."))
 
         self._effective_building = building
@@ -618,18 +625,16 @@ class WorkOrderForm(forms.ModelForm):
                 change_log["added"].append(name)
         return change_log
 
-    def _compute_allowed_statuses(self, building_id, *, current_status=None):
+    def _compute_allowed_statuses(self, building_id, *, current_status=None, can_user_approve: bool = False):
         current = current_status or (self.instance.status if self.instance.pk else WorkOrder.Status.OPEN)
         if building_id is None:
             return {WorkOrder.Status.OPEN}
         can_manage = False
         can_create = False
-        can_approve = False
         if self._resolver:
             can_manage = self._resolver.has(Capability.MANAGE_BUILDINGS, building_id=building_id)
             can_create = self._resolver.has(Capability.CREATE_WORK_ORDERS, building_id=building_id)
-            can_approve = self._resolver.has(Capability.APPROVE_WORK_ORDERS, building_id=building_id)
-        if not (can_manage or can_create or can_approve):
+        if not (can_manage or can_create or can_user_approve):
             return {current}
 
         transitions = {
@@ -642,14 +647,20 @@ class WorkOrderForm(forms.ModelForm):
             WorkOrder.Status.AWAITING_APPROVAL: {WorkOrder.Status.AWAITING_APPROVAL},
             WorkOrder.Status.DONE: {WorkOrder.Status.DONE},
             WorkOrder.Status.APPROVED: {WorkOrder.Status.APPROVED},
-            WorkOrder.Status.REJECTED: {WorkOrder.Status.REJECTED},
+            WorkOrder.Status.REJECTED: {
+                WorkOrder.Status.REJECTED,
+                WorkOrder.Status.OPEN,
+                WorkOrder.Status.IN_PROGRESS,
+                WorkOrder.Status.AWAITING_APPROVAL,
+                WorkOrder.Status.DONE,
+            },
         }
         allowed = transitions.get(current, {current})
         if current == WorkOrder.Status.AWAITING_APPROVAL:
-            if can_approve:
+            if can_user_approve:
                 return {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
             return allowed
-        if can_approve:
+        if can_user_approve:
             allowed |= {
                 WorkOrder.Status.OPEN,
                 WorkOrder.Status.IN_PROGRESS,
