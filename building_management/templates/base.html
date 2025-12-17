@@ -17,39 +17,44 @@
     <div class="flex min-h-screen flex-col">
       <header class="border-b border-emerald-100/60 bg-white/80 shadow-md backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/80">
         <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <nav class="flex flex-1 flex-wrap items-center gap-4" aria-label="Primary">
-            {% block topbar_left %}
-              <a href="{% url 'core:dashboard' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/' %}">
-                {% trans "Dashboard" %}
-              </a>
-              <a href="{% url 'core:buildings_list' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/buildings/' %}">
-                {% trans "Buildings" %}
-              </a>
-              {% if work_orders_enabled and work_orders_url %}
-                <a href="{{ work_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav work_orders_url %}">
-                  {% trans "Work Orders" %}
+          <nav class="flex flex-1 flex-col items-start gap-3" aria-label="Primary">
+            <a href="{% url 'core:dashboard' %}" class="inline-flex items-center" aria-label="{% trans 'Dashboard' %}">
+              <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" class="h-9 w-auto"/>
+            </a>
+            <div class="flex flex-wrap items-center gap-4">
+              {% block topbar_left %}
+                <a href="{% url 'core:dashboard' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/' %}">
+                  {% trans "Dashboard" %}
                 </a>
-              {% endif %}
-              {% if work_orders_archive_enabled and work_orders_archive_url %}
-                <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav work_orders_archive_url %}">
-                  {% trans "Archive" %}
+                <a href="{% url 'core:buildings_list' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/buildings/' %}">
+                  {% trans "Buildings" %}
                 </a>
-              {% endif %}
-              {% if mass_assign_work_orders_enabled and mass_assign_work_orders_url %}
-                <a href="{{ mass_assign_work_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav mass_assign_work_orders_url %}">
-                  {% trans "Mass Assign" %}
-                </a>
-              {% endif %}
-              {% if can_view_user_management and user_management_url %}
-                <a href="{{ user_management_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/manage/users/' %}">
-                  {% trans "User Management" %}
-                </a>
-              {% elif user.is_staff %}
-                <a href="{% url 'admin:index' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/admin/' %}">
-                  {% trans "Admin Panel" %}
-                </a>
-              {% endif %}
-            {% endblock %}
+                {% if work_orders_enabled and work_orders_url %}
+                  <a href="{{ work_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav work_orders_url %}">
+                    {% trans "Work Orders" %}
+                  </a>
+                {% endif %}
+                {% if work_orders_archive_enabled and work_orders_archive_url %}
+                  <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav work_orders_archive_url %}">
+                    {% trans "Archive" %}
+                  </a>
+                {% endif %}
+                {% if mass_assign_work_orders_enabled and mass_assign_work_orders_url %}
+                  <a href="{{ mass_assign_work_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav mass_assign_work_orders_url %}">
+                    {% trans "Mass Assign" %}
+                  </a>
+                {% endif %}
+                {% if can_view_user_management and user_management_url %}
+                  <a href="{{ user_management_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/manage/users/' %}">
+                    {% trans "User Management" %}
+                  </a>
+                {% elif user.is_staff %}
+                  <a href="{% url 'admin:index' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/admin/' %}">
+                    {% trans "Admin Panel" %}
+                  </a>
+                {% endif %}
+              {% endblock %}
+            </div>
           </nav>
 
           <div class="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-300">
