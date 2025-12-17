@@ -200,6 +200,19 @@ a:hover {
   border-color: rgba(234, 88, 12, 0.4) !important;
 }
 
+/* Date inputs: ensure the calendar indicator remains visible in dark mode */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(30%) sepia(80%) saturate(800%) hue-rotate(350deg) brightness(0.95) contrast(1.1);
+}
+
+html.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) saturate(0) brightness(1.4);
+}
+
+html.dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(1) saturate(0) brightness(1.8);
+}
+
 .dark .dark\:border-emerald-500 {
   border-color: var(--brand-orange-strong) !important;
 }

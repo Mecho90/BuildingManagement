@@ -872,7 +872,6 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             "status",
             "new_attachments",
             "remove_attachments",
-            "awaiting_approval_assignee",
         }
         for field in changed_fields:
             if field in ignored_fields:

@@ -438,17 +438,7 @@ class WorkOrderForm(forms.ModelForm):
             "Explain what replacements or supplies are needed when sending for approval."
         )
         self._approver_queryset = self._build_approver_queryset(self._effective_building)
-        self._selected_approver = None
-        if self._approver_queryset.exists():
-            field = forms.ModelChoiceField(
-                queryset=self._approver_queryset,
-                required=False,
-                label=_("Send for approval to"),
-                help_text=_("Select who should approve when marking the work order as Awaiting approval."),
-            )
-            if self.instance.pk and self.instance.awaiting_approval_by_id:
-                field.initial = self.instance.awaiting_approval_by_id
-            self.fields["awaiting_approval_assignee"] = field
+        self._approvers_available = self._approver_queryset.exists()
 
         # Attachments (upload)
         self.fields["new_attachments"] = MultipleFileField(
@@ -505,6 +495,7 @@ class WorkOrderForm(forms.ModelForm):
             building = self._coerce_building(self._building)
         elif building is None and getattr(self.instance, "building_id", None):
             building = getattr(self.instance, "building")
+        building_id = getattr(building, "pk", None)
 
         unit = cleaned.get("unit")
 
@@ -514,7 +505,6 @@ class WorkOrderForm(forms.ModelForm):
 
         # Non-staff must own the building
         if self._user and building:
-            building_id = getattr(building, "pk", None)
             allowed = False
             if self._resolver:
                 allowed = self._resolver.has(Capability.MANAGE_BUILDINGS, building_id=building_id) or self._resolver.has(
@@ -528,34 +518,26 @@ class WorkOrderForm(forms.ModelForm):
             self.add_error("deadline", _("Deadline cannot be in the past."))
 
         status_value = cleaned.get("status")
-        allowed_statuses = self._compute_allowed_statuses(getattr(building, "pk", None), current_status=self._current_status)
+        allowed_statuses = self._compute_allowed_statuses(building_id, current_status=self._current_status)
         self._allowed_status_values = allowed_statuses
         if status_value and status_value not in allowed_statuses:
             self.add_error("status", _("You cannot select this status."))
 
         original_status = self.instance.status if self.instance.pk else WorkOrder.Status.OPEN
-        awaiting_by_id = getattr(self.instance, "awaiting_approval_by_id", None)
-        awaiting_assignee = cleaned.get("awaiting_approval_assignee")
-        if status_value == WorkOrder.Status.AWAITING_APPROVAL:
-            if not self._approver_queryset.exists():
-                self.add_error("status", _("No approvers are available for this building."))
-            elif not awaiting_assignee:
-                self.add_error("awaiting_approval_assignee", _("Select an approver."))
-            else:
-                self._selected_approver = awaiting_assignee
-        else:
-            self._selected_approver = None
+        if status_value == WorkOrder.Status.AWAITING_APPROVAL and not self._approvers_available:
+            self.add_error("status", _("No approvers are available for this building."))
 
         if (
             original_status == WorkOrder.Status.AWAITING_APPROVAL
             and status_value == WorkOrder.Status.DONE
-            and awaiting_by_id
-            and self._user
-            and awaiting_by_id == self._user.id
         ):
-            can_approve = self._resolver.has(Capability.APPROVE_WORK_ORDERS, building_id=getattr(building, "pk", None)) if self._resolver else False
+            can_approve = (
+                self._resolver.has(Capability.APPROVE_WORK_ORDERS, building_id=building_id)
+                if self._resolver
+                else False
+            )
             if not can_approve:
-                self.add_error("status", _("Another approver must complete this approval."))
+                self.add_error("status", _("You do not have permission to approve this work order."))
 
         self._effective_building = building
         return cleaned
@@ -579,7 +561,10 @@ class WorkOrderForm(forms.ModelForm):
             obj.building = self._locked_building_obj
 
         if obj.status == WorkOrder.Status.AWAITING_APPROVAL:
-            obj.awaiting_approval_by = self._selected_approver
+            if self._user and getattr(self._user, "is_authenticated", False):
+                obj.awaiting_approval_by = self._user
+            else:
+                obj.awaiting_approval_by = None
         elif obj.status != WorkOrder.Status.AWAITING_APPROVAL and original_status == WorkOrder.Status.AWAITING_APPROVAL:
             obj.awaiting_approval_by = None
 

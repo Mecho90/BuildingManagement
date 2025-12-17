@@ -31,18 +31,7 @@
 
     <div class="grid gap-5">
       {% for field in form.visible_fields %}
-        {% if field.name == 'awaiting_approval_assignee' %}
-          {% with status_value=form.status.value %}
-            <div class="space-y-1 {% if status_value != 'AWAITING_APPROVAL' %}hidden{% endif %}" data-awaiting-field>
-              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {{ field }}
-              {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
-              {% if field.errors %}
-                <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
-              {% endif %}
-            </div>
-          {% endwith %}
-        {% elif field.name != 'new_attachments' and field.name != 'remove_attachments' %}
+        {% if field.name != 'new_attachments' and field.name != 'remove_attachments' %}
           {% if field.field.widget.input_type == 'checkbox' %}
             <div class="space-y-1">
               <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -84,18 +73,6 @@
   {% if units_api_template %}
     <script src="{% static 'js/work-order-units.js' %}" defer></script>
   {% endif %}
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const statusSelect = document.getElementById("id_status");
-      const awaitingField = document.querySelector("[data-awaiting-field]");
-      if (!statusSelect || !awaitingField) return;
-      function toggleAwaitingField() {
-        awaitingField.classList.toggle("hidden", statusSelect.value !== "AWAITING_APPROVAL");
-      }
-      statusSelect.addEventListener("change", toggleAwaitingField);
-      toggleAwaitingField();
-    });
-  </script>
 {% endblock %}
 
 {% block extra_css %}

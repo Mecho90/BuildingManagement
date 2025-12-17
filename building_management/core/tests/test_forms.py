@@ -196,7 +196,6 @@ class WorkOrderFormTests(TestCase):
                 "deadline": order.deadline,
                 "description": order.description,
                 "replacement_request_note": "Replace filter",
-                "awaiting_approval_assignee": self.owner.pk,
             },
             instance=order,
             user=self.other_user,
@@ -204,7 +203,7 @@ class WorkOrderFormTests(TestCase):
         )
         self.assertTrue(form.is_valid(), form.errors)
         saved = form.save()
-        self.assertEqual(saved.awaiting_approval_by, self.owner)
+        self.assertEqual(saved.awaiting_approval_by, self.other_user)
         self.assertEqual(saved.replacement_request_note, "Replace filter")
 
     def test_same_user_cannot_approve_without_capability(self):
@@ -238,7 +237,7 @@ class WorkOrderFormTests(TestCase):
             building=self.building,
         )
         self.assertFalse(form.is_valid())
-        self.assertIn("Another approver", "".join(form.errors.get("status", [])))
+        self.assertIn("do not have permission", "".join(form.errors.get("status", [])))
 
     def test_backoffice_can_approve(self):
         BuildingMembership.objects.create(
@@ -275,12 +274,8 @@ class WorkOrderFormTests(TestCase):
         saved = form.save()
         self.assertIsNone(saved.awaiting_approval_by)
 
-    def test_awaiting_requires_assignee(self):
-        BuildingMembership.objects.create(
-            user=self.other_user,
-            building=self.building,
-            role=MembershipRole.TECHNICIAN,
-        )
+    def test_awaiting_requires_available_approver(self):
+        BuildingMembership.objects.filter(role=MembershipRole.ADMINISTRATOR).delete()
         order = WorkOrder.objects.create(
             building=self.building,
             unit=self.unit,
@@ -305,7 +300,7 @@ class WorkOrderFormTests(TestCase):
             building=self.building,
         )
         self.assertFalse(form.is_valid())
-        self.assertIn("Select an approver", "".join(form.errors.get("awaiting_approval_assignee", [])))
+        self.assertIn("No approvers", "".join(form.errors.get("status", [])))
 
 
 class BuildingMembershipFormTests(TestCase):
