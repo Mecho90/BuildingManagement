@@ -97,10 +97,6 @@ msgstr "Диапазон на срока"
 msgid "YYYY-MM-DD / YYYY-MM-DD"
 msgstr "ГГГГ-ММ-ДД / ГГГГ-ММ-ДД"
 
-# Audit log
-msgid "Audit Trail"
-msgstr "Одит дневник"
-
 #: templates/core/audit_trail.html:12
 #, python-format
 msgid "Total audit logs: %(total)s"
@@ -120,9 +116,6 @@ msgstr "Техник"
 
 msgid "Backoffice Employee"
 msgstr "Служител бек офис"
-
-msgid "Read-only auditor"
-msgstr "Одитор (само за четене)"
 
 msgid "Status changed"
 msgstr "Статусът е променен"

@@ -317,6 +317,4 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             return ""
         if resolver.has(Capability.CREATE_WORK_ORDERS) and not resolver.has(Capability.MANAGE_BUILDINGS):
             return "Technician overview"
-        if resolver.has(Capability.VIEW_AUDIT_LOG):
-            return "Auditor overview"
         return ""

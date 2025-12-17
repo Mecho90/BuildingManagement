@@ -9,7 +9,6 @@ This release introduces explicit role memberships per building. Each membership 
 | Technician | Assigned buildings only | Interact with their own work orders. |
 | Backoffice Employee | Buildings they manage | Create/edit buildings, units, and work orders; mass assign techs; manage memberships for those buildings. |
 | Administrator | Global | All capabilities, including user management and audit visibility. |
-| Read-only Auditor | Global | Organization-wide read-only access and audit log visibility. |
 
 ## Capabilities
 
@@ -35,7 +34,7 @@ Technicians progress requests from **Open → In progress → Awaiting approval*
 
 ## Auditing
 
-Role/membership changes automatically emit `RoleAuditLog` entries. Administrators and auditors can review them via **Audit Log** in the main navigation or through the Django admin (`RoleAuditLog`).
+Role/membership changes automatically emit `RoleAuditLog` entries. Administrators can review them via **Audit Log** in the main navigation or through the Django admin (`RoleAuditLog`).
 
 ## Auto-provisioning
 

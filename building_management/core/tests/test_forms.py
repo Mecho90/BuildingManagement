@@ -375,7 +375,7 @@ class AdminUserFormTests(TestCase):
 
     def test_update_respects_existing_role(self):
         user = get_user_model().objects.create_user("edit-user", password="pass1234")
-        BuildingMembership.objects.create(user=user, building=None, role=MembershipRole.AUDITOR)
+        BuildingMembership.objects.create(user=user, building=None, role=MembershipRole.BACKOFFICE)
         form = AdminUserUpdateForm(
             instance=user,
             data={

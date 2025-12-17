@@ -29,11 +29,12 @@ ROLE_DESCRIPTIONS = {
     MembershipRole.TECHNICIAN: _("Technician – access to assigned buildings."),
     MembershipRole.BACKOFFICE: _("Backoffice – manage assignments for their buildings."),
     MembershipRole.ADMINISTRATOR: _("Administrator – full system access."),
-    MembershipRole.AUDITOR: _("Auditor – read-only visibility across the organization."),
 }
 
 
 class RoleSelectionMixin:
+    role_descriptions = ROLE_DESCRIPTIONS
+
     def role_description(self, value):
         return ROLE_DESCRIPTIONS.get(value, "")
 from .services.files import validate_work_order_attachment

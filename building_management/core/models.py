@@ -531,7 +531,6 @@ class MembershipRole(models.TextChoices):
     TECHNICIAN = "TECHNICIAN", _("Technician")
     BACKOFFICE = "BACKOFFICE", _("Backoffice Employee")
     ADMINISTRATOR = "ADMINISTRATOR", _("Administrator")
-    AUDITOR = "AUDITOR", _("Read-only auditor")
 
 
 class Capability:
@@ -570,10 +569,6 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         Capability.VIEW_AUDIT_LOG,
         Capability.MANAGE_MEMBERSHIPS,
         Capability.VIEW_USERS,
-    },
-    MembershipRole.AUDITOR: {
-        Capability.VIEW_ALL_BUILDINGS,
-        Capability.VIEW_AUDIT_LOG,
     },
 }
 

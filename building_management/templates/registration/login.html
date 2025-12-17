@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n static %}
 {% block title %}{% trans "Login" %} · {% trans "Building Management" %}{% endblock %}
 
 {# Hide topbar content only on this page #}
@@ -20,45 +20,58 @@
 {% endblock %}
 
 {% block content %}
-<section class="flex min-h-[60vh] w-full items-center justify-center px-4">
-  <div class="w-full max-w-md space-y-6 rounded-2xl bg-white p-6 shadow-card ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-    <header class="space-y-2 text-center">
-      <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Sign in" %}</h1>
-    </header>
-
-    {% if form.non_field_errors %}
-      <div class="alert alert--danger">
-        {% for err in form.non_field_errors %}
-          <div>{{ err }}</div>
-        {% endfor %}
+<section class="flex min-h-[70vh] w-full items-center justify-center bg-emerald-50/60 px-4 py-16 dark:bg-slate-900">
+  <div class="flex w-full max-w-4xl items-center justify-center gap-6 rounded-[32px] bg-white/95 p-10 shadow-[0_45px_75px_-35px_rgba(16,185,129,0.65)]">
+    <div class="flex w-60 shrink-0 items-center justify-center">
+        <div class="rounded-2xl bg-[#050505] p-4 shadow-card">
+        <img
+          src="{% static 'img/logo-Galus.png' %}"
+          alt="{% trans 'Galus logo' %}"
+          class="h-16 w-auto"
+          loading="lazy"
+        />
       </div>
-    {% endif %}
+    </div>
 
-    <form method="post" action="{% url 'login' %}" class="space-y-4" novalidate>
-      {% csrf_token %}
+    <div class="w-full max-w-md space-y-6 rounded-2xl bg-white p-6 shadow-card dark:bg-slate-900">
+      <header class="space-y-2 text-center">
+        <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Sign in" %}</h1>
+      </header>
 
-      <div class="space-y-1">
-        <label for="{{ form.username.id_for_label }}">{% trans "Username" %}</label>
-        {{ form.username }}
-        {% if form.username.errors %}
-          <div class="errors">
-            {% for err in form.username.errors %}<div>{{ err }}</div>{% endfor %}
-          </div>
-        {% endif %}
-      </div>
+      {% if form.non_field_errors %}
+        <div class="alert alert--danger">
+          {% for err in form.non_field_errors %}
+            <div>{{ err }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
 
-      <div class="space-y-1">
-        <label for="{{ form.password.id_for_label }}">{% trans "Password" %}</label>
-        {{ form.password }}
-        {% if form.password.errors %}
-          <div class="errors">
-            {% for err in form.password.errors %}<div>{{ err }}</div>{% endfor %}
-          </div>
-        {% endif %}
-      </div>
+      <form method="post" action="{% url 'login' %}" class="space-y-4" novalidate>
+        {% csrf_token %}
 
-      <button class="btn w-full justify-center" type="submit">{% trans "Sign in" %}</button>
-    </form>
+        <div class="space-y-1">
+          <label for="{{ form.username.id_for_label }}">{% trans "Username" %}</label>
+          {{ form.username }}
+          {% if form.username.errors %}
+            <div class="errors">
+              {% for err in form.username.errors %}<div>{{ err }}</div>{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="space-y-1">
+          <label for="{{ form.password.id_for_label }}">{% trans "Password" %}</label>
+          {{ form.password }}
+          {% if form.password.errors %}
+            <div class="errors">
+              {% for err in form.password.errors %}<div>{{ err }}</div>{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <button class="btn w-full justify-center" type="submit">{% trans "Sign in" %}</button>
+      </form>
+    </div>
   </div>
 </section>
 {% endblock %}

@@ -228,11 +228,6 @@ class CapabilityEnforcementTests(TestCase):
             email="backoffice@example.com",
             password="pass1234",
         )
-        self.auditor = User.objects.create_user(
-            username="auditor-user",
-            email="auditor@example.com",
-            password="pass1234",
-        )
         self.building = Building.objects.create(
             owner=self.backoffice,
             name="Capability Plaza",
@@ -254,11 +249,6 @@ class CapabilityEnforcementTests(TestCase):
             user=self.backoffice,
             building=None,
             role=MembershipRole.BACKOFFICE,
-        )
-        BuildingMembership.objects.create(
-            user=self.auditor,
-            building=None,
-            role=MembershipRole.AUDITOR,
         )
 
     def test_building_create_requires_manage_capability(self):
@@ -296,17 +286,6 @@ class CapabilityEnforcementTests(TestCase):
         self.client.login(username="admin", password="pass1234")
         response = self.client.get(reverse("core:work_orders_archive"))
         self.assertEqual(response.status_code, 200)
-
-    def test_auditor_cannot_edit_work_order(self):
-        self.client.login(username="auditor-user", password="pass1234")
-        response = self.client.get(reverse("core:work_order_update", args=[self.work_order.pk]))
-        self.assertEqual(response.status_code, 403)
-
-    def test_auditor_has_read_only_detail(self):
-        self.client.login(username="auditor-user", password="pass1234")
-        response = self.client.get(reverse("core:work_order_detail", args=[self.work_order.pk]))
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["can_edit_order"])
 
 
 class DashboardViewTests(TestCase):
