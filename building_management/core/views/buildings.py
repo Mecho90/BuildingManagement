@@ -270,9 +270,6 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         w_q = (self.request.GET.get("w_q") or "").strip()
         w_per = self._get_int("w_per", 25)
         w_status = (self.request.GET.get("w_status") or "").strip().upper()
-        w_scope = (self.request.GET.get("w_scope") or "active").strip().lower()
-        if w_scope not in {"active", "archived", "all"}:
-            w_scope = "active"
         w_deadline_range_raw = (self.request.GET.get("w_deadline_range") or "").strip()
         w_deadline_from = None
         w_deadline_to = None
@@ -299,12 +296,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             )
         )
 
-        scope_filters = {
-            "active": Q(archived_at__isnull=True),
-            "archived": Q(archived_at__isnull=False),
-        }
-        if scope_filter := scope_filters.get(w_scope):
-            wo_qs = wo_qs.filter(scope_filter)
+        wo_qs = wo_qs.filter(archived_at__isnull=True)
 
         if w_q:
             wo_qs = wo_qs.filter(Q(title__icontains=w_q) | Q(description__icontains=w_q))
@@ -321,12 +313,6 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
 
         wo_qs = wo_qs.order_by("priority_order", "deadline", "-id")
         workorders_page = Paginator(wo_qs, w_per).get_page(self.request.GET.get("w_page"))
-        w_scope_choices = (
-            ("active", _("Active")),
-            ("archived", _("Archived")),
-            ("all", _("All")),
-        )
-
         ctx.update(
             {
                 "workorders_page": workorders_page,
@@ -334,8 +320,6 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 "w_per": w_per,
                 "w_status": w_status,
                 "w_status_choices": WorkOrder.Status.choices,
-                "w_scope": w_scope,
-                "w_scope_choices": w_scope_choices,
                 "w_deadline_range": w_deadline_range_raw,
                 "w_active": active_tab == "work_orders",
             }

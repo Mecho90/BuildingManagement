@@ -1419,10 +1419,6 @@ msgstr "Добави задача"
 msgid "Title or description"
 msgstr "Заглавие или описание"
 
-#: templates/core/building_detail.html:235
-msgid "Show"
-msgstr ""
-
 #: templates/core/building_detail.html:252
 #: templates/core/work_orders_list.html:75
 msgid "Deadline range"

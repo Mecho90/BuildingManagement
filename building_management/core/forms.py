@@ -237,7 +237,7 @@ class BuildingForm(forms.ModelForm):
 class UnitForm(forms.ModelForm):
     class Meta:
         model = Unit
-        fields = ("number", "floor", "owner_name", "contact_phone", "is_occupied", "description")
+        fields = ("number", "floor", "owner_name", "contact_phone", "description")
         # If your form includes "building", keep it in fields and this class will lock it.
 
     def __init__(self, *args, user=None, building=None, **kwargs):
@@ -255,7 +255,6 @@ class UnitForm(forms.ModelForm):
                 self.fields["building"].disabled = True
 
         self.fields["floor"].label = _("Floor")
-        self.fields["is_occupied"].label = _("Is occupied")
 
         # show an inline hint in the input
         self.fields["contact_phone"].widget.attrs.setdefault(

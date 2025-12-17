@@ -7,7 +7,7 @@ from .authz import Capability, CapabilityResolver
 
 def theme(request):
     data = {
-        "theme": request.session.get("theme", "light"),
+        "theme": request.session.get("theme", "dark"),
         "work_orders_enabled": False,
         "work_orders_url": "",
         "work_orders_archive_enabled": False,
