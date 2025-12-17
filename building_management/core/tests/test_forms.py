@@ -227,7 +227,41 @@ class WorkOrderFormTests(TestCase):
                 "building": self.building.pk,
                 "unit": self.unit.pk,
                 "priority": WorkOrder.Priority.MEDIUM,
-                "status": WorkOrder.Status.DONE,
+                "status": WorkOrder.Status.APPROVED,
+                "deadline": order.deadline,
+                "description": order.description,
+                "replacement_request_note": order.replacement_request_note,
+            },
+            instance=order,
+            user=self.other_user,
+            building=self.building,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("do not have permission", "".join(form.errors.get("status", [])))
+
+    def test_same_user_cannot_reject_without_capability(self):
+        BuildingMembership.objects.create(
+            user=self.other_user,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+        )
+        order = WorkOrder.objects.create(
+            building=self.building,
+            unit=self.unit,
+            title="Awaiting",
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            awaiting_approval_by=self.owner,
+            priority=WorkOrder.Priority.MEDIUM,
+            deadline=timezone.localdate() + timedelta(days=3),
+            replacement_request_note="Need pump",
+        )
+        form = WorkOrderForm(
+            data={
+                "title": order.title,
+                "building": self.building.pk,
+                "unit": self.unit.pk,
+                "priority": WorkOrder.Priority.MEDIUM,
+                "status": WorkOrder.Status.REJECTED,
                 "deadline": order.deadline,
                 "description": order.description,
                 "replacement_request_note": order.replacement_request_note,
@@ -261,7 +295,7 @@ class WorkOrderFormTests(TestCase):
                 "building": self.building.pk,
                 "unit": self.unit.pk,
                 "priority": WorkOrder.Priority.MEDIUM,
-                "status": WorkOrder.Status.DONE,
+                "status": WorkOrder.Status.APPROVED,
                 "deadline": order.deadline,
                 "description": order.description,
                 "replacement_request_note": order.replacement_request_note,
@@ -272,7 +306,73 @@ class WorkOrderFormTests(TestCase):
         )
         self.assertTrue(form.is_valid(), form.errors)
         saved = form.save()
+        self.assertEqual(saved.status, WorkOrder.Status.APPROVED)
         self.assertIsNone(saved.awaiting_approval_by)
+
+    def test_backoffice_status_choices_for_awaiting(self):
+        BuildingMembership.objects.create(
+            user=self.other_user,
+            building=self.building,
+            role=MembershipRole.BACKOFFICE,
+        )
+        order = WorkOrder.objects.create(
+            building=self.building,
+            unit=self.unit,
+            title="Awaiting",
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            priority=WorkOrder.Priority.MEDIUM,
+            deadline=timezone.localdate() + timedelta(days=3),
+        )
+        form = WorkOrderForm(instance=order, user=self.other_user, building=self.building)
+        statuses = [value for value, _ in form.fields["status"].choices]
+        self.assertEqual(statuses, [WorkOrder.Status.REJECTED, WorkOrder.Status.APPROVED])
+
+    def test_non_approver_status_choices_for_awaiting(self):
+        order = WorkOrder.objects.create(
+            building=self.building,
+            unit=self.unit,
+            title="Awaiting",
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            priority=WorkOrder.Priority.MEDIUM,
+            deadline=timezone.localdate() + timedelta(days=3),
+        )
+        form = WorkOrderForm(instance=order, user=self.other_user, building=self.building)
+        statuses = [value for value, _ in form.fields["status"].choices]
+        self.assertEqual(statuses, [WorkOrder.Status.AWAITING_APPROVAL])
+
+    def test_backoffice_can_reject(self):
+        BuildingMembership.objects.create(
+            user=self.other_user,
+            building=self.building,
+            role=MembershipRole.BACKOFFICE,
+        )
+        order = WorkOrder.objects.create(
+            building=self.building,
+            unit=self.unit,
+            title="Awaiting",
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            priority=WorkOrder.Priority.MEDIUM,
+            deadline=timezone.localdate() + timedelta(days=3),
+            replacement_request_note="Need pump",
+        )
+        form = WorkOrderForm(
+            data={
+                "title": order.title,
+                "building": self.building.pk,
+                "unit": self.unit.pk,
+                "priority": WorkOrder.Priority.MEDIUM,
+                "status": WorkOrder.Status.REJECTED,
+                "deadline": order.deadline,
+                "description": order.description,
+                "replacement_request_note": order.replacement_request_note,
+            },
+            instance=order,
+            user=self.other_user,
+            building=self.building,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        self.assertEqual(saved.status, WorkOrder.Status.REJECTED)
 
     def test_awaiting_requires_available_approver(self):
         BuildingMembership.objects.filter(role=MembershipRole.ADMINISTRATOR).delete()
@@ -395,6 +495,7 @@ class AdminUserFormTests(TestCase):
         form = WorkOrderForm(user=self.other_user, building=self.building)
         statuses = {value for value, _ in form.fields["status"].choices}
         self.assertNotIn(WorkOrder.Status.DONE, statuses)
+        self.assertNotIn(WorkOrder.Status.APPROVED, statuses)
 
     def test_unit_mismatch_adds_error(self):
         form = WorkOrderForm(

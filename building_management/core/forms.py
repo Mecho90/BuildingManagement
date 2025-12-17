@@ -429,9 +429,20 @@ class WorkOrderForm(forms.ModelForm):
         self.fields["deadline"].label = _("Deadline")
         self._current_status = self.instance.status if self.instance.pk else WorkOrder.Status.OPEN
         self._allowed_status_values = self._compute_allowed_statuses(b_id, current_status=self._current_status)
-        self.fields["status"].choices = [
-            choice for choice in WorkOrder.Status.choices if choice[0] in self._allowed_status_values
-        ]
+        if (
+            self._current_status == WorkOrder.Status.AWAITING_APPROVAL
+            and self._resolver
+            and self._resolver.has(Capability.APPROVE_WORK_ORDERS, building_id=b_id)
+        ):
+            self._allowed_status_values = {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
+            self.fields["status"].choices = [
+                (WorkOrder.Status.REJECTED, WorkOrder.Status.REJECTED.label),
+                (WorkOrder.Status.APPROVED, WorkOrder.Status.APPROVED.label),
+            ]
+        else:
+            self.fields["status"].choices = [
+                choice for choice in WorkOrder.Status.choices if choice[0] in self._allowed_status_values
+            ]
         self.fields["replacement_request_note"].label = "Заявка за подмяна"
         self.fields["replacement_request_note"].widget = forms.Textarea(attrs={"rows": 3})
         self.fields["replacement_request_note"].help_text = _(
@@ -529,7 +540,7 @@ class WorkOrderForm(forms.ModelForm):
 
         if (
             original_status == WorkOrder.Status.AWAITING_APPROVAL
-            and status_value == WorkOrder.Status.DONE
+            and status_value in {WorkOrder.Status.DONE, WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
         ):
             can_approve = (
                 self._resolver.has(Capability.APPROVE_WORK_ORDERS, building_id=building_id)
@@ -537,7 +548,7 @@ class WorkOrderForm(forms.ModelForm):
                 else False
             )
             if not can_approve:
-                self.add_error("status", _("You do not have permission to approve this work order."))
+                self.add_error("status", _("You do not have permission to complete this approval."))
 
         self._effective_building = building
         return cleaned
@@ -628,10 +639,16 @@ class WorkOrderForm(forms.ModelForm):
                 WorkOrder.Status.AWAITING_APPROVAL,
                 WorkOrder.Status.DONE,
             },
-            WorkOrder.Status.AWAITING_APPROVAL: {WorkOrder.Status.AWAITING_APPROVAL, WorkOrder.Status.DONE},
+            WorkOrder.Status.AWAITING_APPROVAL: {WorkOrder.Status.AWAITING_APPROVAL},
             WorkOrder.Status.DONE: {WorkOrder.Status.DONE},
+            WorkOrder.Status.APPROVED: {WorkOrder.Status.APPROVED},
+            WorkOrder.Status.REJECTED: {WorkOrder.Status.REJECTED},
         }
         allowed = transitions.get(current, {current})
+        if current == WorkOrder.Status.AWAITING_APPROVAL:
+            if can_approve:
+                return {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
+            return allowed
         if can_approve:
             allowed |= {
                 WorkOrder.Status.OPEN,

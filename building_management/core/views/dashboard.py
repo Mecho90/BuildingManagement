@@ -117,6 +117,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             requester = None
             if wo.awaiting_approval_by:
                 requester = wo.awaiting_approval_by.get_full_name() or wo.awaiting_approval_by.username
+            can_take_action = resolver.has(
+                Capability.APPROVE_WORK_ORDERS,
+                building_id=getattr(wo.building, "pk", None),
+            )
             cards.append(
                 {
                     "id": wo.pk,
@@ -126,6 +130,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     "note": wo.replacement_request_note,
                     "awaiting_since": wo.updated_at.strftime("%Y-%m-%d %H:%M"),
                     "requested_by": requester,
+                    "can_take_action": can_take_action,
                 }
             )
 

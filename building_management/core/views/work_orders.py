@@ -55,6 +55,7 @@ __all__ = [
     "ArchivedWorkOrderListView",
     "ArchivedWorkOrderDetailView",
     "WorkOrderAttachmentDeleteView",
+    "WorkOrderApprovalDecisionView",
 ]
 
 
@@ -821,7 +822,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             Capability.CREATE_WORK_ORDERS,
         ):
             raise Http404()
-        if obj.archived_at and obj.status != WorkOrder.Status.DONE:
+        if obj.archived_at and obj.status not in {WorkOrder.Status.DONE, WorkOrder.Status.APPROVED}:
             obj.archived_at = None
         with transaction.atomic():
             obj.save()
@@ -848,7 +849,10 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         actor = self.request.user if self.request.user.is_authenticated else None
         if previous_status != obj.status:
             action = WorkOrderAuditLog.Action.STATUS_CHANGED
-            if previous_status == WorkOrder.Status.AWAITING_APPROVAL and obj.status == WorkOrder.Status.DONE:
+            if (
+                previous_status == WorkOrder.Status.AWAITING_APPROVAL
+                and obj.status in {WorkOrder.Status.DONE, WorkOrder.Status.APPROVED}
+            ):
                 action = WorkOrderAuditLog.Action.APPROVAL
             elif previous_status != WorkOrder.Status.AWAITING_APPROVAL and obj.status == WorkOrder.Status.AWAITING_APPROVAL:
                 action = WorkOrderAuditLog.Action.STATUS_CHANGED
@@ -948,7 +952,57 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         else:
             ctx.setdefault("cancel_url", reverse("core:building_detail", args=[obj.building_id]))
         return ctx
-    
+
+
+class WorkOrderApprovalDecisionView(LoginRequiredMixin, View):
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        order = get_object_or_404(
+            WorkOrder.objects.visible_to(request.user).select_related("building"),
+            pk=kwargs["pk"],
+        )
+        if not _user_has_building_capability(request.user, order.building, Capability.APPROVE_WORK_ORDERS):
+            raise Http404()
+        if order.status != WorkOrder.Status.AWAITING_APPROVAL:
+            messages.error(request, _("This work order is no longer awaiting approval."))
+            return redirect(self._next_url(request))
+
+        decision = request.POST.get("decision")
+        if decision not in {"approve", "reject"}:
+            messages.error(request, _("Invalid approval choice."))
+            return redirect(self._next_url(request))
+
+        target_status = (
+            WorkOrder.Status.APPROVED if decision == "approve" else WorkOrder.Status.REJECTED
+        )
+        previous_status = order.status
+        audit_action = (
+            WorkOrderAuditLog.Action.APPROVAL
+            if target_status == WorkOrder.Status.APPROVED
+            else WorkOrderAuditLog.Action.STATUS_CHANGED
+        )
+        success_message = (
+            _("Work order approved.") if target_status == WorkOrder.Status.APPROVED else _("Work order rejected.")
+        )
+
+        with transaction.atomic():
+            order.status = target_status
+            order.awaiting_approval_by = None
+            order.save(update_fields=["status", "awaiting_approval_by", "updated_at"])
+            log_workorder_action(
+                actor=request.user if request.user.is_authenticated else None,
+                work_order=order,
+                action=audit_action,
+                payload={"from": previous_status, "to": target_status},
+            )
+
+        messages.success(request, success_message)
+        return redirect(self._next_url(request))
+
+    @staticmethod
+    def _next_url(request):
+        return _safe_next_url(request) or reverse("core:dashboard")
 
 class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
     """
@@ -978,7 +1032,7 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
     def post(self, request, *args, **kwargs):
         wo = self.get_object()
 
-        if wo.status != WorkOrder.Status.DONE:
+        if wo.status not in {WorkOrder.Status.DONE, WorkOrder.Status.APPROVED}:
             raise Http404(_("Only completed work orders can be archived."))
 
         if not wo.is_archived:

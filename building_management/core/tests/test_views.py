@@ -75,6 +75,143 @@ class WorkOrderArchiveViewTests(TestCase):
         work_order.refresh_from_db()
         self.assertIsNone(work_order.archived_at)
 
+    def test_archive_approved_work_order(self):
+        work_order = WorkOrder.objects.create(
+            building=self.building,
+            unit=self.unit,
+            title="Approved order",
+            status=WorkOrder.Status.APPROVED,
+            priority=WorkOrder.Priority.LOW,
+            deadline=timezone.localdate(),
+        )
+
+        self.client.login(username="archive-owner", password="pass1234")
+        response = self.client.post(
+            reverse("core:work_order_archive", args=[work_order.pk]),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        work_order.refresh_from_db()
+        self.assertIsNotNone(work_order.archived_at)
+
+
+class WorkOrderApprovalDecisionViewTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.owner = User.objects.create_user(
+            username="approvals-owner",
+            email="approvals-owner@example.com",
+            password="pass1234",
+        )
+        self.backoffice = User.objects.create_user(
+            username="approvals-bo",
+            email="approvals-bo@example.com",
+            password="pass1234",
+        )
+        self.tech = User.objects.create_user(
+            username="approvals-tech",
+            email="approvals-tech@example.com",
+            password="pass1234",
+        )
+        self.building = Building.objects.create(
+            owner=self.owner,
+            name="Approval Plaza",
+            address="789 Approve St",
+        )
+        BuildingMembership.objects.create(
+            user=self.backoffice,
+            building=self.building,
+            role=MembershipRole.BACKOFFICE,
+        )
+        BuildingMembership.objects.create(
+            user=self.tech,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+        )
+        self.work_order = WorkOrder.objects.create(
+            building=self.building,
+            title="Need approval",
+            status=WorkOrder.Status.AWAITING_APPROVAL,
+            priority=WorkOrder.Priority.MEDIUM,
+            deadline=timezone.localdate() + timedelta(days=2),
+            replacement_request_note="Need budget approval",
+        )
+
+    def _url(self):
+        return reverse("core:work_order_approval_decide", args=[self.work_order.pk])
+
+    def test_requires_login(self):
+        response = self.client.post(self._url(), {"decision": "approve"})
+        self.assertEqual(response.status_code, 302)
+        self.work_order.refresh_from_db()
+        self.assertEqual(self.work_order.status, WorkOrder.Status.AWAITING_APPROVAL)
+
+    def test_backoffice_can_approve(self):
+        self.client.login(username="approvals-bo", password="pass1234")
+        response = self.client.post(
+            self._url(),
+            {"decision": "approve", "next": reverse("core:dashboard")},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.work_order.refresh_from_db()
+        self.assertEqual(self.work_order.status, WorkOrder.Status.APPROVED)
+        log = WorkOrderAuditLog.objects.filter(
+            work_order=self.work_order,
+            action=WorkOrderAuditLog.Action.APPROVAL,
+        ).first()
+        self.assertIsNotNone(log)
+
+    def test_backoffice_can_reject(self):
+        self.client.login(username="approvals-bo", password="pass1234")
+        response = self.client.post(
+            self._url(),
+            {"decision": "reject", "next": reverse("core:dashboard")},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.work_order.refresh_from_db()
+        self.assertEqual(self.work_order.status, WorkOrder.Status.REJECTED)
+        log = WorkOrderAuditLog.objects.filter(
+            work_order=self.work_order,
+            action=WorkOrderAuditLog.Action.STATUS_CHANGED,
+        ).first()
+        self.assertIsNotNone(log)
+
+    def test_invalid_decision_shows_error(self):
+        self.client.login(username="approvals-bo", password="pass1234")
+        response = self.client.post(
+            self._url(),
+            {"decision": "maybe", "next": reverse("core:dashboard")},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.work_order.refresh_from_db()
+        self.assertEqual(self.work_order.status, WorkOrder.Status.AWAITING_APPROVAL)
+
+    def test_requires_capability(self):
+        self.client.login(username="approvals-tech", password="pass1234")
+        response = self.client.post(
+            self._url(),
+            {"decision": "approve", "next": reverse("core:dashboard")},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.work_order.refresh_from_db()
+        self.assertEqual(self.work_order.status, WorkOrder.Status.AWAITING_APPROVAL)
+
+    def test_requires_awaiting_status(self):
+        self.work_order.status = WorkOrder.Status.OPEN
+        self.work_order.save(update_fields=["status"])
+        self.client.login(username="approvals-bo", password="pass1234")
+        response = self.client.post(
+            self._url(),
+            {"decision": "approve", "next": reverse("core:dashboard")},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.work_order.refresh_from_db()
+        self.assertEqual(self.work_order.status, WorkOrder.Status.OPEN)
+
 
 class LoginLockoutTests(TestCase):
     def setUp(self):

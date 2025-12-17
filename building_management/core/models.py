@@ -240,6 +240,8 @@ class WorkOrder(TimeStampedModel):
         OPEN = "OPEN", _("Open")
         IN_PROGRESS = "IN_PROGRESS", _("In progress")
         AWAITING_APPROVAL = "AWAITING_APPROVAL", _("Awaiting approval")
+        APPROVED = "APPROVED", _("Approved")
+        REJECTED = "REJECTED", _("Rejected")
         DONE = "DONE", _("Done")
 
     class Priority(models.TextChoices):
