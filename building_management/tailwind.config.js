@@ -49,12 +49,12 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: "#0f172a", // slate-900
-          foreground: "#0f172a",
-          accent: "#059669",
-          surface: "#ffffff",
-          muted: colors.slate[500],
-          border: colors.slate[200],
+          DEFAULT: "#4b5563", // warm grey
+          foreground: "#4b5563",
+          accent: "#ea580c",
+          surface: "#fff8db",
+          muted: colors.slate[400],
+          border: "#fde68a",
         },
       },
       fontFamily: {

@@ -84,7 +84,7 @@
                 <div class="flex justify-end gap-2">
                   <a class="btn btn-secondary btn-sm" href="{% url 'core:user_update' u.pk %}">{% trans "Edit" %}</a>
                   <a class="btn btn-secondary btn-sm" href="{% url 'core:user_password' u.pk %}">{% trans "Reset password" %}</a>
-                  <a class="btn btn-danger btn-sm" href="{% url 'core:user_delete' u.pk %}">{% trans "Delete" %}</a>
+                  <a class="btn btn-danger btn-sm text-black" href="{% url 'core:user_delete' u.pk %}">{% trans "Delete" %}</a>
                 </div>
               </td>
             </tr>

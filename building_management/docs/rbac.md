@@ -38,7 +38,7 @@ Role/membership changes automatically emit `RoleAuditLog` entries. Administrator
 
 ## Auto-provisioning
 
-- Building owners automatically receive a Backoffice membership for that building.
+- Building owners automatically receive a Technician membership for that building, pre-filled with their configured sub-role.
 - Staff/superusers receive a global Administrator membership via migration.
 
 You can manage memberships via Django admin (`Building > Memberships`) or by editing `BuildingMembership` records directly.

@@ -44,10 +44,10 @@
   }
 
   .btn-danger {
-    @apply border border-rose-300 bg-none bg-rose-500/90 text-white shadow-md transition
+    @apply border border-rose-300 bg-none bg-rose-500/90 text-black shadow-md transition
            hover:bg-rose-500 hover:shadow-lg
            focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white
-           dark:border-rose-600 dark:bg-rose-600/80 dark:hover:bg-rose-500 dark:focus-visible:ring-offset-slate-900;
+           dark:border-rose-600 dark:bg-rose-600/80 dark:hover:bg-rose-500 dark:text-black dark:focus-visible:ring-offset-slate-900;
   }
 
   .btn.is-disabled,

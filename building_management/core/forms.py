@@ -135,7 +135,14 @@ class BuildingForm(forms.ModelForm):
         )
 
         if self._can_manage_buildings:
-            owner_queryset = User.objects.order_by("username")
+            owner_queryset = (
+                User.objects.filter(
+                    memberships__building__isnull=True,
+                    memberships__role=MembershipRole.TECHNICIAN,
+                )
+                .order_by("username")
+                .distinct()
+            )
             self.fields["owner"].queryset = owner_queryset
             owner_ids = list(owner_queryset.values_list("pk", flat=True))
             technician_ids = set(
