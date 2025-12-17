@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from functools import lru_cache
 from urllib.parse import quote_plus, urlencode
@@ -280,6 +280,21 @@ def _render_attachment_panel(request, *, order=None, form=None) -> dict[str, obj
     return context
 
 
+def _log_attachment_activity(*, actor, work_order, changes: dict[str, list[str]] | None):
+    if not changes:
+        return
+    added = [name for name in (changes.get("added") or []) if name]
+    removed = [name for name in (changes.get("removed") or []) if name]
+    if not added and not removed:
+        return
+    log_workorder_action(
+        actor=actor,
+        work_order=work_order,
+        action=WorkOrderAuditLog.Action.ATTACHMENTS,
+        payload={"attachments": {"added": added, "removed": removed}},
+    )
+
+
 class UnitsWidgetMixin:
     """Augment the WorkOrder unit field with client-side metadata."""
 
@@ -514,7 +529,10 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
 
     def get_queryset(self):
         base = WorkOrder.objects.visible_to(self.request.user)
-        return base.select_related("building", "unit").prefetch_related("attachments")
+        return (
+            base.select_related("building", "unit")
+            .prefetch_related("attachments", "audit_entries__actor")
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -536,6 +554,110 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         )
         ctx["replacement_request_note"] = self.object.replacement_request_note
         ctx["awaiting_requested_by"] = self.object.awaiting_approval_by
+        audit_entries = list(
+            self.object.audit_entries.select_related("actor").order_by("created_at", "id")
+        )
+        status_labels = dict(WorkOrder.Status.choices)
+        history_entries: list[dict[str, object]] = []
+        participant_labels: list[str] = []
+        seen_participants: set[object] = set()
+        approval_actor = None
+        for entry in audit_entries:
+            actor = entry.actor
+            if actor:
+                actor_label = actor.get_full_name() or actor.username
+                participant_key = actor.pk
+            else:
+                actor_label = _("System")
+                participant_key = "system"
+            if participant_key not in seen_participants:
+                participant_labels.append(actor_label)
+                seen_participants.add(participant_key)
+            payload = entry.payload or {}
+            action = entry.action
+            from_code = payload.get("from")
+            to_code = payload.get("to")
+            from_label = status_labels.get(from_code, from_code)
+            to_label = status_labels.get(to_code, to_code)
+            description = entry.get_action_display()
+            changes_payload = payload.get("fields") or {}
+            attachments_payload = payload.get("attachments") or {}
+            if action == WorkOrderAuditLog.Action.CREATED:
+                description = _("Work order created")
+            elif action == WorkOrderAuditLog.Action.UPDATED:
+                field_list = ", ".join(sorted(changes_payload.keys()))
+                if field_list:
+                    description = _("Updated: %(fields)s") % {"fields": field_list}
+            elif action == WorkOrderAuditLog.Action.ARCHIVED:
+                description = _("Archived")
+            if action in {WorkOrderAuditLog.Action.STATUS_CHANGED, WorkOrderAuditLog.Action.APPROVAL} and (
+                from_label or to_label
+            ):
+                if from_label and to_label:
+                    description = _("Status changed: %(from)s → %(to)s") % {
+                        "from": from_label,
+                        "to": to_label,
+                    }
+                elif to_label:
+                    description = _("Status set to %(to)s") % {"to": to_label}
+            history_entries.append(
+                {
+                    "timestamp": timezone.localtime(entry.created_at),
+                    "actor": actor_label,
+                    "description": description,
+                    "from": from_label,
+                    "to": to_label,
+                    "action": action,
+                    "is_approval": action == WorkOrderAuditLog.Action.APPROVAL,
+                    "changes": changes_payload,
+                    "attachments": attachments_payload,
+                }
+            )
+            if action == WorkOrderAuditLog.Action.APPROVAL:
+                approval_actor = actor_label
+        if not history_entries:
+            history_entries.append(
+                {
+                    "timestamp": timezone.localtime(self.object.created_at),
+                    "actor": _("System"),
+                    "description": _("Work order created"),
+                    "from": "",
+                    "to": "",
+                    "action": WorkOrderAuditLog.Action.CREATED,
+                    "is_approval": False,
+                    "changes": {},
+                    "attachments": {},
+                }
+            )
+            participant_labels.append(_("System"))
+            seen_participants.add("system")
+        ctx["history_entries"] = history_entries
+        ctx["history_participants"] = participant_labels
+        ctx["history_approval_actor"] = approval_actor
+
+        deadline_status = None
+        if self.object.deadline and self.object.archived_at:
+            completion_date = timezone.localtime(self.object.archived_at).date()
+            delta_days = (completion_date - self.object.deadline).days
+            if delta_days > 0:
+                label = ngettext(
+                    "Missed deadline by %(days)s day.",
+                    "Missed deadline by %(days)s days.",
+                    delta_days,
+                ) % {"days": delta_days}
+                state = "missed"
+            else:
+                label = _("Completed on time on %(date)s") % {
+                    "date": formats.date_format(completion_date, "DATE_FORMAT")
+                }
+                state = "met"
+            deadline_status = {
+                "state": state,
+                "label": label,
+                "completion_date": completion_date,
+                "days_delta": delta_days,
+            }
+        ctx["deadline_status"] = deadline_status
         return ctx
 
     def test_func(self):
@@ -603,7 +725,14 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
             raise Http404()
         with transaction.atomic():
             response = super().form_valid(form)
-            form.save_attachments(self.object)
+            attachment_changes = form.save_attachments(self.object)
+        self._log_creation()
+        actor = self.request.user if self.request.user.is_authenticated else None
+        _log_attachment_activity(
+            actor=actor,
+            work_order=self.object,
+            changes=attachment_changes,
+        )
         messages.success(self.request, _("Work order created."))
         return response
 
@@ -612,6 +741,20 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
         if next_url:
             return next_url
         return f"{reverse('core:building_detail', args=[self.object.building_id])}?tab=work_orders"
+
+    def _log_creation(self):
+        if not getattr(self, "object", None):
+            return
+        actor = self.request.user if self.request.user.is_authenticated else None
+        log_workorder_action(
+            actor=actor,
+            work_order=self.object,
+            action=WorkOrderAuditLog.Action.CREATED,
+            payload={
+                "status": self.object.status,
+                "priority": self.object.priority,
+            },
+        )
 
 
 class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, UnitsWidgetMixin, UpdateView):
@@ -660,7 +803,14 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         )
 
     def form_valid(self, form):
-        previous_status = form.instance.status if form.instance.pk else WorkOrder.Status.OPEN
+        previous_obj = None
+        previous_status = WorkOrder.Status.OPEN
+        if form.instance.pk:
+            try:
+                previous_obj = WorkOrder.objects.select_related("unit", "building").get(pk=form.instance.pk)
+                previous_status = previous_obj.status
+            except WorkOrder.DoesNotExist:
+                previous_obj = None
         obj = form.save(commit=False)
         if not _user_can_access_building(self.request.user, obj.building):
             raise Http404()
@@ -675,9 +825,13 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             obj.archived_at = None
         with transaction.atomic():
             obj.save()
-            form.save_attachments(obj)
+            attachment_changes = form.save_attachments(obj)
         self.object = obj
         self._after_status_change(previous_status)
+        if previous_obj:
+            self._log_general_updates(previous_obj, obj, form.changed_data or [])
+        actor = self.request.user if self.request.user.is_authenticated else None
+        _log_attachment_activity(actor=actor, work_order=obj, changes=attachment_changes)
         messages.warning(self.request, _("Work order updated."))
         return HttpResponseRedirect(self.get_success_url())
 
@@ -709,6 +863,55 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             and obj.status == WorkOrder.Status.AWAITING_APPROVAL
         ):
             notify_approvers_of_pending_order(obj, exclude_user_id=getattr(self.request.user, "id", None))
+
+    def _log_general_updates(self, previous_obj, updated_obj, changed_fields):
+        if not changed_fields:
+            return
+        tracked_changes = {}
+        ignored_fields = {
+            "status",
+            "new_attachments",
+            "remove_attachments",
+            "awaiting_approval_assignee",
+        }
+        for field in changed_fields:
+            if field in ignored_fields:
+                continue
+            old_value = getattr(previous_obj, field, None)
+            new_value = getattr(updated_obj, field, None)
+            if field == "unit":
+                old_value = getattr(previous_obj.unit, "number", None) if previous_obj else None
+                new_value = getattr(updated_obj.unit, "number", None)
+                if old_value is not None:
+                    old_value = f"#{old_value}"
+                if new_value is not None:
+                    new_value = f"#{new_value}"
+            elif field == "building":
+                old_value = getattr(previous_obj.building, "name", None) if previous_obj else None
+                new_value = getattr(updated_obj.building, "name", None)
+            tracked_changes[field] = {
+                "from": self._serialize_change_value(old_value),
+                "to": self._serialize_change_value(new_value),
+            }
+        if not tracked_changes:
+            return
+        actor = self.request.user if self.request.user.is_authenticated else None
+        log_workorder_action(
+            actor=actor,
+            work_order=updated_obj,
+            action=WorkOrderAuditLog.Action.UPDATED,
+            payload={"fields": tracked_changes},
+        )
+
+    @staticmethod
+    def _serialize_change_value(value):
+        if value is None:
+            return ""
+        if isinstance(value, datetime):
+            return timezone.localtime(value).strftime("%Y-%m-%d %H:%M")
+        if isinstance(value, date):
+            return value.isoformat()
+        return str(value)
 
 
 class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
@@ -782,6 +985,13 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
         if not wo.is_archived:
             wo.archive()
             messages.success(request, _("Work order archived."))
+            actor = request.user if request.user.is_authenticated else None
+            log_workorder_action(
+                actor=actor,
+                work_order=wo,
+                action=WorkOrderAuditLog.Action.ARCHIVED,
+                payload={"status": wo.status},
+            )
 
         next_url = _safe_next_url(request)
         if next_url:

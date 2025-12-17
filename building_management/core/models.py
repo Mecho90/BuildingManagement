@@ -688,9 +688,13 @@ class RoleAuditLog(TimeStampedModel):
 
 class WorkOrderAuditLog(TimeStampedModel):
     class Action(models.TextChoices):
+        CREATED = "created", _("Created")
+        UPDATED = "updated", _("Updated")
+        ATTACHMENTS = "attachments", _("Attachments updated")
         STATUS_CHANGED = "status_changed", _("Status changed")
         APPROVAL = "approval", _("Approval decision" )
         REASSIGNED = "reassigned", _("Reassigned")
+        ARCHIVED = "archived", _("Archived")
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

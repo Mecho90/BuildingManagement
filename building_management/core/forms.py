@@ -591,13 +591,20 @@ class WorkOrderForm(forms.ModelForm):
     def save_attachments(self, work_order: WorkOrder):
         """
         Persist uploaded attachments and delete any that were flagged for removal.
+        Returns a dict describing added/removed filenames for audit logging.
         """
+        change_log = {"added": [], "removed": []}
         remove_ids = self.cleaned_data.get("remove_attachments", []) if hasattr(self, "cleaned_data") else []
         if remove_ids:
             to_delete = [
                 self._attachment_lookup[pk] for pk in remove_ids if pk in self._attachment_lookup
             ]
             for attachment in to_delete:
+                name = (attachment.original_name or "").strip()
+                if not name and attachment.file:
+                    name = Path(attachment.file.name).name
+                if name:
+                    change_log["removed"].append(name)
                 attachment.delete()
 
         new_files = self.cleaned_data.get("new_attachments", []) if hasattr(self, "cleaned_data") else []
@@ -608,6 +615,12 @@ class WorkOrderForm(forms.ModelForm):
                 original_name=getattr(uploaded, "name", ""),
             )
             attachment.save()
+            name = (attachment.original_name or "").strip()
+            if not name and attachment.file:
+                name = Path(attachment.file.name).name
+            if name:
+                change_log["added"].append(name)
+        return change_log
 
     def _compute_allowed_statuses(self, building_id, *, current_status=None):
         current = current_status or (self.instance.status if self.instance.pk else WorkOrder.Status.OPEN)
