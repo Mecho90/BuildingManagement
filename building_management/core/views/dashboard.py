@@ -423,9 +423,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         if visible_buildings is not None:
             qs = qs.filter(building_id__in=list(visible_buildings))
         logs = list(qs.order_by("-created_at")[:15])
+        dismissed_ids = self._dismissed_activity_ids()
 
         notifications = []
         for log in logs:
+            if log.pk in dismissed_ids:
+                continue
             message, level = self._format_activity_message(log)
             if not message:
                 continue
@@ -433,15 +436,22 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 {
                     "id": f"wo-activity-{log.pk}",
                     "level": level,
-                    "level_label": _("Актуализация"),
+                    "level_label": _("Информация"),
                     "message": message,
                     "category": "activity",
                     "is_new": log.created_at >= recent_threshold,
-                    "dismissible": False,
+                    "dismissible": True,
                     "_priority_weight": 1,
                 }
             )
         return notifications
+
+    def _dismissed_activity_ids(self):
+        store = self.request.session.get("dismissed_activity_logs", [])
+        try:
+            return {int(val) for val in store}
+        except (TypeError, ValueError):
+            return set()
 
     def _format_activity_message(self, log):
         order = getattr(log, "work_order", None)

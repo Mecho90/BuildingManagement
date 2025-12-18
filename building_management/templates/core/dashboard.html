@@ -170,22 +170,18 @@
                 <article class="{{ card_base }}" data-notification-key="{{ note.id }}" data-is-new="{{ note.is_new|yesno:'true,false' }}">
                   <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div class="flex-1 space-y-2">
-                      {% if note.level %}
-                      <span class="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100">{{ note.level_label|default:note.level }}</span>
-                      {% endif %}
+                      <span class="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100">{% trans "Информация" %}</span>
                       <p class="leading-snug">{{ note.message }}</p>
                     </div>
-                  {% if note.dismissible %}
                     <form method="post"
                           action="{% url 'core:notification_snooze' note.id %}"
                           hx-post="{% url 'core:notification_snooze' note.id %}"
-                          hx-target="closest li"
+                          hx-target="closest article"
                           hx-swap="delete"
                           class="mt-2 inline-flex sm:mt-0">
                       {% csrf_token %}
                       <button type="submit" class="btn btn-secondary btn-xs">{% trans "Read" %}</button>
                     </form>
-                  {% endif %}
                 </div>
                 </article>
               </li>
