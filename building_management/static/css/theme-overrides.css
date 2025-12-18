@@ -313,3 +313,63 @@ html.dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .dark .btn-danger:focus-visible {
   color: #111827 !important;
 }
+
+/* Archived building cards */
+.archive-building-card {
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dark .archive-building-card {
+  background-color: rgba(23, 31, 44, 0.95) !important;
+  border-color: rgba(148, 163, 184, 0.4) !important;
+  box-shadow: 0 12px 25px -10px rgba(0, 0, 0, 0.6);
+}
+
+.dark .archive-building-card:hover {
+  background-color: rgba(33, 44, 61, 0.95) !important;
+  border-color: rgba(226, 232, 240, 0.6) !important;
+}
+
+.dark .archive-building-link {
+  color: inherit !important;
+  text-decoration: none;
+}
+
+.dark .archive-building-name {
+  color: #ffe8a3 !important;
+}
+
+.dark .archive-building-link:hover .archive-building-name {
+  color: #fff6c7 !important;
+}
+
+.dark .archive-building-owner {
+  color: #cbd5f5 !important;
+}
+
+/* Building detail tabs */
+.building-tabs__link {
+  position: relative;
+}
+
+.building-tabs {
+  gap: 1rem;
+}
+
+.building-tabs__link + .building-tabs__link::before {
+  content: "";
+  position: absolute;
+  left: -0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 2.4rem;
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.95), rgba(148, 163, 184, 0.2));
+  border-radius: 999px;
+  box-shadow: 0 0 10px rgba(148, 163, 184, 0.4);
+}
+
+.dark .building-tabs__link + .building-tabs__link::before {
+  background: linear-gradient(180deg, rgba(255, 215, 170, 0.35), rgba(255, 215, 170, 1), rgba(255, 215, 170, 0.35));
+  box-shadow: 0 0 14px rgba(255, 215, 170, 0.45);
+}

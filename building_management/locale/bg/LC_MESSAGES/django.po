@@ -1562,10 +1562,8 @@ msgid "Search buildings"
 msgstr "Търсене на сгради"
 
 #: templates/core/buildings_list.html:31
-#, fuzzy
-#| msgid "Search by name, address, owner"
 msgid "Name, address or owner"
-msgstr "Търсене по име, адрес, собственик"
+msgstr "Име, адрес или собственик"
 
 #: templates/core/buildings_list.html:87
 msgid "Work orders"
