@@ -200,6 +200,51 @@ a:hover {
   border-color: rgba(234, 88, 12, 0.4) !important;
 }
 
+/* Archive emphasis */
+.btn-archive {
+  background-image: linear-gradient(120deg, #fed7aa, #f97316) !important;
+  color: #78350f !important;
+  border-color: #f97316 !important;
+  box-shadow: 0 12px 32px -12px rgba(249, 115, 22, 0.8), 0 0 0 1px rgba(249, 115, 22, 0.35) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: relative;
+  overflow: hidden;
+  animation: archive-pulse 1.4s ease-in-out infinite alternate;
+}
+
+.btn-archive:hover,
+.btn-archive:focus-visible {
+  color: #431407 !important;
+  box-shadow: 0 14px 40px -10px rgba(234, 88, 12, 0.9), 0 0 0 2px rgba(251, 191, 36, 0.8) !important;
+  transform: translateY(-1px);
+}
+
+.btn-archive::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+.dark .btn-archive {
+  color: #1f2937 !important;
+  box-shadow: 0 12px 32px -12px rgba(253, 230, 138, 0.6), 0 0 0 1px rgba(255, 248, 227, 0.3) !important;
+}
+
+@keyframes archive-pulse {
+  from {
+    transform: translateY(0);
+    filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.25));
+  }
+  to {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 0 10px rgba(249, 115, 22, 0.45));
+  }
+}
+
 /* Date inputs: ensure the calendar indicator remains visible in dark mode */
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(30%) sepia(80%) saturate(800%) hue-rotate(350deg) brightness(0.95) contrast(1.1);

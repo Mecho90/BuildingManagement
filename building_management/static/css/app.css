@@ -50,6 +50,12 @@
            dark:border-rose-600 dark:bg-rose-600/80 dark:hover:bg-rose-500 dark:text-black dark:focus-visible:ring-offset-slate-900;
   }
 
+  .btn-archive {
+    @apply from-amber-400 via-amber-300 to-amber-500 text-amber-950
+           focus-visible:ring-amber-300 focus-visible:ring-offset-white
+           dark:from-amber-500 dark:via-amber-400 dark:to-amber-500 dark:text-slate-900 dark:focus-visible:ring-amber-400 dark:focus-visible:ring-offset-slate-900;
+  }
+
   .btn.is-disabled,
   [disabled].btn,
   a.btn.is-disabled {

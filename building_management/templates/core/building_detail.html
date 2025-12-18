@@ -287,7 +287,7 @@
                     {% if w.status == 'DONE' and not w.archived_at %}
                       <form action="{% url 'core:work_order_archive' w.id %}?building={{ building.id }}" method="post" class="inline-flex">
                         {% csrf_token %}
-                        <button class="btn btn-secondary btn-sm">{% trans "Archive" %}</button>
+                        <button class="btn btn-archive btn-sm">{% trans "Archive" %}</button>
                       </form>
                     {% endif %}
                     <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' w.id %}?building={{ building.id }}">{% trans "Delete" %}</a>
@@ -334,7 +334,7 @@
                         {% if w.status == 'DONE' and not w.archived_at %}
                           <form action="{% url 'core:work_order_archive' w.id %}?building={{ building.id }}" method="post" class="inline-flex">
                             {% csrf_token %}
-                            <button class="btn btn-secondary btn-sm">{% trans "Archive" %}</button>
+                            <button class="btn btn-archive btn-sm">{% trans "Archive" %}</button>
                           </form>
                         {% endif %}
                         <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' w.id %}?building={{ building.id }}">{% trans "Delete" %}</a>

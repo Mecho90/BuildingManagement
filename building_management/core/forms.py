@@ -642,7 +642,13 @@ class WorkOrderForm(forms.ModelForm):
             },
             WorkOrder.Status.AWAITING_APPROVAL: {WorkOrder.Status.AWAITING_APPROVAL},
             WorkOrder.Status.DONE: {WorkOrder.Status.DONE},
-            WorkOrder.Status.APPROVED: {WorkOrder.Status.APPROVED},
+            WorkOrder.Status.APPROVED: {
+                WorkOrder.Status.APPROVED,
+                WorkOrder.Status.OPEN,
+                WorkOrder.Status.IN_PROGRESS,
+                WorkOrder.Status.AWAITING_APPROVAL,
+                WorkOrder.Status.DONE,
+            },
             WorkOrder.Status.REJECTED: {
                 WorkOrder.Status.REJECTED,
                 WorkOrder.Status.OPEN,

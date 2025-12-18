@@ -143,7 +143,7 @@
             {% if w.status == 'DONE' %}
               <form action="{% url 'core:work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
                 {% csrf_token %}
-                <button class="btn btn-secondary btn-sm" type="submit">{% trans "Archive" %}</button>
+                <button class="btn btn-archive btn-sm" type="submit">{% trans "Archive" %}</button>
               </form>
             {% endif %}
             <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
@@ -239,7 +239,7 @@
                 {% if w.status == 'DONE' %}
                   <form action="{% url 'core:work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
                     {% csrf_token %}
-                    <button class="btn btn-secondary btn-sm" type="submit">{% trans "Archive" %}</button>
+                    <button class="btn btn-archive btn-sm" type="submit">{% trans "Archive" %}</button>
                   </form>
                 {% endif %}
                 <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>

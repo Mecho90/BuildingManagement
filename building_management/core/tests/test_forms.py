@@ -338,6 +338,33 @@ class WorkOrderFormTests(TestCase):
         statuses = [value for value, _ in form.fields["status"].choices]
         self.assertEqual(statuses, [WorkOrder.Status.AWAITING_APPROVAL])
 
+    def test_technician_status_choices_after_approved(self):
+        BuildingMembership.objects.create(
+            user=self.other_user,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+        )
+        order = WorkOrder.objects.create(
+            building=self.building,
+            unit=self.unit,
+            title="Approved order",
+            status=WorkOrder.Status.APPROVED,
+            priority=WorkOrder.Priority.MEDIUM,
+            deadline=timezone.localdate() + timedelta(days=3),
+        )
+        form = WorkOrderForm(instance=order, user=self.other_user, building=self.building)
+        statuses = [value for value, _ in form.fields["status"].choices]
+        self.assertEqual(
+            statuses,
+            [
+                WorkOrder.Status.OPEN,
+                WorkOrder.Status.IN_PROGRESS,
+                WorkOrder.Status.AWAITING_APPROVAL,
+                WorkOrder.Status.APPROVED,
+                WorkOrder.Status.DONE,
+            ],
+        )
+
     def test_backoffice_can_reject(self):
         BuildingMembership.objects.create(
             user=self.other_user,
