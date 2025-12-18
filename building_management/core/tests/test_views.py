@@ -594,6 +594,77 @@ class DashboardViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["notifications"])
 
+    def test_deadline_alerts_include_overdue(self):
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Late ticket",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate() - timedelta(days=2),
+        )
+        self.client.login(username="dash-tech", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        alerts = response.context["deadline_alert_cards"]
+        self.assertEqual(len(alerts), 1)
+        self.assertTrue(alerts[0]["is_overdue"])
+        self.assertEqual(alerts[0]["title"], "Late ticket")
+
+    def test_deadline_alerts_respect_priority_windows(self):
+        today = timezone.localdate()
+        WorkOrder.objects.create(
+            building=self.building,
+            title="High priority soon",
+            priority=WorkOrder.Priority.HIGH,
+            status=WorkOrder.Status.OPEN,
+            deadline=today + timedelta(days=8),
+        )
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Medium meets window",
+            priority=WorkOrder.Priority.MEDIUM,
+            status=WorkOrder.Status.OPEN,
+            deadline=today + timedelta(days=3),
+        )
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Medium out of window",
+            priority=WorkOrder.Priority.MEDIUM,
+            status=WorkOrder.Status.OPEN,
+            deadline=today + timedelta(days=2),
+        )
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Low priority tomorrow",
+            priority=WorkOrder.Priority.LOW,
+            status=WorkOrder.Status.IN_PROGRESS,
+            deadline=today + timedelta(days=1),
+        )
+        self.client.login(username="dash-tech", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        alerts = response.context["deadline_alert_cards"]
+        titles = {alert["title"] for alert in alerts}
+        self.assertIn("High priority soon", titles)
+        self.assertIn("Medium meets window", titles)
+        self.assertIn("Low priority tomorrow", titles)
+        self.assertNotIn("Medium out of window", titles)
+
+    def test_deadline_alerts_paginated(self):
+        today = timezone.localdate()
+        for idx in range(5):
+            WorkOrder.objects.create(
+                building=self.building,
+                title=f"Ticket {idx}",
+                priority=WorkOrder.Priority.HIGH,
+                status=WorkOrder.Status.OPEN,
+                deadline=today + timedelta(days=7 + idx),
+            )
+        self.client.login(username="dash-tech", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        first_page_cards = response.context["deadline_alert_cards"]
+        self.assertEqual(len(first_page_cards), 4)
+        response = self.client.get(f"{reverse('core:dashboard')}?deadline_page=2")
+        second_page_cards = response.context["deadline_alert_cards"]
+        self.assertEqual(len(second_page_cards), 1)
+
 
 class MassAssignEnhancedTests(TestCase):
     def setUp(self):

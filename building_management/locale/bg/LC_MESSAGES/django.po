@@ -1568,11 +1568,6 @@ msgstr "Поръчки"
 msgid "No buildings found."
 msgstr "Няма намерени сгради."
 
-#: templates/core/dashboard.html:11
-#, python-format
-msgid "You currently have %(load)s open assignments across your buildings."
-msgstr "В момента имате %(load)s отворени задачи във вашите сгради."
-
 #: templates/core/dashboard.html:41
 msgid "View"
 msgstr "Преглед"

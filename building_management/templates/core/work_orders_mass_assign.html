@@ -41,18 +41,18 @@
                 <nav class="flex flex-wrap items-center justify-between gap-3">
                   <div class="flex items-center gap-2">
                     {% if buildings_page.has_previous %}
-                      <a class="btn btn-secondary" href="?{% if buildings_page_query %}{{ buildings_page_query }}&{% endif %}b_page=1#mass-select">« {% trans "First" %}</a>
-                      <a class="btn btn-secondary" href="?{% if buildings_page_query %}{{ buildings_page_query }}&{% endif %}b_page={{ buildings_page.previous_page_number }}#mass-select">‹ {% trans "Prev" %}</a>
+                      <a class="btn btn-secondary btn-sm" href="?{% if buildings_page_query %}{{ buildings_page_query }}&{% endif %}b_page=1#mass-select">« {% trans "First" %}</a>
+                      <a class="btn btn-secondary btn-sm" href="?{% if buildings_page_query %}{{ buildings_page_query }}&{% endif %}b_page={{ buildings_page.previous_page_number }}#mass-select">‹ {% trans "Prev" %}</a>
                     {% else %}
-                      <span class="btn is-disabled">« {% trans "First" %}</span>
-                      <span class="btn is-disabled">‹ {% trans "Prev" %}</span>
+                      <span class="btn btn-secondary btn-sm is-disabled">« {% trans "First" %}</span>
+                      <span class="btn btn-secondary btn-sm is-disabled">‹ {% trans "Prev" %}</span>
                     {% endif %}
                     {% if buildings_page.has_next %}
-                      <a class="btn btn-secondary" href="?{% if buildings_page_query %}{{ buildings_page_query }}&{% endif %}b_page={{ buildings_page.next_page_number }}#mass-select">{% trans "Next" %} ›</a>
-                      <a class="btn btn-secondary" href="?{% if buildings_page_query %}{{ buildings_page_query }}&{% endif %}b_page={{ buildings_page.paginator.num_pages }}#mass-select">{% trans "Last" %} »</a>
+                      <a class="btn btn-secondary btn-sm" href="?{% if buildings_page_query %}{{ buildings_page_query }}&{% endif %}b_page={{ buildings_page.next_page_number }}#mass-select">{% trans "Next" %} ›</a>
+                      <a class="btn btn-secondary btn-sm" href="?{% if buildings_page_query %}{{ buildings_page_query }}&{% endif %}b_page={{ buildings_page.paginator.num_pages }}#mass-select">{% trans "Last" %} »</a>
                     {% else %}
-                      <span class="btn is-disabled">{% trans "Next" %} ›</span>
-                      <span class="btn is-disabled">{% trans "Last" %} »</span>
+                      <span class="btn btn-secondary btn-sm is-disabled">{% trans "Next" %} ›</span>
+                      <span class="btn btn-secondary btn-sm is-disabled">{% trans "Last" %} »</span>
                     {% endif %}
                   </div>
                   <span class="text-sm text-slate-500 dark:text-slate-300">

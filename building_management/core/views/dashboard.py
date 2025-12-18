@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.utils import formats, timezone, translation
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, ngettext
 from django.views.generic import TemplateView
 
 from ..authz import Capability, CapabilityResolver
@@ -19,6 +19,11 @@ from .common import _querystring_without
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "core/dashboard.html"
+    DEADLINE_WINDOWS = {
+        WorkOrder.Priority.HIGH: 7,
+        WorkOrder.Priority.MEDIUM: 3,
+        WorkOrder.Priority.LOW: 1,
+    }
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -32,6 +37,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["technician_page_query"] = tech_query
         ctx["technician_section_title"] = self._technician_section_title(user)
         ctx["backoffice_cards"] = self._backoffice_cards(user, resolver)
+        deadline_page, deadline_query = self._deadline_alert_cards(user)
+        ctx["deadline_alert_page"] = deadline_page
+        ctx["deadline_alert_cards"] = deadline_page.object_list if deadline_page else []
+        ctx["deadline_page_query"] = deadline_query
         ctx["assignment_load"] = self._assignment_load(user)
         ctx.update(self._notifications_context())
         return ctx
@@ -141,6 +150,109 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             )
 
         return cards
+
+    def _deadline_alert_cards(self, user):
+        query = _querystring_without(self.request, "deadline_page")
+        if not user or not user.is_authenticated:
+            empty_page = Paginator([], 1).get_page(1)
+            return empty_page, query
+        today = timezone.localdate()
+        windows = self.DEADLINE_WINDOWS
+        active_statuses = [
+            WorkOrder.Status.OPEN,
+            WorkOrder.Status.IN_PROGRESS,
+            WorkOrder.Status.AWAITING_APPROVAL,
+        ]
+        attention_filter = Q(deadline__lt=today)
+        for priority, window_days in windows.items():
+            attention_filter |= Q(
+                priority=priority,
+                deadline__gte=today + timedelta(days=window_days),
+            )
+
+        qs = (
+            WorkOrder.objects.visible_to(user)
+            .filter(
+                archived_at__isnull=True,
+                status__in=active_statuses,
+            )
+            .filter(attention_filter)
+            .select_related("building")
+            .order_by("deadline", "-priority")
+        )
+        priority_order = {
+            WorkOrder.Priority.HIGH: 0,
+            WorkOrder.Priority.MEDIUM: 1,
+            WorkOrder.Priority.LOW: 2,
+        }
+        cards = []
+        for wo in qs:
+            days_delta = (wo.deadline - today).days
+            is_overdue = days_delta < 0
+            if is_overdue:
+                overdue_days = abs(days_delta)
+                if overdue_days == 1:
+                    timing_text = _("missed by 1 day")
+                else:
+                    timing_text = ngettext(
+                        "missed by %(count)s day",
+                        "missed by %(count)s days",
+                        overdue_days,
+                    ) % {"count": overdue_days}
+                reason = _("Missed deadline")
+            else:
+                if days_delta == 0:
+                    timing_text = _("due today")
+                elif days_delta == 1:
+                    timing_text = _("due tomorrow")
+                else:
+                    timing_text = ngettext(
+                        "due in %(count)s day",
+                        "due in %(count)s days",
+                        days_delta,
+                    ) % {"count": days_delta}
+
+                priority_label = wo.get_priority_display()
+                threshold_days = windows.get(wo.priority)
+                if threshold_days:
+                    reason = ngettext(
+                        "%(priority)s priority deadline scheduled after %(count)s day threshold",
+                        "%(priority)s priority deadline scheduled after %(count)s days threshold",
+                        threshold_days,
+                    ) % {"priority": priority_label, "count": threshold_days}
+                else:
+                    reason = _("%(priority)s priority deadline scheduled") % {"priority": priority_label}
+
+            cards.append(
+                {
+                    "id": wo.pk,
+                    "title": wo.title,
+                    "building": getattr(wo.building, "name", "-"),
+                    "priority": wo.priority,
+                    "priority_label": wo.get_priority_display(),
+                    "status_label": wo.get_status_display(),
+                    "deadline": wo.deadline,
+                    "deadline_display": formats.date_format(wo.deadline, "DATE_FORMAT"),
+                    "timing_text": timing_text,
+                    "reason": reason,
+                    "is_overdue": is_overdue,
+                }
+            )
+
+        cards.sort(
+            key=lambda item: (
+                0 if item["is_overdue"] else 1,
+                item["deadline"],
+                priority_order.get(item["priority"], 99),
+            )
+        )
+        paginator = Paginator(cards, 4)
+        try:
+            page_number = int(self.request.GET.get("deadline_page", 1))
+        except (TypeError, ValueError):
+            page_number = 1
+        page_obj = paginator.get_page(page_number)
+        return page_obj, query
 
     def _assignment_load(self, user):
         building_ids = self._assigned_building_ids(user)
