@@ -11,7 +11,7 @@ from django.utils.translation import gettext as _, ngettext
 from django.views.generic import TemplateView
 
 from ..authz import Capability, CapabilityResolver
-from ..models import Building, MembershipRole, Notification, UserSecurityProfile, WorkOrder
+from ..models import Building, MembershipRole, Notification, WorkOrder, WorkOrderAuditLog
 from ..utils.roles import user_can_approve_work_orders
 from ..services import NotificationService
 from .common import _querystring_without
@@ -20,7 +20,7 @@ from .common import _querystring_without
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "core/dashboard.html"
     DEADLINE_WINDOWS = {
-        WorkOrder.Priority.HIGH: 7,
+        WorkOrder.Priority.HIGH: 5,
         WorkOrder.Priority.MEDIUM: 3,
         WorkOrder.Priority.LOW: 1,
     }
@@ -167,7 +167,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         for priority, window_days in windows.items():
             attention_filter |= Q(
                 priority=priority,
-                deadline__gte=today + timedelta(days=window_days),
+                deadline__gte=today,
+                deadline__lte=today + timedelta(days=window_days),
             )
 
         qs = (
@@ -192,36 +193,29 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             if is_overdue:
                 overdue_days = abs(days_delta)
                 if overdue_days == 1:
-                    timing_text = _("missed by 1 day")
+                    timing_text = _("просрочено с 1 ден")
                 else:
                     timing_text = ngettext(
-                        "missed by %(count)s day",
-                        "missed by %(count)s days",
+                        "просрочено с %(count)s ден",
+                        "просрочено с %(count)s дни",
                         overdue_days,
                     ) % {"count": overdue_days}
-                reason = _("Missed deadline")
+                reason = _("Пропуснат краен срок")
             else:
                 if days_delta == 0:
-                    timing_text = _("due today")
+                    # Skip same-day reminders – deadline alerts focus on overdue or future thresholds.
+                    continue
                 elif days_delta == 1:
-                    timing_text = _("due tomorrow")
+                    timing_text = _("срокът е утре")
                 else:
                     timing_text = ngettext(
-                        "due in %(count)s day",
-                        "due in %(count)s days",
+                        "срок след %(count)s ден",
+                        "срок след %(count)s дни",
                         days_delta,
                     ) % {"count": days_delta}
 
                 priority_label = wo.get_priority_display()
-                threshold_days = windows.get(wo.priority)
-                if threshold_days:
-                    reason = ngettext(
-                        "%(priority)s priority deadline scheduled after %(count)s day threshold",
-                        "%(priority)s priority deadline scheduled after %(count)s days threshold",
-                        threshold_days,
-                    ) % {"priority": priority_label, "count": threshold_days}
-                else:
-                    reason = _("%(priority)s priority deadline scheduled") % {"priority": priority_label}
+                reason = _("%(priority)s задача с наближаващ срок") % {"priority": priority_label}
 
             cards.append(
                 {
@@ -303,8 +297,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     def _technician_section_title(self, user):
         if self._has_global_staff_role(user):
-            return _("Today's Open Jobs")
-        return _("My Today's Jobs")
+            return _("Днешните отворени задачи")
+        return _("Днешните ми задачи")
 
     def _statuses_for_today(self, user):
         return [
@@ -326,11 +320,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         notifications: list[dict[str, str | bool]] = []
 
         service = NotificationService(user)
-        deadline_notifications = list(service.sync_work_order_deadlines())
-        new_flags = {note.key: note.first_seen_at is None for note in deadline_notifications}
-        if deadline_notifications:
-            service.mark_seen([note.key for note in deadline_notifications])
-
         request_language = getattr(self.request, "LANGUAGE_CODE", translation.get_language())
         with translation.override(request_language):
             level_labels = {
@@ -378,22 +367,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             payload["badge_style"] = style.get("badge_style", "")
             return payload
 
-        for note in deadline_notifications:
-            notifications.append(
-                attach_styles(
-                    {
-                        "id": note.key,
-                        "level": note.level,
-                        "level_label": level_labels.get(note.level, note.get_level_display()),
-                        "message": note.body,
-                        "category": note.category,
-                        "is_new": new_flags.get(note.key, False),
-                        "dismissible": True,
-                        "_priority_weight": level_weights.get(note.level, 99),
-                    }
-                )
-            )
-
         mass_notifications = service.sync_recent_mass_assign()
         if mass_notifications:
             service.mark_seen([note.key for note in mass_notifications])
@@ -408,48 +381,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                         "category": note.category,
                         "is_new": False,
                         "dismissible": True,
-                        "_priority_weight": 3,
+                        "_priority_weight": 0,
                     }
                 )
             )
 
-        is_admin = user.is_staff or user.is_superuser
-
-        if is_admin:
-            locked_accounts = (
-                UserSecurityProfile.objects.select_related("user")
-                .filter(
-                    user__is_active=False,
-                    lock_reason=UserSecurityProfile.LockReason.FAILED_ATTEMPTS,
-                )
-                .order_by("-locked_at")[:20]
-            )
-
-            for profile in locked_accounts:
-                locked_at = profile.locked_at
-                locked_display = (
-                    formats.date_format(timezone.localtime(locked_at), "DATETIME_FORMAT")
-                    if locked_at
-                    else _("an unknown time")
-                )
-                locked_user = profile.user
-                display_name = locked_user.get_full_name() or locked_user.username
-                message = _(
-                    "%(user)s was locked after too many failed login attempts on %(locked)s. Reactivate the account and set a new password to restore access."
-                ) % {"user": display_name, "locked": locked_display}
-                notifications.append(
-                    attach_styles(
-                        {
-                            "id": f"user-locked-{locked_user.pk}",
-                            "level": Notification.Level.DANGER.value,
-                            "level_label": level_labels.get(Notification.Level.DANGER.value, Notification.Level.DANGER.label),
-                            "message": message,
-                            "category": "account_lock",
-                            "is_new": False,
-                            "dismissible": False,
-                        }
-                    )
-                )
+        recent_activity_notes = self._work_order_activity_notifications(user)
+        for note in recent_activity_notes:
+            notifications.append(attach_styles(note))
 
         notifications.sort(key=lambda item: (item.get("_priority_weight", 99), item.get("id")))
         for item in notifications:
@@ -463,6 +402,122 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             timeout=60,
         )
         return notifications
+
+    def _work_order_activity_notifications(self, user):
+        if not user.is_authenticated:
+            return []
+
+        resolver = CapabilityResolver(user)
+        visible_buildings = resolver.visible_building_ids()
+        if visible_buildings == set():
+            return []
+
+        now = timezone.now()
+        window_start = now - timedelta(days=7)
+        recent_threshold = now - timedelta(hours=12)
+        qs = (
+            WorkOrderAuditLog.objects.select_related("work_order", "actor", "building")
+            .filter(created_at__gte=window_start)
+            .exclude(actor=user)
+        )
+        if visible_buildings is not None:
+            qs = qs.filter(building_id__in=list(visible_buildings))
+        logs = list(qs.order_by("-created_at")[:15])
+
+        notifications = []
+        for log in logs:
+            message, level = self._format_activity_message(log)
+            if not message:
+                continue
+            notifications.append(
+                {
+                    "id": f"wo-activity-{log.pk}",
+                    "level": level,
+                    "level_label": _("Актуализация"),
+                    "message": message,
+                    "category": "activity",
+                    "is_new": log.created_at >= recent_threshold,
+                    "dismissible": False,
+                    "_priority_weight": 1,
+                }
+            )
+        return notifications
+
+    def _format_activity_message(self, log):
+        order = getattr(log, "work_order", None)
+        if order is None:
+            return None, Notification.Level.INFO.value
+        actor = getattr(log, "actor", None)
+        actor_name = actor.get_full_name() or actor.username if actor else _("System")
+        building_name = getattr(log.building, "name", _("their building"))
+        title = order.title
+        payload = log.payload or {}
+
+        level = Notification.Level.INFO.value
+        message = None
+        if log.action == WorkOrderAuditLog.Action.CREATED:
+            message = _('%(actor)s създаде "%(title)s" за %(building)s.') % {
+                "actor": actor_name,
+                "title": title,
+                "building": building_name,
+            }
+        elif log.action == WorkOrderAuditLog.Action.STATUS_CHANGED:
+            status_labels = dict(WorkOrder.Status.choices)
+            from_label = status_labels.get(payload.get("from"), payload.get("from"))
+            to_label = status_labels.get(payload.get("to"), payload.get("to"))
+            message = _('%(actor)s промени статуса на "%(title)s" от %(from)s на %(to)s.') % {
+                "actor": actor_name,
+                "title": title,
+                "from": from_label,
+                "to": to_label,
+            }
+            level = Notification.Level.WARNING.value
+        elif log.action == WorkOrderAuditLog.Action.APPROVAL:
+            status_labels = dict(WorkOrder.Status.choices)
+            to_label = status_labels.get(payload.get("to"), payload.get("to"))
+            message = _('%(actor)s записа решение за одобрение за "%(title)s" (%(status)s).') % {
+                "actor": actor_name,
+                "title": title,
+                "status": to_label or _("updated status"),
+            }
+            level = Notification.Level.WARNING.value
+        elif log.action == WorkOrderAuditLog.Action.UPDATED:
+            fields = payload.get("fields", {})
+            field_label_map = {
+                "deadline": _("краен срок"),
+                "description": _("описание"),
+                "priority": _("приоритет"),
+                "replacement_request_note": _("бележка за замяна"),
+                "title": _("заглавие"),
+                "unit": _("апартамент"),
+            }
+            translated_fields = []
+            for field in sorted(fields.keys()):
+                translated_fields.append(field_label_map.get(field, field))
+            field_names = ", ".join(translated_fields) or _("детайли")
+            message = _('%(actor)s актуализира %(fields)s за "%(title)s".') % {
+                "actor": actor_name,
+                "fields": field_names,
+                "title": title,
+            }
+        elif log.action == WorkOrderAuditLog.Action.ATTACHMENTS:
+            message = _('%(actor)s актуализира файловете към "%(title)s".') % {
+                "actor": actor_name,
+                "title": title,
+            }
+        elif log.action == WorkOrderAuditLog.Action.REASSIGNED:
+            message = _('%(actor)s пренасочи "%(title)s".') % {
+                "actor": actor_name,
+                "title": title,
+            }
+            level = Notification.Level.WARNING.value
+        elif log.action == WorkOrderAuditLog.Action.ARCHIVED:
+            message = _('%(actor)s архивира "%(title)s".') % {
+                "actor": actor_name,
+                "title": title,
+            }
+
+        return message, level
 
     def _label_for(self, resolver):
         if resolver.has(Capability.APPROVE_WORK_ORDERS):

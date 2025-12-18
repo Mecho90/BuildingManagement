@@ -5,22 +5,16 @@
 
 {% block content %}
 <section class="space-y-8">
-    <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
       <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Dashboard" %}</h1>
-      <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
-        {% blocktrans with load=assignment_load %}You currently have {{ load }} open assignments across your buildings.{% endblocktrans %}
-      </p>
-    {% if dashboard_label %}
-      <p class="text-sm text-slate-500 dark:text-slate-400">
-        {{ dashboard_label }}
-      </p>
-    {% endif %}
-    </header>
+    </div>
+  </div>
 
   {% with card_base="rounded-lg border border-slate-200 bg-white p-3 text-[13px] shadow-sm transition dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" section_shell="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-card dark:border-slate-700 dark:bg-slate-900/70" %}
     <section class="space-y-4">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Deadline alerts" %}</h2>
+        <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Предупреждения за крайни срокове" %}</h2>
         {% if deadline_alert_page and deadline_alert_page.paginator.count %}
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
             {% blocktrans count total=deadline_alert_page.paginator.count %}{{ total }} items{% plural %}{{ total }} items{% endblocktrans %}
@@ -172,14 +166,15 @@
         {% if notifications_page and notifications_page.object_list %}
           <ul class="space-y-4">
             {% for note in notifications_page %}
-              <li class="{{ card_base }} {{ note.card_classes|default:'' }}" style="{{ note.card_style|default:'' }}" data-notification-key="{{ note.id }}" data-is-new="{{ note.is_new|yesno:'true,false' }}">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div class="flex-1 space-y-2">
-                    {% if note.level %}
-                      <span class="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide {{ note.badge_classes|default:'' }}" style="{{ note.badge_style|default:'' }}">{{ note.level_label|default:note.level }}</span>
-                    {% endif %}
-                    <p class="leading-snug">{{ note.message }}</p>
-                  </div>
+              <li>
+                <article class="{{ card_base }}" data-notification-key="{{ note.id }}" data-is-new="{{ note.is_new|yesno:'true,false' }}">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="flex-1 space-y-2">
+                      {% if note.level %}
+                      <span class="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100">{{ note.level_label|default:note.level }}</span>
+                      {% endif %}
+                      <p class="leading-snug">{{ note.message }}</p>
+                    </div>
                   {% if note.dismissible %}
                     <form method="post"
                           action="{% url 'core:notification_snooze' note.id %}"
@@ -192,6 +187,7 @@
                     </form>
                   {% endif %}
                 </div>
+                </article>
               </li>
             {% endfor %}
           </ul>

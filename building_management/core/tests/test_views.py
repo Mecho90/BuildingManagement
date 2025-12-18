@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.auth_views import RoleAwareLoginView
+from core.authz import log_workorder_action
 from core.models import (
     Building,
     BuildingMembership,
@@ -584,10 +585,11 @@ class DashboardViewTests(TestCase):
     def test_dashboard_shows_notifications(self):
         WorkOrder.objects.create(
             building=self.building,
-            title="Deadline soon",
+            title="Mass notice",
             status=WorkOrder.Status.OPEN,
-            priority=WorkOrder.Priority.HIGH,
-            deadline=timezone.localdate() + timedelta(days=1),
+            priority=WorkOrder.Priority.MEDIUM,
+            mass_assigned=True,
+            deadline=timezone.localdate() + timedelta(days=5),
         )
         self.client.login(username="dash-back", password="pass1234")
         response = self.client.get(reverse("core:dashboard"))
@@ -595,18 +597,27 @@ class DashboardViewTests(TestCase):
         self.assertTrue(response.context["notifications"])
 
     def test_deadline_alerts_include_overdue(self):
+        today = timezone.localdate()
         WorkOrder.objects.create(
             building=self.building,
             title="Late ticket",
             status=WorkOrder.Status.OPEN,
-            deadline=timezone.localdate() - timedelta(days=2),
+            deadline=today - timedelta(days=2),
+        )
+        WorkOrder.objects.create(
+            building=self.building,
+            title="Due today hidden",
+            status=WorkOrder.Status.OPEN,
+            deadline=today,
         )
         self.client.login(username="dash-tech", password="pass1234")
         response = self.client.get(reverse("core:dashboard"))
         alerts = response.context["deadline_alert_cards"]
-        self.assertEqual(len(alerts), 1)
-        self.assertTrue(alerts[0]["is_overdue"])
-        self.assertEqual(alerts[0]["title"], "Late ticket")
+        titles = {alert["title"] for alert in alerts}
+        self.assertIn("Late ticket", titles)
+        self.assertNotIn("Due today hidden", titles)
+        target = next(alert for alert in alerts if alert["title"] == "Late ticket")
+        self.assertTrue(target["is_overdue"])
 
     def test_deadline_alerts_respect_priority_windows(self):
         today = timezone.localdate()
@@ -615,7 +626,14 @@ class DashboardViewTests(TestCase):
             title="High priority soon",
             priority=WorkOrder.Priority.HIGH,
             status=WorkOrder.Status.OPEN,
-            deadline=today + timedelta(days=8),
+            deadline=today + timedelta(days=4),
+        )
+        WorkOrder.objects.create(
+            building=self.building,
+            title="High out of window",
+            priority=WorkOrder.Priority.HIGH,
+            status=WorkOrder.Status.OPEN,
+            deadline=today + timedelta(days=6),
         )
         WorkOrder.objects.create(
             building=self.building,
@@ -629,7 +647,7 @@ class DashboardViewTests(TestCase):
             title="Medium out of window",
             priority=WorkOrder.Priority.MEDIUM,
             status=WorkOrder.Status.OPEN,
-            deadline=today + timedelta(days=2),
+            deadline=today + timedelta(days=4),
         )
         WorkOrder.objects.create(
             building=self.building,
@@ -643,6 +661,7 @@ class DashboardViewTests(TestCase):
         alerts = response.context["deadline_alert_cards"]
         titles = {alert["title"] for alert in alerts}
         self.assertIn("High priority soon", titles)
+        self.assertNotIn("High out of window", titles)
         self.assertIn("Medium meets window", titles)
         self.assertIn("Low priority tomorrow", titles)
         self.assertNotIn("Medium out of window", titles)
@@ -655,7 +674,7 @@ class DashboardViewTests(TestCase):
                 title=f"Ticket {idx}",
                 priority=WorkOrder.Priority.HIGH,
                 status=WorkOrder.Status.OPEN,
-                deadline=today + timedelta(days=7 + idx),
+                deadline=today + timedelta(days=(idx % 3) + 1),
             )
         self.client.login(username="dash-tech", password="pass1234")
         response = self.client.get(reverse("core:dashboard"))
@@ -664,6 +683,26 @@ class DashboardViewTests(TestCase):
         response = self.client.get(f"{reverse('core:dashboard')}?deadline_page=2")
         second_page_cards = response.context["deadline_alert_cards"]
         self.assertEqual(len(second_page_cards), 1)
+
+    def test_notifications_include_work_order_changes(self):
+        actor = get_user_model().objects.create_user("changer", "changer@example.com", "pass1234")
+        order = WorkOrder.objects.create(
+            building=self.building,
+            title="Alert order",
+            status=WorkOrder.Status.OPEN,
+            deadline=timezone.localdate() + timedelta(days=3),
+        )
+        log_workorder_action(
+            actor=actor,
+            work_order=order,
+            action=WorkOrderAuditLog.Action.UPDATED,
+            payload={"fields": {"title": {"from": "Old", "to": "New"}}},
+        )
+        self.client.login(username="dash-back", password="pass1234")
+        response = self.client.get(reverse("core:dashboard"))
+        self.assertEqual(response.status_code, 200)
+        messages = [note["message"] for note in response.context["notifications"]]
+        self.assertTrue(any("Alert order" in msg for msg in messages))
 
 
 class MassAssignEnhancedTests(TestCase):
