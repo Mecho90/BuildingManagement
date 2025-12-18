@@ -149,9 +149,9 @@
                     {% endif %}
                     {% if entry.changes %}
                       <ul class="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-300">
-                        {% for field, change in entry.changes.items %}
+                        {% for change in entry.changes %}
                           <li>
-                            <span class="font-semibold text-slate-600 dark:text-white">{{ field|capfirst }}:</span>
+                            <span class="font-semibold text-slate-600 dark:text-white">{{ change.label }}:</span>
                             {% if change.from and change.to %}
                               {{ change.from }} → {{ change.to }}
                             {% elif change.to %}

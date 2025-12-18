@@ -257,6 +257,7 @@ class WorkOrder(TimeStampedModel):
         Building,
         on_delete=models.CASCADE,
         related_name="work_orders",  # used by annotations in views
+        verbose_name=_("Building"),
     )
     unit = models.ForeignKey(
         Unit,
@@ -264,6 +265,7 @@ class WorkOrder(TimeStampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="work_orders",
+        verbose_name=_("Unit"),
     )
 
     title = models.CharField(max_length=255, verbose_name=_("Title"))
@@ -281,6 +283,7 @@ class WorkOrder(TimeStampedModel):
         choices=Priority.choices,
         default=Priority.MEDIUM,
         db_index=True,
+        verbose_name=_("Priority"),
     )
     kind = models.CharField(
         max_length=32,
@@ -289,7 +292,7 @@ class WorkOrder(TimeStampedModel):
         db_index=True,
     )
     # Mandatory deadline (non-nullable at DB level)
-    deadline = models.DateField(null=False, blank=False)
+    deadline = models.DateField(null=False, blank=False, verbose_name=_("Deadline"))
 
     mass_assigned = models.BooleanField(
         default=False,

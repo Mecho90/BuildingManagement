@@ -9,6 +9,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import redirect_to_login
+from django.core.exceptions import FieldDoesNotExist
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Max, Min, OuterRef, Q, Subquery, Value, When
@@ -583,11 +584,13 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             to_label = status_labels.get(to_code, to_code)
             description = entry.get_action_display()
             changes_payload = payload.get("fields") or {}
+            formatted_changes = self._format_change_payload(changes_payload)
             attachments_payload = payload.get("attachments") or {}
             if action == WorkOrderAuditLog.Action.CREATED:
                 description = _("Work order created")
             elif action == WorkOrderAuditLog.Action.UPDATED:
-                field_list = ", ".join(sorted(changes_payload.keys()))
+                field_labels = self._format_audit_field_labels(changes_payload.keys())
+                field_list = ", ".join(field_labels)
                 if field_list:
                     description = _("Updated: %(fields)s") % {"fields": field_list}
             elif action == WorkOrderAuditLog.Action.ARCHIVED:
@@ -611,7 +614,7 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
                     "to": to_label,
                     "action": action,
                     "is_approval": action == WorkOrderAuditLog.Action.APPROVAL,
-                    "changes": changes_payload,
+                    "changes": formatted_changes,
                     "attachments": attachments_payload,
                 }
             )
@@ -627,7 +630,7 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
                     "to": "",
                     "action": WorkOrderAuditLog.Action.CREATED,
                     "is_approval": False,
-                    "changes": {},
+                    "changes": [],
                     "attachments": {},
                 }
             )
@@ -661,6 +664,37 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             }
         ctx["deadline_status"] = deadline_status
         return ctx
+
+    def _format_audit_field_labels(self, field_names):
+        labels = []
+        for field in sorted(field_names):
+            labels.append(self._get_audit_field_label(field))
+        return labels
+
+    def _format_change_payload(self, changes_payload: dict[str, dict[str, str]]):
+        formatted = []
+        for field in sorted(changes_payload.keys()):
+            label = self._get_audit_field_label(field)
+            change = changes_payload.get(field) or {}
+            formatted.append(
+                {
+                    "label": label,
+                    "from": change.get("from"),
+                    "to": change.get("to"),
+                }
+            )
+        return formatted
+
+    @staticmethod
+    def _get_audit_field_label(field_name: str) -> str:
+        if not field_name:
+            return ""
+        try:
+            field = WorkOrder._meta.get_field(field_name)
+            return str(field.verbose_name)
+        except FieldDoesNotExist:
+            readable = field_name.replace("_", " ").strip()
+            return readable.capitalize() if readable else field_name
 
     def test_func(self):
         wo = self.get_object()

@@ -116,7 +116,7 @@ msgstr "Краен срок"
 
 #: core/forms.py:452
 msgid "Awaiting approval. Only backoffice users can change this status."
-msgstr ""
+msgstr "Очаква одобрение. Само потребители от бек офиса могат да променят този статус."
 
 #: core/forms.py:465
 msgid "Add attachments"
@@ -397,10 +397,8 @@ msgid "Mass assignment"
 msgstr "Масово възлагане"
 
 #: core/models.py:271
-#, fuzzy
-#| msgid "No replacement request note provided."
 msgid "Replacement request note"
-msgstr "Няма бележка към заявката за подмяна."
+msgstr "Бележка към заявката за замяна"
 
 #: core/models.py:297
 msgid "Mass assigned"
@@ -532,7 +530,7 @@ msgstr "Общо записи в одита: %(total)s"
 #: core/models.py:687 core/views/work_orders.py:573
 #: core/views/work_orders.py:624 core/views/work_orders.py:634
 msgid "System"
-msgstr ""
+msgstr "Система"
 
 #: core/models.py:693 templates/core/building_detail.html:50
 #: templates/core/building_detail.html:294
@@ -1070,38 +1068,35 @@ msgid "Owner (Z → A)"
 msgstr "Отговорник (Я → А)"
 
 #: core/views/work_orders.py:588 core/views/work_orders.py:625
-#, fuzzy
-#| msgid "Work order created."
 msgid "Work order created"
-msgstr "Поръчката беше създадена."
+msgstr "Работната задача е създадена"
 
 #: core/views/work_orders.py:592
-#, fuzzy, python-format
-#| msgid "Uploaded %(date)s"
+#, python-format
 msgid "Updated: %(fields)s"
-msgstr "Качено на %(date)s"
+msgstr "Обновено: %(fields)s"
 
 #: core/views/work_orders.py:599
 #, python-format
 msgid "Status changed: %(from)s → %(to)s"
-msgstr ""
+msgstr "Статусът е променен: %(from)s → %(to)s"
 
 #: core/views/work_orders.py:604
 #, python-format
 msgid "Status set to %(to)s"
-msgstr ""
+msgstr "Статусът е зададен на %(to)s"
 
 #: core/views/work_orders.py:646
 #, python-format
 msgid "Missed deadline by %(days)s day."
 msgid_plural "Missed deadline by %(days)s days."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Просрочен краен срок с %(days)s ден."
+msgstr[1] "Просрочен краен срок с %(days)s дни."
 
 #: core/views/work_orders.py:652
 #, python-format
 msgid "Completed on time on %(date)s"
-msgstr ""
+msgstr "Завършено навреме на %(date)s"
 
 #: core/views/work_orders.py:738
 msgid "Work order created."
@@ -1957,26 +1952,21 @@ msgid "Back"
 msgstr "Назад"
 
 #: templates/core/work_order_detail.html:65
-#, fuzzy
-#| msgid "Deadline"
 msgid "Deadline status"
-msgstr "Краен срок"
+msgstr "Състояние на крайния срок"
 
 #: templates/core/work_order_detail.html:77
 msgid "Approved by"
 msgstr "Одобрено от"
 
 #: templates/core/work_order_detail.html:96
-#, fuzzy
-#| msgid "No replacement request note provided."
 msgid "Replacement request"
-msgstr "Няма бележка към заявката за подмяна."
+msgstr "Заявка за замяна"
 
 #: templates/core/work_order_detail.html:101
-#, fuzzy, python-format
-#| msgid "Requested by"
+#, python-format
 msgid "Requested by %(name)s"
-msgstr "Заявено от"
+msgstr "Заявено от %(name)s"
 
 #: templates/core/work_order_detail.html:112
 msgid "Work history"
