@@ -114,6 +114,33 @@ class WorkOrderFormTests(TestCase):
         data.update(overrides)
         return data
 
+    def test_lawyer_submission_marked_confidential(self):
+        lawyer = get_user_model().objects.create_user(
+            username="legal-user",
+            email="legal@example.com",
+            password="pass1234",
+        )
+        BuildingMembership.objects.create(
+            user=lawyer,
+            building=None,
+            role=MembershipRole.LAWYER,
+        )
+        form = WorkOrderForm(data=self._base_data(), user=lawyer)
+        self.assertTrue(form.is_valid(), form.errors)
+        order = form.save()
+        self.assertTrue(order.lawyer_only)
+        self.assertEqual(order.created_by, lawyer)
+
+    def test_non_lawyer_submission_not_confidential(self):
+        form = WorkOrderForm(
+            data=self._base_data(title="Admin request"),
+            user=self.owner,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        order = form.save()
+        self.assertFalse(order.lawyer_only)
+        self.assertEqual(order.created_by, self.owner)
+
     def test_non_owner_cannot_target_foreign_building(self):
         form = WorkOrderForm(
             data={

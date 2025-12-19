@@ -86,12 +86,18 @@ class WorkOrderQuerySet(models.QuerySet):
         from .authz import CapabilityResolver
 
         resolver = CapabilityResolver(user)
+        qs = self
         building_ids = resolver.visible_building_ids()
-        if building_ids is None:
-            return self
-        if not building_ids:
-            return self.none()
-        return self.filter(building_id__in=building_ids)
+        if building_ids is not None:
+            if not building_ids:
+                return self.none()
+            qs = qs.filter(building_id__in=building_ids)
+        can_view_confidential = resolver.has(Capability.VIEW_CONFIDENTIAL_WORK_ORDERS)
+        if not can_view_confidential and _user_can_view_confidential_orders(user):
+            can_view_confidential = True
+        if not can_view_confidential:
+            qs = qs.filter(lawyer_only=False)
+        return qs
 
 
 # ---------------------------------------------------------------------------
@@ -309,6 +315,20 @@ class WorkOrder(TimeStampedModel):
         on_delete=models.SET_NULL,
         related_name="work_orders_sent_for_approval",
         verbose_name=_("Awaiting approval requested by"),
+    )
+    lawyer_only = models.BooleanField(
+        _("Lawyer-only visibility"),
+        default=False,
+        db_index=True,
+        help_text=_("Only lawyers, backoffice employees, and administrators can view these work orders."),
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="work_orders_created",
+        verbose_name=_("Created by"),
     )
 
     objects = WorkOrderQuerySet.as_manager()
@@ -540,6 +560,7 @@ class Notification(TimeStampedModel):
 class MembershipRole(models.TextChoices):
     TECHNICIAN = "TECHNICIAN", _("Technician")
     BACKOFFICE = "BACKOFFICE", _("Backoffice Employee")
+    LAWYER = "LAWYER", _("Lawyer")
     ADMINISTRATOR = "ADMINISTRATOR", _("Administrator")
 
 
@@ -553,6 +574,7 @@ class Capability:
     VIEW_AUDIT_LOG = "view_audit_log"
     MANAGE_MEMBERSHIPS = "manage_memberships"
     VIEW_USERS = "view_users"
+    VIEW_CONFIDENTIAL_WORK_ORDERS = "view_confidential_work_orders"
 
 
 ROLE_CAPABILITIES: dict[str, set[str]] = {
@@ -568,6 +590,13 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         Capability.MASS_ASSIGN,
         Capability.APPROVE_WORK_ORDERS,
         Capability.MANAGE_MEMBERSHIPS,
+        Capability.VIEW_CONFIDENTIAL_WORK_ORDERS,
+    },
+    MembershipRole.LAWYER: {
+        Capability.VIEW_ALL_BUILDINGS,
+        Capability.CREATE_UNITS,
+        Capability.CREATE_WORK_ORDERS,
+        Capability.VIEW_CONFIDENTIAL_WORK_ORDERS,
     },
     MembershipRole.ADMINISTRATOR: {
         Capability.VIEW_ALL_BUILDINGS,
@@ -579,6 +608,7 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         Capability.VIEW_AUDIT_LOG,
         Capability.MANAGE_MEMBERSHIPS,
         Capability.VIEW_USERS,
+        Capability.VIEW_CONFIDENTIAL_WORK_ORDERS,
     },
 }
 
@@ -651,6 +681,21 @@ class BuildingMembership(TimeStampedModel):
     @property
     def is_global(self) -> bool:
         return self.building_id is None
+
+
+def _user_can_view_confidential_orders(user) -> bool:
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return BuildingMembership.objects.filter(
+        user=user,
+        role__in=(
+            MembershipRole.LAWYER,
+            MembershipRole.BACKOFFICE,
+            MembershipRole.ADMINISTRATOR,
+        ),
+    ).exists()
 
 
 class RoleAuditLog(TimeStampedModel):

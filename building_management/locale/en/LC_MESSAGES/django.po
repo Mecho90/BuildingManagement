@@ -806,6 +806,21 @@ msgstr "No buildings found."
 msgid "Notifications"
 msgstr "Notifications"
 
+#: templates/base.html:60 templates/core/lawyer_work_orders.html:4 templates/core/lawyer_work_orders.html:11
+msgid "Lawyer Orders"
+msgstr "Lawyer Orders"
+
+#: core/views/dashboard.py:208
+msgid "Deadline is today"
+msgstr "Deadline is today"
+
+#: templates/core/lawyer_work_orders.html:12
+msgid "Total lawyer orders: %(total)s"
+msgstr "Total lawyer orders: %(total)s"
+
+#: templates/core/lawyer_work_orders.html:57
+msgid "No lawyer-created work orders found."
+msgstr "No lawyer-created work orders found."
 #: templates/core/buildings_list.html:201
 #, python-format
 msgid "%(total)s alert"
@@ -1110,6 +1125,38 @@ msgstr "Delete Work Order"
 msgid "Delete work order"
 msgstr "Delete work order"
 
+#: core/models.py:309
+msgid "Lawyer-only visibility"
+msgstr "Lawyer-only visibility"
+
+#: core/models.py:314
+msgid ""
+"Only lawyers, backoffice employees, and administrators can view these work "
+"orders."
+msgstr ""
+"Only lawyers, backoffice employees, and administrators can view these work "
+"orders."
+
+#: core/models.py:321
+msgid "Created by"
+msgstr "Created by"
+
+#: core/models.py:543
+msgid "Lawyer"
+msgstr "Lawyer"
+
+#: core/forms.py:33
+msgid "Lawyer – read-only access to all buildings; can create legal work orders."
+msgstr "Lawyer – read-only access to all buildings; can create legal work orders."
+
+#: core/forms.py:847
+msgid ""
+"No technician, backoffice, or lawyer users available. Create them first from "
+"the Users section."
+msgstr ""
+"No technician, backoffice, or lawyer users available. Create them first from "
+"the Users section."
+
 #: templates/core/work_order_confirm_delete.html:10
 #, python-format
 msgid ""
@@ -1386,3 +1433,6 @@ msgstr "Password"
 
 #~ msgid "Archived (Oldest first)"
 #~ msgstr "Archived (Oldest first)"
+#: templates/core/lawyer_work_orders.html:21
+msgid "Search lawyer work orders"
+msgstr "Search lawyer work orders"

@@ -8,6 +8,7 @@ This release introduces explicit role memberships per building. Each membership 
 | --- | --- | --- |
 | Technician | Assigned buildings only | Interact with their own work orders. |
 | Backoffice Employee | Buildings they manage | Create/edit buildings, units, and work orders; mass assign techs; manage memberships for those buildings. |
+| Lawyer / Адвокат | Global / Глобално | Read-only access to every building, can create or edit apartments, and files confidential legal work orders hidden from technicians. / Достъп само за четене до всички сгради, възможност за създаване и редакция на апартаменти и подаване на конфиденциални юридически поръчки, скрити от техниците. |
 | Administrator | Global | All capabilities, including user management and audit visibility. |
 
 ## Capabilities
@@ -25,6 +26,8 @@ Capabilities are referenced in code via `core.authz.Capability` constants.
 | `view_audit_log` | Access the human-readable audit trail UI. |
 | `manage_memberships` | Invite/remove building members and adjust role overrides. |
 | `view_users` | Access the internal user-management dashboard. |
+| `view_confidential_work_orders` | View lawyer-only work orders / Преглед на адвокатските конфиденциални поръчки. |
+| `manage_units` | (Same as create_units; included for completeness.) |
 
 Use `BuildingMembership.capabilities_override` to fine-tune privileges. Its structure accepts lists of capability slugs under `{"add": [], "remove": []}`.
 

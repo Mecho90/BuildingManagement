@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Lawyer Orders" %} · {% trans "Building Management" %}{% endblock %}
+
+{% block content %}
+<section class="space-y-6">
+  <header class="rounded-2xl border border-emerald-100 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Lawyer Orders" %}</h1>
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          {% blocktrans with total=lawyer_orders_total %}Total lawyer orders: {{ total }}{% endblocktrans %}
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <form method="get" class="filter-panel space-y-5">
+    <div class="space-y-2">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search lawyer work orders" %}</label>
+      <input
+        id="id_q"
+        class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+        type="text"
+        name="q"
+        value="{{ q }}"
+        placeholder="{% trans "Title or description" %}"
+        autocomplete="off"
+      />
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div class="space-y-2">
+        <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+        <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+          {% for opt in per_choices %}
+            <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="space-y-2">
+        <label for="id_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
+        <select id="id_status" name="status" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+          <option value="" {% if not status %}selected{% endif %}>{% trans "All" %}</option>
+          {% for val, label in status_choices %}
+            <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="space-y-2">
+        <label for="id_priority" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Priority" %}</label>
+        <select id="id_priority" name="priority" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+          <option value="" {% if not priority %}selected{% endif %}>{% trans "All priorities" %}</option>
+          {% for val, label in priority_choices %}
+            <option value="{{ val }}" {% if priority == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% if owner_choices %}
+        <div class="space-y-2">
+          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+          <select id="id_owner" name="owner" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            <option value="" {% if not owner %}selected{% endif %}>{% trans "All" %}</option>
+            {% for opt in owner_choices %}
+              <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+
+      <div class="space-y-2">
+        <label for="id_deadline_range" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Deadline range" %}</label>
+        <input
+          id="id_deadline_range"
+          name="deadline_range"
+          type="text"
+          placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}"
+          value="{{ deadline_range }}"
+          class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+          onchange="this.form.submit()"
+        />
+      </div>
+
+      <div class="space-y-2">
+        <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
+        <select id="id_sort" name="sort" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+          {% for value, label in sort_choices %}
+            <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button class="btn" type="submit">{% trans "Filter" %}</button>
+      {% if q or status or owner or sort != 'priority' or per != 25 or priority or deadline_range %}
+        <a class="btn btn-secondary" href="{% url 'core:lawyer_work_orders' %}">{% trans "Reset" %}</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-900">
+    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+      <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+        <tr>
+          <th class="px-4 py-3">{% trans "Title" %}</th>
+          <th class="px-4 py-3">{% trans "Building" %}</th>
+          {% if show_owner_info %}
+            <th class="px-4 py-3">{% trans "Owner" %}</th>
+          {% endif %}
+          <th class="px-4 py-3">{% trans "Deadline" %}</th>
+          <th class="px-4 py-3">{% trans "Priority" %}</th>
+          <th class="px-4 py-3">{% trans "Status" %}</th>
+          <th class="px-4 py-3">{% trans "Created by" %}</th>
+          <th class="px-4 py-3 text-right">{% trans "Actions" %}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+        {% for order in work_orders %}
+          <tr class="text-slate-700 dark:text-slate-100">
+            <td class="px-4 py-3 font-semibold">
+              <a href="{% url 'core:work_order_detail' order.pk %}" class="text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">
+                {{ order.title }}
+              </a>
+            </td>
+            <td class="px-4 py-3">{{ order.building.name|default:"—" }}</td>
+            {% if show_owner_info %}
+              <td class="px-4 py-3">
+                {% with owner=order.building.owner %}
+                  {% if owner %}
+                    {{ owner.get_full_name|default:owner.username }}
+                  {% else %}
+                    —
+                  {% endif %}
+                {% endwith %}
+              </td>
+            {% endif %}
+            <td class="px-4 py-3">{{ order.deadline|date:"Y-m-d" }}</td>
+            <td class="px-4 py-3">{{ order.get_priority_display }}</td>
+            <td class="px-4 py-3">{{ order.get_status_display }}</td>
+            <td class="px-4 py-3">
+              {% if order.created_by %}
+                {{ order.created_by.get_full_name|default:order.created_by.username }}
+              {% else %}
+                {% trans "Unknown" %}
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right">
+              <div class="inline-flex gap-2">
+                <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_update' order.pk %}">{% trans "Update" %}</a>
+                <a class="btn btn-sm" href="{% url 'core:work_order_detail' order.pk %}">{% trans "View" %}</a>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">
+              {% trans "No lawyer-created work orders found." %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if is_paginated %}
+    {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=request.GET.urlencode %}
+  {% endif %}
+</section>
+{% endblock %}

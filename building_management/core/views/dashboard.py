@@ -12,7 +12,7 @@ from django.views.generic import TemplateView
 
 from ..authz import Capability, CapabilityResolver
 from ..models import Building, MembershipRole, Notification, WorkOrder, WorkOrderAuditLog
-from ..utils.roles import user_can_approve_work_orders
+from ..utils.roles import user_can_approve_work_orders, user_is_lawyer
 from ..services import NotificationService
 from .common import _querystring_without
 
@@ -29,6 +29,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
         resolver = CapabilityResolver(user)
+        self._is_lawyer = user_is_lawyer(user)
+        staff_role = self._has_global_staff_role(user)
+        self._lawyer_scope_only = self._is_lawyer and not staff_role
 
         ctx.setdefault("dashboard_label", self._label_for(resolver))
         tech_page, tech_query = self._technician_cards(user, resolver)
@@ -62,7 +65,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             return empty_page, query
 
         today = timezone.localdate()
-        show_all_today = self._has_global_staff_role(user)
+        show_all_today = self._has_global_staff_role(user) or self._is_lawyer
         filter_kwargs = {}
         visible_statuses = self._statuses_for_today(user)
         if not show_all_today:
@@ -83,6 +86,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             .select_related("building")
             .order_by("deadline", "priority", "-id")
         )
+        qs = self._restrict_queryset_to_lawyer(qs, user)
 
         cards = [
             {
@@ -128,8 +132,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 status=WorkOrder.Status.AWAITING_APPROVAL,
             )
             .select_related("building", "awaiting_approval_by")
-            .order_by("-updated_at")[:8]
+            .order_by("-updated_at")
         )
+        qs = self._restrict_queryset_to_lawyer(qs, user)[:8]
         cards = []
         for wo in qs:
             requester = None
@@ -181,6 +186,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             .select_related("building")
             .order_by("deadline", "-priority")
         )
+        qs = self._restrict_queryset_to_lawyer(qs, user)
         priority_order = {
             WorkOrder.Priority.HIGH: 0,
             WorkOrder.Priority.MEDIUM: 1,
@@ -203,19 +209,20 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 reason = _("Пропуснат краен срок")
             else:
                 if days_delta == 0:
-                    # Skip same-day reminders – deadline alerts focus on overdue or future thresholds.
-                    continue
+                    timing_text = _("Deadline is today")
+                    reason = _("Deadline is today")
                 elif days_delta == 1:
                     timing_text = _("срокът е утре")
+                    priority_label = wo.get_priority_display()
+                    reason = _("%(priority)s задача с наближаващ срок") % {"priority": priority_label}
                 else:
                     timing_text = ngettext(
                         "срок след %(count)s ден",
                         "срок след %(count)s дни",
                         days_delta,
                     ) % {"count": days_delta}
-
-                priority_label = wo.get_priority_display()
-                reason = _("%(priority)s задача с наближаващ срок") % {"priority": priority_label}
+                    priority_label = wo.get_priority_display()
+                    reason = _("%(priority)s задача с наближаващ срок") % {"priority": priority_label}
 
             cards.append(
                 {
@@ -249,21 +256,20 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return page_obj, query
 
     def _assignment_load(self, user):
+        today = timezone.localdate()
+        statuses = self._statuses_for_today(user)
+        qs = WorkOrder.objects.visible_to(user).filter(
+            archived_at__isnull=True,
+            status__in=statuses,
+            deadline=today,
+        )
+        qs = self._restrict_queryset_to_lawyer(qs, user)
+        if getattr(self, "_lawyer_scope_only", False):
+            return qs.count()
         building_ids = self._assigned_building_ids(user)
         if not building_ids:
             return 0
-        today = timezone.localdate()
-        statuses = self._statuses_for_today(user)
-        return (
-            WorkOrder.objects.visible_to(user)
-            .filter(
-                archived_at__isnull=True,
-                building_id__in=building_ids,
-                status__in=statuses,
-                deadline=today,
-            )
-            .count()
-        )
+        return qs.filter(building_id__in=building_ids).count()
 
     def _notifications_context(self):
         notifications_list = self._build_notifications()
@@ -403,6 +409,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         )
         return notifications
 
+    def _restrict_queryset_to_lawyer(self, queryset, user):
+        if not getattr(self, "_lawyer_scope_only", False):
+            return queryset
+        return queryset.filter(lawyer_only=True)
     def _work_order_activity_notifications(self, user):
         if not user.is_authenticated:
             return []

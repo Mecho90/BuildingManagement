@@ -55,6 +55,11 @@
                     {% trans "Work Orders" %}
                   </a>
                 {% endif %}
+                {% if lawyer_orders_enabled and lawyer_orders_url %}
+                  <a href="{{ lawyer_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav lawyer_orders_url %}">
+                    {% trans "Lawyer Orders" %}
+                  </a>
+                {% endif %}
                 {% if work_orders_archive_enabled and work_orders_archive_url %}
                   <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav work_orders_archive_url %}">
                     {% trans "Archive" %}

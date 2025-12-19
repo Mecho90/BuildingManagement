@@ -27,8 +27,8 @@ from django.views.generic import CreateView, DeleteView, DetailView, FormView, L
 
 from ..authz import Capability, CapabilityResolver, log_workorder_action
 from ..forms import MassAssignWorkOrdersForm, WorkOrderForm
-from ..models import Building, BuildingMembership, WorkOrder, WorkOrderAttachment, WorkOrderAuditLog
-from ..utils.roles import user_can_approve_work_orders
+from ..models import Building, BuildingMembership, MembershipRole, WorkOrder, WorkOrderAttachment, WorkOrderAuditLog
+from ..utils.roles import user_can_approve_work_orders, user_has_role, user_is_lawyer
 from ..services.notifications import (
     notify_approvers_of_pending_order,
     notify_building_technicians_of_mass_assignment,
@@ -47,6 +47,7 @@ User = get_user_model()
 
 
 __all__ = [
+    "LawyerWorkOrderListView",
     "WorkOrderListView",
     "WorkOrderDetailView",
     "WorkOrderCreateView",
@@ -59,6 +60,180 @@ __all__ = [
     "WorkOrderAttachmentDeleteView",
     "WorkOrderApprovalDecisionView",
 ]
+
+
+class LawyerOrAdminRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        return user_is_lawyer(user) or user_has_role(user, MembershipRole.ADMINISTRATOR)
+
+
+class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, ListView):
+    model = WorkOrder
+    template_name = "core/lawyer_work_orders.html"
+    context_object_name = "work_orders"
+    paginate_by = 25
+    _per_choices = (25, 50, 100, 200)
+
+    def get_queryset(self):
+        request = self.request
+        user = request.user
+        resolver = CapabilityResolver(user)
+        self._can_view_all = resolver.has(Capability.VIEW_ALL_BUILDINGS)
+
+        # pagination size
+        try:
+            per = int(request.GET.get("per", self.paginate_by))
+        except (TypeError, ValueError):
+            per = self.paginate_by
+        self._per = per
+
+        search = (request.GET.get("q") or "").strip()
+        status = (request.GET.get("status") or "").strip().upper()
+        priority = (request.GET.get("priority") or "").strip().upper()
+        deadline_range_raw = (request.GET.get("deadline_range") or "").strip()
+        deadline_from = None
+        deadline_to = None
+        if deadline_range_raw:
+            normalized = deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
+            parts = [part.strip() for part in normalized.split("/") if part.strip()]
+            if parts:
+                deadline_from = parse_date(parts[0])
+                if len(parts) > 1:
+                    deadline_to = parse_date(parts[1])
+
+        valid_status = {choice[0] for choice in WorkOrder.Status.choices}
+        valid_priority = {choice[0] for choice in WorkOrder.Priority.choices}
+        if status and status not in valid_status:
+            status = ""
+        if priority and priority not in valid_priority:
+            priority = ""
+
+        qs = (
+            WorkOrder.objects.visible_to(user)
+            .filter(lawyer_only=True, archived_at__isnull=True)
+            .select_related("building__owner", "created_by", "unit")
+        )
+
+        # owner choices
+        self._owner_choices = []
+        owner_ids = (
+            qs.values_list("building__owner_id", flat=True)
+            .distinct()
+        )
+        owner_ids = [oid for oid in owner_ids if oid]
+        self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
+
+        qs = qs.annotate(
+            priority_order=Case(
+                When(priority__iexact="high", then=0),
+                When(priority__iexact="medium", then=1),
+                When(priority__iexact="low", then=2),
+                default=3,
+                output_field=IntegerField(),
+            )
+        )
+
+        if search:
+            qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search))
+        if status:
+            qs = qs.filter(status=status)
+        if priority:
+            qs = qs.filter(priority=priority)
+        if deadline_from:
+            qs = qs.filter(deadline__gte=deadline_from)
+        if deadline_to:
+            qs = qs.filter(deadline__lte=deadline_to)
+        if (deadline_from is None) and (deadline_to is None):
+            deadline_range_raw = ""
+
+        owner_param = (request.GET.get("owner") or "").strip()
+        owner_filter = None
+        if owner_param:
+            try:
+                owner_filter = int(owner_param)
+            except (TypeError, ValueError):
+                owner_param = ""
+                owner_filter = None
+        if owner_filter:
+            qs = qs.filter(building__owner_id=owner_filter)
+        else:
+            owner_param = ""
+
+        sort_param = (request.GET.get("sort") or "priority").strip()
+        sort_map = {
+            "priority": ("priority_order", "deadline", "-pk"),
+            "priority_desc": ("-priority_order", "-deadline", "-pk"),
+            "deadline": ("deadline", "priority_order", "-pk"),
+            "deadline_desc": ("-deadline", "priority_order", "-pk"),
+            "created": ("-created_at",),
+            "created_asc": ("created_at",),
+            "building": ("building__name", "priority_order", "deadline", "-pk"),
+            "building_desc": ("-building__name", "priority_order", "deadline", "-pk"),
+            "owner": ("building__owner__username", "priority_order", "deadline", "-pk"),
+            "owner_desc": ("-building__owner__username", "priority_order", "deadline", "-pk"),
+        }
+        if sort_param not in sort_map:
+            sort_param = "priority"
+
+        qs = qs.order_by(*sort_map[sort_param])
+
+        self._search = search
+        self._status = status
+        self._priority = priority
+        self._owner = owner_param
+        self._sort = sort_param
+        self._deadline_range = deadline_range_raw
+
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        paginator = ctx.get("paginator")
+        if paginator is not None:
+            ctx["lawyer_orders_total"] = paginator.count
+        else:
+            ctx["lawyer_orders_total"] = len(ctx.get("work_orders") or [])
+        ctx.update(
+            {
+                "q": getattr(self, "_search", ""),
+                "status": getattr(self, "_status", ""),
+                "priority": getattr(self, "_priority", ""),
+                "deadline_range": getattr(self, "_deadline_range", ""),
+                "status_choices": WorkOrder.Status.choices,
+                "priority_choices": WorkOrder.Priority.choices,
+                "per": self.get_paginate_by(self.object_list),
+                "per_choices": self._per_choices,
+                "owner": getattr(self, "_owner", ""),
+                "owner_choices": getattr(self, "_owner_choices", []),
+                "sort": getattr(self, "_sort", "priority"),
+                "sort_choices": [
+                    ("priority", _("Priority (High → Low)")),
+                    ("priority_desc", _("Priority (Low → High)")),
+                    ("deadline", _("Deadline (Soon → Late)")),
+                    ("deadline_desc", _("Deadline (Late → Soon)")),
+                    ("created", _("Created (Newest first)")),
+                    ("created_asc", _("Created (Oldest first)")),
+                    ("building", _("Building (A → Z)")),
+                    ("building_desc", _("Building (Z → A)")),
+                    ("owner", _("Owner (A → Z)")),
+                    ("owner_desc", _("Owner (Z → A)")),
+                ],
+                "pagination_query": _querystring_without(self.request, "page"),
+                "show_owner_info": True,
+            }
+        )
+        return ctx
+
+    def get_paginate_by(self, queryset):
+        per = getattr(self, "_per", self.paginate_by)
+        if per not in self._per_choices:
+            per = self.paginate_by
+        return per
 
 
 @lru_cache(maxsize=256)
@@ -673,14 +848,26 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
 
     def _format_change_payload(self, changes_payload: dict[str, dict[str, str]]):
         formatted = []
+        priority_labels = dict(WorkOrder.Priority.choices)
+        status_labels = dict(WorkOrder.Status.choices)
+
+        def _translate_value(field: str, value: str | None):
+            if not value:
+                return value
+            if field == "priority":
+                return priority_labels.get(value, value)
+            if field == "status":
+                return status_labels.get(value, value)
+            return value
+
         for field in sorted(changes_payload.keys()):
             label = self._get_audit_field_label(field)
             change = changes_payload.get(field) or {}
             formatted.append(
                 {
                     "label": label,
-                    "from": change.get("from"),
-                    "to": change.get("to"),
+                    "from": _translate_value(field, change.get("from")),
+                    "to": _translate_value(field, change.get("to")),
                 }
             )
         return formatted
@@ -797,6 +984,10 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
     model = WorkOrder
     form_class = WorkOrderForm
     template_name = "core/work_order_form.html"
+
+    def get_queryset(self):
+        base = WorkOrder.objects.visible_to(self.request.user)
+        return base.select_related("building", "unit")
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
@@ -955,6 +1146,10 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
 class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DeleteView):
     model = WorkOrder
     template_name = "core/work_order_confirm_delete.html"   # <- new specific template
+
+    def get_queryset(self):
+        base = WorkOrder.objects.visible_to(self.request.user)
+        return base.select_related("building")
 
     def test_func(self):
         wo = self.get_object()
@@ -1206,6 +1401,7 @@ class MassAssignWorkOrdersView(CapabilityRequiredMixin, LoginRequiredMixin, Form
                     priority=priority,
                     deadline=deadline,
                     mass_assigned=True,
+                    created_by=self.request.user if self.request.user.is_authenticated else None,
                 )
                 created += 1
                 created_names.append(building.name)

@@ -24,11 +24,12 @@ from .models import (
     WorkOrderAttachment,
     UserSecurityProfile,
 )
-from .utils.roles import user_can_approve_work_orders
+from .utils.roles import user_can_approve_work_orders, user_is_lawyer
 
 ROLE_DESCRIPTIONS = {
     MembershipRole.TECHNICIAN: _("Technician – access to assigned buildings."),
     MembershipRole.BACKOFFICE: _("Backoffice – manage assignments for their buildings."),
+    MembershipRole.LAWYER: _("Lawyer – read-only access to all buildings; can create legal work orders."),
     MembershipRole.ADMINISTRATOR: _("Administrator – full system access."),
 }
 
@@ -574,6 +575,12 @@ class WorkOrderForm(forms.ModelForm):
         if self._locked_building_obj is not None:
             obj.building = self._locked_building_obj
 
+        if not obj.pk:
+            if self._user_is_lawyer():
+                obj.lawyer_only = True
+            if self._user and getattr(self._user, "is_authenticated", False) and not obj.created_by_id:
+                obj.created_by = self._user
+
         if obj.status == WorkOrder.Status.AWAITING_APPROVAL:
             if self._user and getattr(self._user, "is_authenticated", False):
                 obj.awaiting_approval_by = self._user
@@ -585,6 +592,15 @@ class WorkOrderForm(forms.ModelForm):
         if commit:
             obj.save()
         return obj
+
+    def _user_is_lawyer(self) -> bool:
+        if user_is_lawyer(self._user):
+            return True
+        if not self._resolver:
+            return False
+        can_view_confidential = self._resolver.has(Capability.VIEW_CONFIDENTIAL_WORK_ORDERS)
+        can_manage_buildings = self._resolver.has(Capability.MANAGE_BUILDINGS)
+        return can_view_confidential and not can_manage_buildings
 
     # ---------- attachments helpers ----------
     def save_attachments(self, work_order: WorkOrder):
@@ -773,6 +789,7 @@ class BuildingMembershipForm(forms.Form):
     allowed_roles = {
         MembershipRole.TECHNICIAN,
         MembershipRole.BACKOFFICE,
+        MembershipRole.LAWYER,
     }
 
     def __init__(self, *args, building=None, **kwargs):
@@ -844,7 +861,7 @@ class BuildingMembershipForm(forms.Form):
         else:
             user_field.disabled = True
             user_field.help_text = _(
-                "No technician or backoffice users available. Create them first from the Users section."
+                "No technician, backoffice, or lawyer users available. Create them first from the Users section."
             )
         self.fields["user"] = user_field
 

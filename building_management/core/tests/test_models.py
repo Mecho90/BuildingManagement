@@ -154,6 +154,56 @@ class WorkOrderSaveTests(TestCase):
         full_clean.assert_not_called()
 
 
+class WorkOrderVisibilityTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.owner = user_model.objects.create_user("law-owner", password="pass1234")
+        self.lawyer = user_model.objects.create_user("law-viewer", password="pass1234")
+        BuildingMembership.objects.create(user=self.lawyer, building=None, role=MembershipRole.LAWYER)
+        self.building = Building.objects.create(owner=self.owner, name="Legal Tower")
+        self.unit = Unit.objects.create(building=self.building, number="1L")
+        today = timezone.localdate()
+        self.confidential = WorkOrder.objects.create(
+            building=self.building,
+            unit=self.unit,
+            title="Legal follow-up",
+            priority=WorkOrder.Priority.HIGH,
+            status=WorkOrder.Status.OPEN,
+            deadline=today + timedelta(days=5),
+            lawyer_only=True,
+            created_by=self.lawyer,
+        )
+        self.regular = WorkOrder.objects.create(
+            building=self.building,
+            unit=self.unit,
+            title="General maintenance",
+            priority=WorkOrder.Priority.LOW,
+            status=WorkOrder.Status.OPEN,
+            deadline=today + timedelta(days=7),
+            created_by=self.owner,
+        )
+
+    def _create_user_with_role(self, username: str, role: str):
+        user = get_user_model().objects.create_user(username=username, password="pass1234")
+        BuildingMembership.objects.create(user=user, building=None, role=role)
+        return user
+
+    def test_technician_cannot_see_confidential_orders(self):
+        tech = get_user_model().objects.create_user("tech-view", password="pass1234")
+        BuildingMembership.objects.create(user=tech, building=self.building, role=MembershipRole.TECHNICIAN)
+        visible = WorkOrder.objects.visible_to(tech)
+        self.assertEqual(list(visible), [self.regular])
+
+    def test_lawyer_can_see_confidential_orders(self):
+        visible = WorkOrder.objects.visible_to(self.lawyer)
+        self.assertCountEqual(list(visible), [self.confidential, self.regular])
+
+    def test_admin_can_see_confidential_orders(self):
+        admin = self._create_user_with_role("admin-view", MembershipRole.ADMINISTRATOR)
+        visible = WorkOrder.objects.visible_to(admin)
+        self.assertCountEqual(list(visible), [self.confidential, self.regular])
+
+
 class UnitConstraintTests(TestCase):
     def setUp(self):
         user_model = get_user_model()

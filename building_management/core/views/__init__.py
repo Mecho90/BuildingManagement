@@ -38,6 +38,7 @@ from .notifications import NotificationSnoozeView
 from .work_orders import (
     ArchivedWorkOrderDetailView,
     ArchivedWorkOrderListView,
+    LawyerWorkOrderListView,
     MassAssignWorkOrdersView,
     WorkOrderArchiveView,
     WorkOrderApprovalDecisionView,
@@ -78,6 +79,7 @@ __all__ = [
     "UnitUpdateView",
     "ArchivedWorkOrderDetailView",
     "ArchivedWorkOrderListView",
+    "LawyerWorkOrderListView",
     "MassAssignWorkOrdersView",
     "WorkOrderArchiveView",
     "WorkOrderApprovalDecisionView",

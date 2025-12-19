@@ -114,60 +114,23 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
             .annotate(
                 buildings_total=Count("buildings", distinct=True),
                 units_total=Count("buildings__units", distinct=True),
-                priority_high_total=Count(
-                    "buildings__work_orders",
-                    filter=Q(
-                        buildings__work_orders__archived_at__isnull=True,
-                        buildings__work_orders__priority=WorkOrder.Priority.HIGH,
-                    ),
-                    distinct=True,
-                ),
-                priority_medium_total=Count(
-                    "buildings__work_orders",
-                    filter=Q(
-                        buildings__work_orders__archived_at__isnull=True,
-                        buildings__work_orders__priority=WorkOrder.Priority.MEDIUM,
-                    ),
-                    distinct=True,
-                ),
-                priority_low_total=Count(
-                    "buildings__work_orders",
-                    filter=Q(
-                        buildings__work_orders__archived_at__isnull=True,
-                        buildings__work_orders__priority=WorkOrder.Priority.LOW,
-                    ),
-                    distinct=True,
-                ),
-                archived_total=Count(
-                    "buildings__work_orders",
-                    filter=Q(
-                        buildings__work_orders__archived_at__isnull=False,
-                    ),
-                    distinct=True,
-                ),
             )
             .values(
                 "pk",
                 "buildings_total",
                 "units_total",
-                "priority_high_total",
-                "priority_medium_total",
-                "priority_low_total",
-                "archived_total",
             )
         )
 
         stats = {
             row["pk"]: {
+                **_empty_stats(),
                 "buildings": row["buildings_total"],
                 "units": row["units_total"],
-                "priority_high": row["priority_high_total"],
-                "priority_medium": row["priority_medium_total"],
-                "priority_low": row["priority_low_total"],
-                "archived": row["archived_total"],
             }
             for row in aggregated_stats
         }
+        self._apply_work_order_stats(stats, user_ids)
 
         totals = defaultdict(int)
         overview_rows: list[dict[str, object]] = []
@@ -186,6 +149,40 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
             )
 
         return {"rows": overview_rows, "totals": dict(totals)}
+
+    def _apply_work_order_stats(self, stats: dict[int, dict[str, int]], user_ids: list[int]) -> None:
+        if not stats:
+            return
+
+        work_orders = (
+            WorkOrder.objects.filter(
+                Q(building__owner_id__in=user_ids) | Q(created_by_id__in=user_ids)
+            )
+            .values(
+                "lawyer_only",
+                "created_by_id",
+                "building__owner_id",
+                "priority",
+                "archived_at",
+            )
+        )
+
+        for row in work_orders:
+            responsible_id = row["building__owner_id"]
+            if row["lawyer_only"] and row["created_by_id"] in stats:
+                responsible_id = row["created_by_id"]
+            if responsible_id not in stats or responsible_id is None:
+                continue
+            if row["archived_at"]:
+                stats[responsible_id]["archived"] += 1
+                continue
+            priority = row["priority"]
+            if priority == WorkOrder.Priority.HIGH:
+                stats[responsible_id]["priority_high"] += 1
+            elif priority == WorkOrder.Priority.MEDIUM:
+                stats[responsible_id]["priority_medium"] += 1
+            elif priority == WorkOrder.Priority.LOW:
+                stats[responsible_id]["priority_low"] += 1
 
 
 class AdminUserCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):

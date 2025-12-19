@@ -47,6 +47,7 @@ urlpatterns = [
     
     # Work Orders    
     path("work-orders/", views.WorkOrderListView.as_view(), name="work_orders_list"),
+    path("work-orders/lawyer/", views.LawyerWorkOrderListView.as_view(), name="lawyer_work_orders"),
     path("work-orders/new/", views.WorkOrderCreateView.as_view(), name="work_order_create"),
     path("work-orders/<int:pk>/", views.WorkOrderDetailView.as_view(), name="work_order_detail"),
     path("work-orders/<int:pk>/edit/", views.WorkOrderUpdateView.as_view(), name="work_order_update"),
