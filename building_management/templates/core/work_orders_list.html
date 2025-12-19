@@ -108,7 +108,7 @@
         <div class="flex items-start justify-between gap-2">
           <div>
             <h2 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
-              <a href="{% url 'core:work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+              <a href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
                 {{ w.title }}
               </a>
             </h2>
@@ -200,7 +200,7 @@
         {% for w in orders %}
           <tr class="text-sm text-slate-700 dark:text-slate-200">
             <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
-              <a class="break-words hyphens-auto" href="{% url 'core:work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
+              <a class="break-words hyphens-auto" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
             </td>
             <td class="px-4 py-3">
               <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'core:building_detail' w.building_id %}">
