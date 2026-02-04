@@ -214,8 +214,6 @@ def _resolve_todo_owner(request, raw_owner, *, required: bool = False, allow_sel
     if not _user_can_assign_todo_owner(request.user):
         return request.user
     if raw_owner in (None, "", "null"):
-        if required:
-            raise ValidationError(_("Please select a task owner."))
         return request.user
     try:
         owner_id = int(raw_owner)
@@ -500,7 +498,7 @@ def _todo_create_view(request):
             request,
             payload.get("owner"),
             required=_user_can_assign_todo_owner(request.user),
-            allow_self=False,
+            allow_self=True,
         )
     except ValidationError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
@@ -578,12 +576,11 @@ def _todo_update_view(request, item: TodoItem):
 
     if "owner" in payload and _user_can_assign_todo_owner(request.user):
         try:
-            allow_self = item.user_id == getattr(request.user, "pk", None)
             new_owner = _resolve_todo_owner(
                 request,
                 payload.get("owner"),
                 required=True,
-                allow_self=allow_self,
+                allow_self=True,
             )
         except ValidationError as exc:
             return JsonResponse({"error": str(exc)}, status=400)

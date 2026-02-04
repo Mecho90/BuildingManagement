@@ -6,3 +6,39 @@
 {% block content %}
   {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url %}
 {% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll("input[data-date-placeholder]").forEach(function (input) {
+        const nativeType = input.getAttribute("type") || "date";
+        const placeholder = input.getAttribute("data-date-placeholder") || "";
+
+        function showPlaceholder() {
+          if (!input.value) {
+            input.setAttribute("type", "text");
+            input.setAttribute("placeholder", placeholder);
+          }
+        }
+
+        function activatePicker() {
+          input.setAttribute("type", nativeType);
+          input.removeAttribute("placeholder");
+        }
+
+        input.addEventListener("focus", function () {
+          activatePicker();
+        });
+
+        input.addEventListener("blur", function () {
+          if (!input.value) {
+            showPlaceholder();
+          }
+        });
+
+        showPlaceholder();
+      });
+    });
+  </script>
+{% endblock %}

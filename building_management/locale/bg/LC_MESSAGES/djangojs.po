@@ -1,0 +1,61 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-12-17 23:09+0200\n"
+"PO-Revision-Date: 2026-02-04 08:00+0000\n"
+"Last-Translator: Codex Translator <noreply@example.com>\n"
+"Language-Team: Bulgarian <bg@example.com>\n"
+"Language: bg\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Due"
+msgstr "Краен срок"
+
+msgid "Mark done"
+msgstr "Отбележи като завършена"
+
+msgid "Edit"
+msgstr "Редактирай"
+
+msgid "Delete"
+msgstr "Изтрий"
+
+msgid "Reopen"
+msgstr "Отвори отново"
+
+msgid "Pending"
+msgstr "Изчаква"
+
+msgid "Completed"
+msgstr "Завършени"
+
+msgid "WK"
+msgstr "СЕД"
+
+msgid "Mon"
+msgstr "Пон"
+
+msgid "Tue"
+msgstr "Вто"
+
+msgid "Wed"
+msgstr "Сря"
+
+msgid "Thu"
+msgstr "Чет"
+
+msgid "Fri"
+msgstr "Пет"
+
+msgid "Sat"
+msgstr "Съб"
+
+msgid "Sun"
+msgstr "Нед"
+
+msgid "Are you sure you want to delete"
+msgstr "Сигурни ли сте, че искате да изтриете"

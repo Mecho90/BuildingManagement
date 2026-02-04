@@ -137,8 +137,9 @@ class BuildingForm(forms.ModelForm):
             if self._resolver
             else False
         )
+        self._can_assign_owner = self._user_can_assign_owner(user)
 
-        if self._can_manage_buildings:
+        if self._can_assign_owner:
             owner_queryset = (
                 User.objects.filter(
                     memberships__building__isnull=True,
@@ -160,6 +161,7 @@ class BuildingForm(forms.ModelForm):
             self.fields["owner"].widget.attrs["data-technician-users"] = ",".join(
                 str(pk) for pk in sorted(technician_ids)
             )
+            self.fields["owner"].label_from_instance = lambda obj: obj.get_full_name() or obj.get_username()
         else:
             self.fields.pop("owner", None)
 
@@ -177,7 +179,12 @@ class BuildingForm(forms.ModelForm):
                 ).exists()
         is_editing_existing = bool(getattr(self.instance, "pk", None))
         role_field = self.fields["role"]
-        if is_editing_existing and not self._is_admin:
+        if not is_editing_existing:
+            role_field.widget = forms.HiddenInput()
+            role_field.required = False
+            role_field.initial = Building.Role.TECH_SUPPORT
+            role_field.help_text = ""
+        elif is_editing_existing and not self._is_admin:
             role_field.disabled = True
             role_field.help_text = _(
                 "Only administrators can change the building role once it has been set."
@@ -192,7 +199,7 @@ class BuildingForm(forms.ModelForm):
         obj: Building = super().save(commit=False)
 
         # Safety net: users without manage permission cannot set arbitrary owners
-        if not self._can_manage_buildings and self._user is not None:
+        if not self._can_assign_owner and self._user is not None:
             obj.owner = self._user
 
         if commit:
@@ -203,7 +210,7 @@ class BuildingForm(forms.ModelForm):
 
     def _determine_owner_candidate(self):
         owner_user = getattr(self.instance, "owner", None)
-        if self._can_manage_buildings:
+        if self._can_assign_owner:
             owner_field_name = self.add_prefix("owner")
             owner_value = None
             if self.data:
@@ -217,6 +224,16 @@ class BuildingForm(forms.ModelForm):
         elif self._user is not None:
             owner_user = self._user
         return owner_user
+
+    def _user_can_assign_owner(self, user):
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        return BuildingMembership.objects.filter(
+            user=user,
+            role__in=[MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE],
+        ).exists()
 
     def _user_is_admin(self, user):
         if not user or not getattr(user, "is_authenticated", False):
@@ -251,18 +268,24 @@ class TodoItemForm(forms.ModelForm):
             choice for choice in TodoItem.Status.choices if choice[0] != TodoItem.Status.ARCHIVED
         ]
         self.fields["title"].widget.attrs.setdefault("class", "input")
+        self.fields["title"].label = _("Title")
         self.fields["status"].widget.attrs.setdefault("class", "input")
+        self.fields["status"].label = _("Status")
         self.fields["due_date"].widget.attrs.setdefault("class", "input")
         self.fields["due_date"].widget.attrs.setdefault("min", timezone.localdate().isoformat())
+        self.fields["due_date"].label = _("Due date")
+        self.fields["due_date"].widget.attrs.setdefault("data-date-placeholder", _("dd.mm.yyyy"))
         self.fields["description"].widget.attrs.setdefault("class", "input")
+        self.fields["description"].label = _("Description")
         if self._can_assign_owner:
             owner_field = forms.ModelChoiceField(
                 queryset=self._owner_queryset(),
                 label=_("Owner"),
-                required=True,
-                empty_label="---------",
+                required=False,
                 widget=forms.Select(attrs={"class": "input"}),
             )
+            owner_field.empty_label = self._current_user_label()
+            owner_field.label_from_instance = lambda obj: obj.get_full_name() or obj.get_username()
             initial_owner = None
             if getattr(self.instance, "pk", None):
                 initial_owner = getattr(self.instance, "user_id", None)
@@ -306,9 +329,12 @@ class TodoItemForm(forms.ModelForm):
         qs = User.objects.filter(is_active=True).order_by(Lower("username"))
         user_id = getattr(self.user, "pk", None)
         instance_owner = getattr(self.instance, "user_id", None)
-        if user_id and instance_owner != user_id:
-            qs = qs.exclude(pk=user_id)
         return qs
+
+    def _current_user_label(self) -> str:
+        if self.user and getattr(self.user, "is_authenticated", False):
+            return self.user.get_full_name() or self.user.get_username()
+        return _("Assign to me")
 
 
 # -----------------------------

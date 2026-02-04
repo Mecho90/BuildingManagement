@@ -17,7 +17,7 @@
         <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Предупреждения за крайни срокове" %}</h2>
         {% if deadline_alert_page and deadline_alert_page.paginator.count %}
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-            {% blocktrans count total=deadline_alert_page.paginator.count %}{{ total }} items{% plural %}{{ total }} items{% endblocktrans %}
+            {{ deadline_alert_page.paginator.count }}{{ deadline_alert_page.paginator.count|pluralize:" ЕЛЕМЕНТ, ЕЛЕМЕНТА" }}
           </span>
         {% endif %}
       </div>
@@ -64,7 +64,7 @@
           <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{{ technician_section_title }}</h2>
           {% if technician_cards_page and technician_cards_page.paginator.count %}
             <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              {% blocktrans count total=technician_cards_page.paginator.count %}{{ total }} jobs{% plural %}{{ total }} jobs{% endblocktrans %}
+              {{ technician_cards_page.paginator.count }}{{ technician_cards_page.paginator.count|pluralize:" ЗАДАЧА, ЗАДАЧИ" }}
             </span>
           {% endif %}
         </div>

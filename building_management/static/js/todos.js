@@ -459,7 +459,12 @@
       })
       .join("");
 
-    els.calendarGrid.innerHTML = `<table class="w-full border-collapse text-xs text-slate-700 dark:text-slate-100" role="grid" aria-label="Task calendar"><thead><tr>${dayNames}</tr></thead><tbody>${body}</tbody></table>`;
+    els.calendarGrid.innerHTML = `<div class="overflow-hidden rounded-2xl border border-emerald-100/60 dark:border-slate-700/70 shadow-inner">
+      <table class="w-full border-collapse text-xs text-slate-700 dark:text-slate-100" role="grid" aria-label="Task calendar">
+        <thead><tr>${dayNames}</tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>`;
   }
 
   function setCalendarStatus(message) {

@@ -20,7 +20,7 @@
       (function() {
         const ownerField = document.getElementById("{{ form.owner.auto_id }}");
         const roleField = document.getElementById("{{ form.role.auto_id }}");
-        if (!ownerField || !roleField) {
+        if (!ownerField || !roleField || roleField.type === "hidden") {
           return;
         }
         const techSetRaw = ownerField.dataset.technicianUsers || "";

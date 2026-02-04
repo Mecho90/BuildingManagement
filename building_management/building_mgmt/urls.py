@@ -4,6 +4,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.i18n import JavaScriptCatalog
 from core.auth_views import RoleAwareLoginView
 from core.views import DashboardView
 
@@ -25,6 +26,11 @@ urlpatterns = [
         "logout/",
         auth_views.LogoutView.as_view(next_page="login"),
         name="logout",
+    ),
+    path(
+        "jsi18n/",
+        JavaScriptCatalog.as_view(packages=["core"]),
+        name="javascript-catalog",
     ),
 
     # App routes (no namespace so plain names work, but not required by this file)

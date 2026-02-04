@@ -2297,9 +2297,6 @@ msgstr "Парола"
 #~ msgid "Dismiss"
 #~ msgstr "Откажи"
 
-#~ msgid "Previous"
-#~ msgstr "Предишна"
-
 #, python-format
 #~ msgid "Page %(page_obj.number)s of %(paginator.num_pages)s"
 #~ msgstr "Страница %(page_obj.number)s от %(paginator.num_pages)s"
@@ -2373,8 +2370,50 @@ msgstr "Търсене на адвокатски поръчки"
 msgid "Weekly To-Do Planner"
 msgstr "Седмичен планер със задачи"
 
+msgid "New Task"
+msgstr "Нова задача"
+
+msgid "Edit Task"
+msgstr "Редактиране на задача"
+
+msgid "To-Dos"
+msgstr "Задачи"
+
+msgid "My Tasks"
+msgstr "Моите задачи"
+
+# Translators: singular/plural counters on dashboard cards
+# Translators: singular/plural counters on dashboard cards
+msgid "%(total)s item"
+msgid_plural "%(total)s items"
+msgstr[0] "%(total)s ЕЛЕМЕНТ"
+msgstr[1] "%(total)s ЕЛЕМЕНТА"
+
+msgid "%(total)s task"
+msgid_plural "%(total)s tasks"
+msgstr[0] "%(total)s задача"
+msgstr[1] "%(total)s задачи"
+
+msgid "%(total)s job"
+msgid_plural "%(total)s jobs"
+msgstr[0] "%(total)s ЗАДАЧА"
+msgstr[1] "%(total)s ЗАДАЧИ"
+
+msgid "%(total)s request"
+msgid_plural "%(total)s requests"
+msgstr[0] "%(total)s заявка"
+msgstr[1] "%(total)s заявки"
+msgid "Total tasks: %(count)s"
+msgstr "Общо задачи: %(count)s"
+
 msgid "Add Task"
 msgstr "Добави задача"
+
+msgid "Due date"
+msgstr "Краен срок"
+
+msgid "dd.mm.yyyy"
+msgstr "дд.мм.гггг"
 
 msgid "Calendar"
 msgstr "Календар"
@@ -2397,6 +2436,27 @@ msgstr "Отмени преместването"
 msgid "Planner"
 msgstr "Планер"
 
+msgid "Assign to me"
+msgstr "Задай на мен"
+
+msgid "Pending"
+msgstr "Изчаква"
+
+msgid "Filter controls"
+msgstr "Контроли за филтриране"
+
+msgid "Delete all completed tasks? This cannot be undone."
+msgstr "Да се изтрият ли всички завършени задачи? Това действие е необратимо."
+
+msgid "Delete all"
+msgstr "Изтрий всички"
+
+msgid "Search tasks"
+msgstr "Търсене на задачи"
+
+msgid "Name or description"
+msgstr "Име или описание"
+
 msgid "Planner tabs"
 msgstr "Раздели на планера"
 
@@ -2409,6 +2469,9 @@ msgstr "Предстоящи"
 msgid "Completed"
 msgstr "Завършени"
 
+msgid "All owners"
+msgstr "Всички отговорници"
+
 msgid "No tasks for this view. Create one above to get started."
 msgstr "Няма задачи за този изглед. Създайте такава по-горе, за да започнете."
 
@@ -2418,24 +2481,39 @@ msgstr "Изтрий задача"
 msgid "Are you sure you want to delete <strong>{{ title }}</strong>?"
 msgstr "Сигурни ли сте, че искате да изтриете <strong>{{ title }}</strong>?"
 
-msgid "Yes, delete"
-msgstr "Да, изтрий"
-
 # JS strings
-msgid "Delete"
-msgstr "Изтрий"
+msgid "Previous"
+msgstr "Предишна"
+
+msgid "Delete completed tasks?"
+msgstr "Да се изтрият ли завършените задачи?"
+
+msgid "Failed to delete tasks"
+msgstr "Неуспешно изтриване на задачите"
+
+msgid "Showing"
+msgstr "Показани"
 
 msgid "Due"
 msgstr "Краен срок"
-
-msgid "Edit"
-msgstr "Редактирай"
 
 msgid "Failed to load calendar"
 msgstr "Грешка при зареждане на календара"
 
 msgid "Failed to load to-dos"
 msgstr "Грешка при зареждане на задачите"
+
+msgid "No tasks to show."
+msgstr "Няма задачи за показване."
+
+msgid "Task created."
+msgstr "Задачата е създадена."
+
+msgid "Task updated."
+msgstr "Задачата е обновена."
+
+msgid "Task deleted."
+msgstr "Задачата е изтрита."
 
 msgid "Fri"
 msgstr "Пет"
