@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import mimetypes
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -15,6 +16,23 @@ from django.db.models.functions import Lower
 from django.utils.functional import cached_property
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+
+# ---------------------------------------------------------------------------
+# Date helpers
+# ---------------------------------------------------------------------------
+
+
+def start_of_week(value: date | datetime | None = None) -> date:
+    """Return Monday of the week for the provided date (localized)."""
+    if value is None:
+        base_date = timezone.localdate()
+    elif isinstance(value, datetime):
+        base_date = timezone.localtime(value).date()
+    else:
+        base_date = value
+    offset = base_date.weekday()  # Monday == 0
+    return base_date - timedelta(days=offset)
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +116,53 @@ class WorkOrderQuerySet(models.QuerySet):
         if not can_view_confidential:
             qs = qs.filter(lawyer_only=False)
         return qs
+
+
+ROLE_TECHNICIAN = "TECHNICIAN"
+ROLE_BACKOFFICE = "BACKOFFICE"
+ROLE_ADMINISTRATOR = "ADMINISTRATOR"
+
+
+class TodoListQuerySet(models.QuerySet):
+    def for_user(self, user):
+        if not user or not getattr(user, "is_authenticated", False):
+            return self.none()
+        return self.filter(user=user)
+
+    def for_week(self, week_start_date: date | None):
+        if week_start_date is None:
+            return self
+        return self.filter(week_start=week_start_date)
+
+
+class TodoItemQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        if not user or not getattr(user, "is_authenticated", False):
+            return self.none()
+        if getattr(user, "is_superuser", False):
+            return self
+
+        Membership = apps.get_model("core", "BuildingMembership")
+        roles = set(Membership.objects.filter(user=user).values_list("role", flat=True))
+        if ROLE_ADMINISTRATOR in roles:
+            return self
+
+        base_filter = models.Q(user=user)
+        if ROLE_BACKOFFICE in roles:
+            technician_ids = (
+                Membership.objects.filter(role=ROLE_TECHNICIAN)
+                .values_list("user_id", flat=True)
+            )
+            base_filter |= models.Q(user_id__in=technician_ids)
+        return self.filter(base_filter)
+
+    def for_week(self, week_start_date: date | None):
+        if week_start_date is None:
+            return self
+        return self.filter(week_start=week_start_date)
+
+    def with_history(self):
+        return self.prefetch_related("activities")
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +525,201 @@ class WorkOrderAttachment(TimeStampedModel):
                 self.size = 0
 
         super().save(*args, **kwargs)
+
+
+class TodoList(TimeStampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="todo_lists",
+    )
+    week_start = models.DateField(db_index=True)
+    title = models.CharField(max_length=255, blank=True)
+
+    objects = TodoListQuerySet.as_manager()
+
+    class Meta:
+        ordering = ("-week_start", "-id")
+        unique_together = ("user", "week_start")
+        indexes = [
+            models.Index(fields=("user", "week_start")),
+        ]
+        verbose_name = _("To-do list")
+        verbose_name_plural = _("To-do lists")
+
+    def save(self, *args, **kwargs):
+        self.week_start = start_of_week(self.week_start)
+        if not self.title:
+            week_label = self.week_start.strftime("%Y-%m-%d")
+            self.title = _("Week of %(week)s") % {"week": week_label}
+        super().save(*args, **kwargs)
+
+
+class TodoItem(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending")
+        IN_PROGRESS = "in_progress", _("In progress")
+        DONE = "done", _("Done")
+        ARCHIVED = "archived", _("Archived")
+
+    todo_list = models.ForeignKey(
+        TodoList,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="todo_items",
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    week_start = models.DateField(db_index=True)
+
+    objects = TodoItemQuerySet.as_manager()
+
+    class Meta:
+        ordering = ("due_date", "pk")
+        indexes = [
+            models.Index(fields=("user", "week_start")),
+            models.Index(fields=("user", "status")),
+        ]
+        verbose_name = _("To-do item")
+        verbose_name_plural = _("To-do items")
+
+    def _resolve_week_start(self) -> date:
+        reference = self.week_start or self.due_date or timezone.localdate()
+        return start_of_week(reference)
+
+    def _ensure_list(self):
+        desired_week = self._resolve_week_start()
+        if not self.user_id and self.todo_list_id:
+            self.user = self.todo_list.user
+        if not self.todo_list_id or self.todo_list.week_start != desired_week:
+            list_obj, _ = TodoList.objects.get_or_create(
+                user=self.user,
+                week_start=desired_week,
+                defaults={"title": ""},
+            )
+            self.todo_list = list_obj
+        self.week_start = desired_week
+
+    def save(self, *args, **kwargs):
+        if not self.user_id and self.todo_list_id:
+            self.user = self.todo_list.user
+        if not self.week_start and not self.due_date:
+            self.week_start = start_of_week()
+        self._ensure_list()
+        if self.status == self.Status.DONE and not self.completed_at:
+            self.completed_at = timezone.now()
+        elif self.status in {self.Status.PENDING, self.Status.IN_PROGRESS}:
+            self.completed_at = None
+        super().save(*args, **kwargs)
+
+    def log_activity(self, *, action: str, actor=None, metadata=None):
+        metadata = metadata or {}
+        return TodoActivity.objects.create(
+            todo_item=self,
+            actor=actor,
+            action=action,
+            metadata=metadata,
+        )
+
+    def set_status(self, new_status: str, *, actor=None, metadata=None):
+        if new_status not in dict(self.Status.choices):
+            raise ValidationError({"status": _("Invalid status.")})
+        if self.status == new_status:
+            return
+        previous = self.status
+        self.status = new_status
+        if new_status == self.Status.DONE and not self.completed_at:
+            self.completed_at = timezone.now()
+        elif new_status in {self.Status.PENDING, self.Status.IN_PROGRESS}:
+            self.completed_at = None
+        self.save(update_fields=["status", "completed_at", "updated_at"])
+        payload = {"from": previous, "to": new_status}
+        if metadata:
+            payload.update(metadata)
+        self.log_activity(
+            action=TodoActivity.Action.STATUS_CHANGED,
+            actor=actor,
+            metadata=payload,
+        )
+        try:
+            from .services.todos import TodoHistoryService
+
+            TodoHistoryService(self).handle_status_change(previous_status=previous, actor=actor)
+        except Exception:  # pragma: no cover
+            pass
+
+
+class TodoActivity(TimeStampedModel):
+    class Action(models.TextChoices):
+        CREATED = "created", _("Created")
+        UPDATED = "updated", _("Updated")
+        STATUS_CHANGED = "status_changed", _("Status changed")
+        DELETED = "deleted", _("Deleted")
+
+    todo_item = models.ForeignKey(
+        TodoItem,
+        on_delete=models.CASCADE,
+        related_name="activities",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="todo_activities",
+    )
+    action = models.CharField(max_length=32, choices=Action.choices)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = _("To-do activity")
+        verbose_name_plural = _("To-do activities")
+
+
+class TodoWeekSnapshot(TimeStampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="todo_week_snapshots",
+    )
+    todo_item = models.ForeignKey(
+        TodoItem,
+        on_delete=models.CASCADE,
+        related_name="week_snapshots",
+    )
+    week_start = models.DateField(db_index=True)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    completed_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True, db_index=True)
+    reopened_at = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-week_start", "-completed_at")
+        indexes = [
+            models.Index(fields=("user", "week_start")),
+            models.Index(fields=("todo_item", "week_start")),
+        ]
+        verbose_name = _("Weekly to-do snapshot")
+        verbose_name_plural = _("Weekly to-do snapshots")
+
+    def __str__(self):  # pragma: no cover
+        return f"{self.title} ({self.week_start})"
 
 
 class NotificationQuerySet(models.QuerySet):

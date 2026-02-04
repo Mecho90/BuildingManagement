@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{{ form_title|default:_("New Task") }} · {% trans "Building Management" %}{% endblock %}
+
+{% block content %}
+  {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url %}
+{% endblock %}

@@ -19,6 +19,7 @@ from .models import (
     Building,
     BuildingMembership,
     MembershipRole,
+    TodoItem,
     Unit,
     WorkOrder,
     WorkOrderAttachment,
@@ -129,7 +130,8 @@ class BuildingForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self._user = user
         self._resolver = CapabilityResolver(user) if user and user.is_authenticated else None
-        self._is_admin = self._user_is_admin(user)
+        user_admin_check = getattr(self, "_user_is_admin", None)
+        self._is_admin = user_admin_check(user) if callable(user_admin_check) else False
         self._can_manage_buildings = (
             self._resolver.has(Capability.MANAGE_BUILDINGS)
             if self._resolver
@@ -211,7 +213,7 @@ class BuildingForm(forms.ModelForm):
                 try:
                     owner_user = User.objects.get(pk=owner_value)
                 except (User.DoesNotExist, ValueError, TypeError):
-                    owner_user = owner_user
+                    pass
         elif self._user is not None:
             owner_user = self._user
         return owner_user
@@ -230,6 +232,83 @@ class BuildingForm(forms.ModelForm):
         else:
             memberships = memberships.filter(building__isnull=True)
         return memberships.exists()
+
+
+class TodoItemForm(forms.ModelForm):
+    class Meta:
+        model = TodoItem
+        fields = ["title", "status", "due_date", "description"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+            "due_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self._can_assign_owner = self._user_can_assign_owner(user)
+        self.fields["status"].choices = [
+            choice for choice in TodoItem.Status.choices if choice[0] != TodoItem.Status.ARCHIVED
+        ]
+        self.fields["title"].widget.attrs.setdefault("class", "input")
+        self.fields["status"].widget.attrs.setdefault("class", "input")
+        self.fields["due_date"].widget.attrs.setdefault("class", "input")
+        self.fields["due_date"].widget.attrs.setdefault("min", timezone.localdate().isoformat())
+        self.fields["description"].widget.attrs.setdefault("class", "input")
+        if self._can_assign_owner:
+            owner_field = forms.ModelChoiceField(
+                queryset=self._owner_queryset(),
+                label=_("Owner"),
+                required=True,
+                empty_label="---------",
+                widget=forms.Select(attrs={"class": "input"}),
+            )
+            initial_owner = None
+            if getattr(self.instance, "pk", None):
+                initial_owner = getattr(self.instance, "user_id", None)
+            elif self.initial.get("owner"):
+                initial_owner = self.initial.get("owner")
+            if initial_owner:
+                owner_field.initial = initial_owner
+            self.fields["owner"] = owner_field
+
+    def clean_due_date(self):
+        due = self.cleaned_data.get("due_date")
+        if due and due < timezone.localdate():
+            raise forms.ValidationError(_("Due date cannot be in the past."))
+        return due
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        owner = self.cleaned_data.get("owner") if self._can_assign_owner else None
+        target_owner = owner or (self.user if self.user and getattr(self.user, "is_authenticated", False) else None)
+        if target_owner is None:
+            # Fallback to the existing relation if present; otherwise raise a clear error.
+            target_owner = getattr(obj, "user", None)
+        if target_owner is None:
+            raise forms.ValidationError(_("A task owner is required."))
+        obj.user = target_owner
+        if commit:
+            obj.save()
+        return obj
+
+    def _user_can_assign_owner(self, user):
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        roles = set(
+            BuildingMembership.objects.filter(user=user).values_list("role", flat=True)
+        )
+        return bool(roles & {MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR})
+
+    def _owner_queryset(self):
+        qs = User.objects.filter(is_active=True).order_by(Lower("username"))
+        user_id = getattr(self.user, "pk", None)
+        instance_owner = getattr(self.instance, "user_id", None)
+        if user_id and instance_owner != user_id:
+            qs = qs.exclude(pk=user_id)
+        return qs
 
 
 # -----------------------------

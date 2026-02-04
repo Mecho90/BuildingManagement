@@ -1,27 +1,12 @@
-const path = require('path');
+require('dotenv').config({ path: '.env' });
 
-let loaded = false;
-
-function ensurePlaywrightEnv() {
-  if (loaded) {
-    return;
+function credentials() {
+  const username = process.env.E2E_TODO_USERNAME;
+  const password = process.env.E2E_TODO_PASSWORD;
+  if (username && password) {
+    return { username, password };
   }
-  loaded = true;
-
-  try {
-    const dotenv = require('dotenv');
-    // Load base .env if present, then override with a dedicated Playwright file.
-    dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-    dotenv.config({ path: path.resolve(process.cwd(), '.env.playwright') });
-  } catch (error) {
-    // Fail gracefully if dotenv is not installed yet; the auth helper will still error later
-    // with a clear message when credentials are required.
-    if (process.env.NODE_ENV !== 'test') {
-      console.warn('[playwright] Unable to load dotenv configuration:', error.message);
-    }
-  }
+  return null;
 }
 
-module.exports = {
-  ensurePlaywrightEnv,
-};
+module.exports = { credentials };

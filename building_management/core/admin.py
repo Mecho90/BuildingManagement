@@ -5,6 +5,9 @@ from .models import (
     BuildingMembership,
     Notification,
     RoleAuditLog,
+    TodoActivity,
+    TodoItem,
+    TodoList,
     Unit,
     WorkOrder,
     WorkOrderAttachment,
@@ -50,6 +53,38 @@ class WorkOrderAdmin(admin.ModelAdmin):
     list_select_related = ("building", "unit")
     autocomplete_fields = ("building", "unit")
     inlines = (WorkOrderAttachmentInline,)
+
+
+class TodoActivityInline(admin.TabularInline):
+    model = TodoActivity
+    extra = 0
+    readonly_fields = ("action", "actor", "metadata", "created_at", "updated_at")
+    can_delete = False
+
+
+@admin.register(TodoItem)
+class TodoItemAdmin(admin.ModelAdmin):
+    list_display = ("title", "user", "status", "due_date", "week_start", "completed_at")
+    list_filter = ("status", "week_start")
+    search_fields = ("title", "description", "user__username")
+    autocomplete_fields = ("user", "todo_list")
+    inlines = (TodoActivityInline,)
+
+
+@admin.register(TodoList)
+class TodoListAdmin(admin.ModelAdmin):
+    list_display = ("title", "user", "week_start", "created_at")
+    list_filter = ("week_start",)
+    search_fields = ("title", "user__username")
+    autocomplete_fields = ("user",)
+
+
+@admin.register(TodoActivity)
+class TodoActivityAdmin(admin.ModelAdmin):
+    list_display = ("todo_item", "action", "actor", "created_at")
+    list_filter = ("action",)
+    search_fields = ("todo_item__title", "actor__username")
+    autocomplete_fields = ("todo_item", "actor")
 
 
 @admin.register(Notification)

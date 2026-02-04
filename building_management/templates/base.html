@@ -47,6 +47,11 @@
                 <a href="{% url 'core:dashboard' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/' %}">
                   {% trans "Dashboard" %}
                 </a>
+                {% if todos_enabled and todos_url %}
+                  <a href="{{ todos_url }}" class="relative inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/todos/' %}">
+                    {% trans "To-Dos" %}
+                  </a>
+                {% endif %}
                 <a href="{% url 'core:buildings_list' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/buildings/' %}">
                   {% trans "Buildings" %}
                 </a>

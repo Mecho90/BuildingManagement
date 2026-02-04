@@ -45,6 +45,11 @@ urlpatterns = [
     ),
     
     
+    path("todos/", views.TodoListPageView.as_view(), name="todo_list"),
+    path("todos/new/", views.TodoCreateView.as_view(), name="todo_create"),
+    path("todos/<int:pk>/edit/", views.TodoUpdateView.as_view(), name="todo_edit"),
+    path("todos/<int:pk>/delete/", views.TodoDeleteView.as_view(), name="todo_delete"),
+
     # Work Orders    
     path("work-orders/", views.WorkOrderListView.as_view(), name="work_orders_list"),
     path("work-orders/lawyer/", views.LawyerWorkOrderListView.as_view(), name="lawyer_work_orders"),
@@ -79,6 +84,11 @@ urlpatterns = [
     # APIs (optional)
     path("api/buildings/", views.api_buildings, name="api_buildings"),
     path("api/buildings/<int:building_id>/units/", views.api_units, name="api_units"),
+    path("api/todos/", views.api_todos, name="api_todos"),
+    path("api/todos/<int:pk>/", views.api_todo_detail, name="api_todo_detail"),
+    path("api/todos/completed/", views.api_todo_completed_clear, name="api_todo_completed_clear"),
+    path("api/todos/ics/", views.todo_ics_feed, name="todo_ics_feed"),
+    path("api/todos/calendar/", views.api_todo_calendar, name="api_todo_calendar"),
     path(
         "api/work-orders/<int:pk>/attachments/",
         views.api_workorder_attachments,

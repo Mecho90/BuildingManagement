@@ -62,6 +62,17 @@ __all__ = [
 ]
 
 
+def _user_can_filter_owner(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return BuildingMembership.objects.filter(
+        user=user,
+        role__in=[MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE],
+    ).exists()
+
+
 class LawyerOrAdminRequiredMixin(UserPassesTestMixin):
     def test_func(self):
         user = self.request.user
@@ -528,6 +539,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         user = request.user
         resolver = CapabilityResolver(user) if user.is_authenticated else None
         self._can_view_all = resolver.has(Capability.VIEW_ALL_BUILDINGS) if resolver else False
+        self._can_filter_owner = self._can_view_all or _user_can_filter_owner(user)
 
         # Page size (validated later in get_paginate_by)
         try:
@@ -565,7 +577,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
         # Build owner choices for staff (before additional filters)
         self._owner_choices: list[dict[str, str]] = []
-        if self._can_view_all:
+        if self._can_filter_owner:
             owner_ids = (
                 Building.objects.filter(work_orders__in=base_qs)
                 .values_list("owner_id", flat=True)
@@ -573,6 +585,8 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
             )
             owner_ids = [oid for oid in owner_ids if oid]
             self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
+        else:
+            self._owner_choices = []
 
         # Priority ordering: High > Medium > Low, then by deadline asc, then newest
         qs = qs.annotate(
@@ -611,9 +625,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 owner_filter = None
 
         if owner_filter:
-            if self._can_view_all:
-                qs = qs.filter(building__owner_id=owner_filter)
-            elif owner_filter == user.id:
+            if self._can_filter_owner:
                 qs = qs.filter(building__owner_id=owner_filter)
             else:
                 owner_param = ""
@@ -635,7 +647,7 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         if sort_param not in sort_map:
             sort_param = "priority"
 
-        if sort_param in {"owner", "owner_desc"} and not self._can_view_all:
+        if sort_param in {"owner", "owner_desc"} and not self._can_filter_owner:
             sort_param = "priority"
 
         qs = qs.order_by(*sort_map[sort_param])
@@ -688,12 +700,12 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                     ("owner", _("Owner (A → Z)")),
                     ("owner_desc", _("Owner (Z → A)")),
                 ],
-                "show_owner_info": getattr(self, "_can_view_all", False),
+                "show_owner_info": getattr(self, "_can_filter_owner", False),
                 "pagination_query": _querystring_without(self.request, "page"),
                 "total_orders": total_orders,
             }
         )
-        if not getattr(self, "_can_view_all", False):
+        if not getattr(self, "_can_filter_owner", False):
             ctx["sort_choices"] = [
                 choice for choice in ctx["sort_choices"]
                 if not choice[0].startswith("owner")

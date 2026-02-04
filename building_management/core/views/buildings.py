@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Case, IntegerField, Q, When
+from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
@@ -45,6 +47,19 @@ __all__ = [
     "UnitDeleteView",
 ]
 
+User = get_user_model()
+
+
+def _user_can_filter_building_owner(user) -> bool:
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return BuildingMembership.objects.filter(
+        user=user,
+        role__in=[MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE],
+    ).exists()
+
 class BuildingListView(LoginRequiredMixin, ListView):
     model = Building
     template_name = "core/buildings_list.html"
@@ -60,6 +75,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
         user = self.request.user
         resolver = CapabilityResolver(user) if user.is_authenticated else None
         self._can_manage_buildings = resolver.has(Capability.MANAGE_BUILDINGS) if resolver else False
+        self._can_filter_owner = _user_can_filter_building_owner(user)
 
         # Per-user visibility + annotate the exact stats the template uses
         qs = (
@@ -76,6 +92,34 @@ class BuildingListView(LoginRequiredMixin, ListView):
                 | Q(address__icontains=q)
                 | Q(owner__username__icontains=q)
             )
+
+        owner_param = (self.request.GET.get("owner") or "").strip()
+        self._owner_filter = ""
+        self._owner_options: list[dict[str, str]] = []
+        if self._can_filter_owner:
+            owner_ids = list(qs.values_list("owner_id", flat=True).distinct())
+            owners = (
+                User.objects.filter(pk__in=owner_ids)
+                .order_by(Lower("first_name"), Lower("last_name"), Lower("username"))
+            )
+            self._owner_options = [
+                {
+                    "value": str(owner.pk),
+                    "label": owner.get_full_name() or owner.username,
+                }
+                for owner in owners
+                if owner.pk
+            ]
+            if owner_param:
+                try:
+                    owner_id = int(owner_param)
+                except (TypeError, ValueError):
+                    owner_param = ""
+                else:
+                    qs = qs.filter(owner_id=owner_id)
+                    self._owner_filter = str(owner_id)
+        else:
+            owner_param = ""
 
         # Sorting
         sort = (self.request.GET.get("sort") or "name").strip()
@@ -122,6 +166,8 @@ class BuildingListView(LoginRequiredMixin, ListView):
         can_manage_buildings = getattr(self, "_can_manage_buildings", False)
         ctx["show_owner_column"] = can_manage_buildings
         ctx["can_manage_buildings"] = can_manage_buildings
+        ctx["owner_options"] = getattr(self, "_owner_options", [])
+        ctx["owner_filter"] = getattr(self, "_owner_filter", "")
 
         ctx["pagination_query"] = _querystring_without(self.request, "page")
         paginator = ctx.get("paginator")

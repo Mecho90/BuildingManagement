@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 
 from .authz import Capability, CapabilityResolver
-from .models import MembershipRole
+from .models import MembershipRole, TodoItem, start_of_week
 from .utils.roles import user_has_role, user_is_lawyer
 
 
@@ -22,6 +23,9 @@ def theme(request):
         "role_audit_url": "",
         "lawyer_orders_enabled": False,
         "lawyer_orders_url": "",
+        "todos_enabled": False,
+        "todos_url": "",
+        "todos_badge_count": 0,
     }
 
     user = getattr(request, "user", None)
@@ -63,4 +67,23 @@ def theme(request):
                 data["role_audit_enabled"] = True
             except NoReverseMatch:
                 pass
+        try:
+            data["todos_url"] = reverse("core:todo_list")
+            data["todos_enabled"] = True
+        except NoReverseMatch:
+            pass
+        try:
+            week_start = start_of_week()
+            badge_count = (
+                TodoItem.objects.filter(
+                    user=user,
+                    status__in=[TodoItem.Status.PENDING, TodoItem.Status.IN_PROGRESS],
+                    week_start=week_start,
+                )
+                .only("id")
+                .count()
+            )
+            data["todos_badge_count"] = badge_count
+        except Exception:
+            data["todos_badge_count"] = 0
     return data

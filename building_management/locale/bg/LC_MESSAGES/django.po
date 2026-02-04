@@ -2368,3 +2368,125 @@ msgstr ""
 #: templates/core/lawyer_work_orders.html:21
 msgid "Search lawyer work orders"
 msgstr "Търсене на адвокатски поръчки"
+
+# -- To-Do planner translations --
+msgid "Weekly To-Do Planner"
+msgstr "Седмичен планер със задачи"
+
+msgid "Add Task"
+msgstr "Добави задача"
+
+msgid "Calendar"
+msgstr "Календар"
+
+msgid "Calendar navigation"
+msgstr "Навигация по календара"
+
+msgid "Previous month"
+msgstr "Предишен месец"
+
+msgid "Next month"
+msgstr "Следващ месец"
+
+msgid "Today"
+msgstr "Днес"
+
+msgid "Cancel move"
+msgstr "Отмени преместването"
+
+msgid "Planner"
+msgstr "Планер"
+
+msgid "Planner tabs"
+msgstr "Раздели на планера"
+
+msgid "This Week"
+msgstr "Тази седмица"
+
+msgid "Upcoming"
+msgstr "Предстоящи"
+
+msgid "Completed"
+msgstr "Завършени"
+
+msgid "No tasks for this view. Create one above to get started."
+msgstr "Няма задачи за този изглед. Създайте такава по-горе, за да започнете."
+
+msgid "Delete task"
+msgstr "Изтрий задача"
+
+msgid "Are you sure you want to delete <strong>{{ title }}</strong>?"
+msgstr "Сигурни ли сте, че искате да изтриете <strong>{{ title }}</strong>?"
+
+msgid "Yes, delete"
+msgstr "Да, изтрий"
+
+# JS strings
+msgid "Delete"
+msgstr "Изтрий"
+
+msgid "Due"
+msgstr "Краен срок"
+
+msgid "Edit"
+msgstr "Редактирай"
+
+msgid "Failed to load calendar"
+msgstr "Грешка при зареждане на календара"
+
+msgid "Failed to load to-dos"
+msgstr "Грешка при зареждане на задачите"
+
+msgid "Fri"
+msgstr "Пет"
+
+msgid "Loading…"
+msgstr "Зареждане…"
+
+msgid "Mark done"
+msgstr "Отбележи като завършена"
+
+msgid "Mon"
+msgstr "Пон"
+
+msgid "Moved"
+msgstr "Преместена"
+
+msgid "No tasks on"
+msgstr "Няма задачи на"
+
+msgid "Reopen"
+msgstr "Отвори отново"
+
+msgid "Request failed"
+msgstr "Заявката се провали"
+
+msgid "Reschedule cancelled."
+msgstr "Промяната на дата е отменена."
+
+msgid "Sat"
+msgstr "Съб"
+
+msgid "Select a new date for"
+msgstr "Изберете нова дата за"
+
+msgid "Sun"
+msgstr "Нед"
+
+msgid "Thu"
+msgstr "Чет"
+
+msgid "Tue"
+msgstr "Вто"
+
+msgid "Wed"
+msgstr "Сря"
+
+msgid "task on"
+msgstr "задача на"
+
+msgid "tasks on"
+msgstr "задачи на"
+
+msgid "to"
+msgstr "до"

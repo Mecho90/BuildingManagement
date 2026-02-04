@@ -6,15 +6,24 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.urls import reverse
 from django.utils import formats, timezone, translation
 from django.utils.translation import gettext as _, ngettext
 from django.views.generic import TemplateView
 
 from ..authz import Capability, CapabilityResolver
-from ..models import Building, MembershipRole, Notification, WorkOrder, WorkOrderAuditLog
+from ..models import (
+    Building,
+    MembershipRole,
+    Notification,
+    TodoItem,
+    WorkOrder,
+    WorkOrderAuditLog,
+    start_of_week,
+)
 from ..utils.roles import user_can_approve_work_orders, user_is_lawyer
 from ..services import NotificationService
-from .common import _querystring_without
+from .common import _querystring_without, _safe_next_url
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -46,6 +55,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["deadline_page_query"] = deadline_query
         ctx["assignment_load"] = self._assignment_load(user)
         ctx.update(self._notifications_context())
+        todo_page = self._todo_cards(user)
+        ctx["todo_cards_page"] = todo_page
+        ctx["todo_cards"] = todo_page.object_list if todo_page else []
+        ctx["todo_page_query"] = _querystring_without(self.request, "todo_page")
         return ctx
 
     # ------------------------------------------------------------------ helpers
@@ -155,6 +168,43 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             )
 
         return cards
+
+    def _todo_cards(self, user):
+        if not user or not user.is_authenticated:
+            empty_page = Paginator([], 1).get_page(1)
+            return empty_page
+        active_statuses = [TodoItem.Status.PENDING, TodoItem.Status.IN_PROGRESS]
+        today = timezone.localdate()
+        default_week = start_of_week(today)
+        qs = (
+            TodoItem.objects.filter(user=user, status__in=active_statuses)
+            .filter(Q(due_date=today) | Q(due_date__isnull=True, week_start=default_week))
+            .order_by("due_date", "week_start", "-pk")
+        )
+        cards = []
+        next_target = self.request.get_full_path()
+        items = []
+        for item in qs:
+            due_date = item.due_date or item.week_start or default_week
+            due_display = formats.date_format(due_date, "DATE_FORMAT") if due_date else _("No date")
+            items.append(
+                {
+                    "id": item.pk,
+                    "title": item.title,
+                    "description": item.description,
+                    "status_label": item.get_status_display(),
+                    "status_code": item.status,
+                    "due_display": due_display,
+                    "url": f"{reverse('core:todo_edit', args=[item.pk])}?next={next_target}",
+                    "delete_url": f"{reverse('core:todo_delete', args=[item.pk])}?next={next_target}",
+                }
+            )
+        paginator = Paginator(items, 4)
+        try:
+            page_number = int(self.request.GET.get("todo_page", 1))
+        except (TypeError, ValueError):
+            page_number = 1
+        return paginator.get_page(page_number)
 
     def _deadline_alert_cards(self, user):
         query = _querystring_without(self.request, "deadline_page")

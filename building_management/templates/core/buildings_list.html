@@ -33,6 +33,18 @@
           />
         </div>
 
+        {% if owner_options %}
+          <div class="space-y-2">
+            <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+            <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+              <option value="" {% if not owner_filter %}selected{% endif %}>{% trans "All owners" %}</option>
+              {% for opt in owner_options %}
+                <option value="{{ opt.value }}" {% if owner_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+
         <div class="space-y-2">
           <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
           <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
@@ -45,7 +57,7 @@
 
         <div class="flex justify-end gap-2">
           <button class="btn" type="submit">{% trans "Filter" %}</button>
-          {% if q or sort != 'name' or per != 25 %}
+          {% if q or owner_filter or sort != 'name' or per != 25 %}
             <a class="btn btn-secondary" href="{{ buildings_reset_url }}">{% trans "Reset" %}</a>
           {% endif %}
         </div>
@@ -101,11 +113,11 @@
             <th class="px-4 py-3">
               {% with field='name' %}
                 {% if sort == field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=-name&per={{ per }}">{% trans "Name" %} ▲</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-name&per={{ per }}">{% trans "Name" %} ▲</a>
                 {% elif sort == '-'|add:field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=name&per={{ per }}">{% trans "Name" %} ▼</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=name&per={{ per }}">{% trans "Name" %} ▼</a>
                 {% else %}
-                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}&sort=name&per={{ per }}">{% trans "Name" %}</a>
+                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=name&per={{ per }}">{% trans "Name" %}</a>
                 {% endif %}
               {% endwith %}
             </th>
@@ -113,11 +125,11 @@
               <th class="px-4 py-3">
                 {% with field='owner' %}
                   {% if sort == field %}
-                    <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=-owner&per={{ per }}">{% trans "Owner" %} ▲</a>
+                    <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-owner&per={{ per }}">{% trans "Owner" %} ▲</a>
                   {% elif sort == '-'|add:field %}
-                    <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=owner&per={{ per }}">{% trans "Owner" %} ▼</a>
+                    <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=owner&per={{ per }}">{% trans "Owner" %} ▼</a>
                   {% else %}
-                    <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}&sort=owner&per={{ per }}">{% trans "Owner" %}</a>
+                    <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=owner&per={{ per }}">{% trans "Owner" %}</a>
                   {% endif %}
                 {% endwith %}
               </th>
@@ -125,44 +137,44 @@
             <th class="px-4 py-3">
               {% with field='role' %}
                 {% if sort == field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=-role&per={{ per }}">{% trans "Role" %} ▲</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-role&per={{ per }}">{% trans "Role" %} ▲</a>
                 {% elif sort == '-'|add:field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=role&per={{ per }}">{% trans "Role" %} ▼</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=role&per={{ per }}">{% trans "Role" %} ▼</a>
                 {% else %}
-                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}&sort=role&per={{ per }}">{% trans "Role" %}</a>
+                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=role&per={{ per }}">{% trans "Role" %}</a>
                 {% endif %}
               {% endwith %}
             </th>
             <th class="px-4 py-3">
               {% with field='address' %}
                 {% if sort == field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=-address&per={{ per }}">{% trans "Address" %} ▲</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-address&per={{ per }}">{% trans "Address" %} ▲</a>
                 {% elif sort == '-'|add:field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=address&per={{ per }}">{% trans "Address" %} ▼</a>
+                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=address&per={{ per }}">{% trans "Address" %} ▼</a>
                 {% else %}
-                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}&sort=address&per={{ per }}">{% trans "Address" %}</a>
+                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=address&per={{ per }}">{% trans "Address" %}</a>
                 {% endif %}
               {% endwith %}
             </th>
             <th class="px-4 py-3 text-right">
               {% with field='units_count' %}
                 {% if sort == field %}
-                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=-units_count&per={{ per }}">{% trans "Units" %} ▲</a>
+                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-units_count&per={{ per }}">{% trans "Units" %} ▲</a>
                 {% elif sort == '-'|add:field %}
-                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=units_count&per={{ per }}">{% trans "Units" %} ▼</a>
+                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=units_count&per={{ per }}">{% trans "Units" %} ▼</a>
                 {% else %}
-                  <a class="flex justify-end gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}&sort=units_count&per={{ per }}">{% trans "Units" %}</a>
+                  <a class="flex justify-end gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=units_count&per={{ per }}">{% trans "Units" %}</a>
                 {% endif %}
               {% endwith %}
             </th>
             <th class="px-4 py-3 text-right">
               {% with field='work_orders_count' %}
                 {% if sort == field %}
-                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=-work_orders_count&per={{ per }}">{% trans "Work Orders" %} ▲</a>
+                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-work_orders_count&per={{ per }}">{% trans "Work Orders" %} ▲</a>
                 {% elif sort == '-'|add:field %}
-                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}&sort=work_orders_count&per={{ per }}">{% trans "Work Orders" %} ▼</a>
+                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=work_orders_count&per={{ per }}">{% trans "Work Orders" %} ▼</a>
                 {% else %}
-                  <a class="flex justify-end gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}&sort=work_orders_count&per={{ per }}">{% trans "Work Orders" %}</a>
+                  <a class="flex justify-end gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=work_orders_count&per={{ per }}">{% trans "Work Orders" %}</a>
                 {% endif %}
               {% endwith %}
             </th>
