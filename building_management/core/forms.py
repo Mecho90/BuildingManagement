@@ -304,10 +304,12 @@ class TodoItemForm(forms.ModelForm):
     def save(self, commit=True):
         obj = super().save(commit=False)
         owner = self.cleaned_data.get("owner") if self._can_assign_owner else None
-        target_owner = owner or (self.user if self.user and getattr(self.user, "is_authenticated", False) else None)
-        if target_owner is None:
-            # Fallback to the existing relation if present; otherwise raise a clear error.
+        if owner is not None:
+            target_owner = owner
+        else:
             target_owner = getattr(obj, "user", None)
+            if target_owner is None and self.user and getattr(self.user, "is_authenticated", False):
+                target_owner = self.user
         if target_owner is None:
             raise forms.ValidationError(_("A task owner is required."))
         obj.user = target_owner

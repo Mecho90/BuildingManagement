@@ -1,0 +1,64 @@
+{% load i18n form_helpers %}
+{% with widget=field.field.widget input_type=field.field.widget.input_type|default_if_none:"" %}
+  {% with attr_icon=field.field.widget.attrs|dict_get:"icon" %}
+    {% with label_text=label|default:field.label help_text=help_text|default:field.help_text icon_name=icon|default:attr_icon %}
+      {% if input_type == "checkbox" %}
+        <div class="form-field form-field--choice">
+          <label class="form-field__choice">
+            {{ field }}
+            <span>
+            {{ label_text }}
+            {% if help_text %}
+              <span class="form-field__support">{{ help_text|safe }}</span>
+            {% endif %}
+          </span>
+        </label>
+        {% if field.errors %}
+          <div class="form-field__errors">
+            {% for error in field.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="form-field">
+        {% if label_text %}
+          <label class="form-field__label" for="{{ field.id_for_label }}">
+            {{ label_text }}
+            {% if field.field.required %}
+              <span class="form-field__required" aria-hidden="true">*</span>
+            {% endif %}
+          </label>
+        {% endif %}
+        <div class="form-field__control{% if icon_name %} form-field__control--with-icon{% endif %}">
+          {{ field }}
+          {% if icon_name %}
+            <span class="form-field__icon" aria-hidden="true">
+              {% if icon_name == "user" %}
+                {% include "components/icons/user.svg" %}
+              {% elif icon_name == "mail" %}
+                {% include "components/icons/mail.svg" %}
+              {% elif icon_name == "lock" %}
+                {% include "components/icons/lock.svg" %}
+              {% else %}
+                {{ icon_name|safe }}
+              {% endif %}
+            </span>
+          {% endif %}
+        </div>
+        {% if help_text %}
+          <p class="form-field__support">{{ help_text|safe }}</p>
+        {% endif %}
+        {% if field.errors %}
+          <div class="form-field__errors">
+            {% for error in field.errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% endwith %}
+  {% endwith %}
+{% endwith %}

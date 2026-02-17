@@ -13,9 +13,7 @@
   <form method="post" class="space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-card dark:border-slate-800 dark:bg-slate-900">
     {% csrf_token %}
     {% if form.non_field_errors %}
-      <div class="alert alert--danger">
-        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
-      </div>
+      {% include "components/alert.html" with variant="danger" items=form.non_field_errors aria_live="assertive" %}
     {% endif %}
     <div class="space-y-2">
       <label class="text-sm font-medium text-slate-600 dark:text-slate-200" for="{{ form.technician_subrole.id_for_label }}">{{ form.technician_subrole.label }}</label>

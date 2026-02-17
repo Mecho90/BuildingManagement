@@ -31,6 +31,22 @@ PostgreSQL is recommended for production, but the project falls back to SQLite w
    python manage.py runserver
    ```
 
+### Auto-fixing the Core Schema (development only)
+
+Set `DJANGO_AUTO_FIX_CORE_SCHEMA=1` in your `.env` **only when `DEBUG=True`** to let
+`EnsureCoreSchemaMiddleware` verify tables/columns on the first request and run
+`python manage.py migrate` automatically if something is missing. In production
+the middleware will never run migrations; instead it logs a clear error instructing
+operators to run `python manage.py migrate` manually. Keeping this safeguard
+dev-only prevents unintended schema changes during live traffic.
+
+### UI tokens & components
+
+The shared typography scale, spacing tokens, and button/panel utilities live
+in `static/css/theme-overrides.css`. See `docs/ui.md` for a quick reference on
+`.ui-panel`, `.ui-card`, `.status-chip`, and `btn` variants so new templates
+stay consistent across the app.
+
 ## Production Quickstart
 
 1. Install dependencies and build static assets (once per deploy):

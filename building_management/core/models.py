@@ -836,6 +836,21 @@ class Capability:
     VIEW_USERS = "view_users"
     VIEW_CONFIDENTIAL_WORK_ORDERS = "view_confidential_work_orders"
 
+    @classmethod
+    def all(cls) -> set[str]:
+        return {
+            cls.VIEW_ALL_BUILDINGS,
+            cls.MANAGE_BUILDINGS,
+            cls.CREATE_UNITS,
+            cls.CREATE_WORK_ORDERS,
+            cls.MASS_ASSIGN,
+            cls.APPROVE_WORK_ORDERS,
+            cls.VIEW_AUDIT_LOG,
+            cls.MANAGE_MEMBERSHIPS,
+            cls.VIEW_USERS,
+            cls.VIEW_CONFIDENTIAL_WORK_ORDERS,
+        }
+
 
 ROLE_CAPABILITIES: dict[str, set[str]] = {
     MembershipRole.TECHNICIAN: {
@@ -886,6 +901,17 @@ def _normalize_capability_list(values):
     return normalized
 
 
+def _validate_capability_entries(values):
+    values = values or []
+    known = Capability.all()
+    invalid = sorted({value for value in values if value and value not in known})
+    if invalid:
+        raise ValidationError(
+            _("Unknown capability/capabilities: %(values)s."),
+            params={"values": ", ".join(invalid)},
+        )
+
+
 class BuildingMembership(TimeStampedModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -931,6 +957,8 @@ class BuildingMembership(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         overrides = self.capabilities_override or {}
+        _validate_capability_entries(overrides.get("add"))
+        _validate_capability_entries(overrides.get("remove"))
         overrides["add"] = _normalize_capability_list(overrides.get("add"))
         overrides["remove"] = _normalize_capability_list(overrides.get("remove"))
         self.capabilities_override = overrides

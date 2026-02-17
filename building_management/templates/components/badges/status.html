@@ -1,0 +1,15 @@
+{% with code=code|default:""|upper %}
+  {% if code %}
+    {% if code == "DONE" or code == "APPROVED" or code == "COMPLETED" %}
+      {% include "components/badge.html" with label=label|default:code tone="success" size=size icon="components/icons/check-circle.svg" %}
+    {% elif code == "IN_PROGRESS" or code == "PENDING" or code == "AWAITING_APPROVAL" or code == "SCHEDULED" %}
+      {% include "components/badge.html" with label=label|default:code tone="warning" size=size icon="components/icons/clock.svg" %}
+    {% elif code == "REJECTED" or code == "CANCELLED" or code == "BLOCKED" %}
+      {% include "components/badge.html" with label=label|default:code tone="danger" size=size icon="components/icons/warning.svg" %}
+    {% else %}
+      {% include "components/badge.html" with label=label|default:code tone="info" size=size icon="components/icons/info.svg" %}
+    {% endif %}
+  {% else %}
+    {% include "components/badge.html" with label=label|default:code tone="muted" size=size icon="components/icons/info.svg" %}
+  {% endif %}
+{% endwith %}

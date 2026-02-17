@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import BuildingMembership, MembershipRole, TodoItem
+from core.models import BuildingMembership, MembershipRole, TodoItem, start_of_week
 
 
 class TodoApiTests(TestCase):
@@ -16,6 +16,7 @@ class TodoApiTests(TestCase):
         self.User = get_user_model()
         self.user = self.User.objects.create_user(username="member", password="pass1234")
         self.url = reverse("core:api_todos")
+        self.clear_url = reverse("core:api_todo_completed_clear")
         self.client.force_login(self.user)
 
     def _post(self, payload: dict) -> dict:
@@ -25,6 +26,20 @@ class TodoApiTests(TestCase):
             content_type="application/json",
         )
         return {"status": response.status_code, "body": response.json()}
+
+    def _patch(self, item: TodoItem, payload: dict):
+        url = reverse("core:api_todo_detail", args=[item.pk])
+        return self.client.patch(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def _delete_completed(self, query=""):
+        target = self.clear_url
+        if query:
+            target = f"{target}?{query}"
+        return self.client.delete(target)
 
     def _make_admin(self, username="admin-user"):
         admin = self.User.objects.create_user(username=username, password="pass1234")
@@ -169,3 +184,97 @@ class TodoApiTests(TestCase):
         payload = response.json()
         titles = {item["title"] for item in payload["results"]}
         self.assertEqual(titles, {"Alpha", "Beta"})
+
+    def test_update_due_date_in_past_rejected(self):
+        today = timezone.localdate()
+        item = TodoItem.objects.create(
+            user=self.user,
+            title="Past blocker",
+            due_date=today,
+            week_start=start_of_week(today),
+        )
+        yesterday = today - timedelta(days=1)
+
+        response = self._patch(item, {"due_date": yesterday.isoformat()})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Due date cannot be in the past.", response.json()["error"])
+
+    def test_update_week_start_in_past_rejected(self):
+        today = timezone.localdate()
+        item = TodoItem.objects.create(
+            user=self.user,
+            title="Week blocker",
+            due_date=today,
+            week_start=start_of_week(today),
+        )
+        last_week = start_of_week(today) - timedelta(days=7)
+
+        response = self._patch(item, {"week_start": last_week.isoformat()})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Week start cannot be in the past.", response.json()["error"])
+
+    def test_completed_clear_only_deletes_self_by_default(self):
+        admin = self._make_admin("admin-clear")
+        other = self.User.objects.create_user(username="other-clear", password="pass1234")
+        today = timezone.localdate()
+        week = start_of_week(today)
+        TodoItem.objects.create(
+            user=admin,
+            title="Admin done",
+            status=TodoItem.Status.DONE,
+            due_date=today,
+            week_start=week,
+        )
+        TodoItem.objects.create(
+            user=other,
+            title="Other done",
+            status=TodoItem.Status.DONE,
+            due_date=today,
+            week_start=week,
+        )
+        self.client.force_login(admin)
+
+        response = self._delete_completed()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["deleted"], 1)
+        self.assertTrue(
+            TodoItem.objects.filter(user=other, status=TodoItem.Status.DONE).exists()
+        )
+
+    def test_regular_user_cannot_clear_other_owner(self):
+        other = self.User.objects.create_user(username="other-block", password="pass1234")
+        today = timezone.localdate()
+        TodoItem.objects.create(
+            user=other,
+            title="Other done",
+            status=TodoItem.Status.DONE,
+            due_date=today,
+            week_start=start_of_week(today),
+        )
+
+        response = self._delete_completed(f"owner={other.pk}")
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(
+            TodoItem.objects.filter(user=other, status=TodoItem.Status.DONE).exists()
+        )
+
+    def test_admin_can_clear_other_owner_with_param(self):
+        admin = self._make_admin("admin-bulk-clear")
+        other = self.User.objects.create_user(username="other-bulk", password="pass1234")
+        today = timezone.localdate()
+        for idx in range(2):
+            TodoItem.objects.create(
+                user=other,
+                title=f"Other done {idx}",
+                status=TodoItem.Status.DONE,
+                due_date=today,
+                week_start=start_of_week(today),
+            )
+        self.client.force_login(admin)
+
+        response = self._delete_completed(f"owner={other.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["deleted"], 2)
+        self.assertFalse(
+            TodoItem.objects.filter(user=other, status=TodoItem.Status.DONE).exists()
+        )

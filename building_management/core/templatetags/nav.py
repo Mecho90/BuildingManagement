@@ -24,6 +24,11 @@ def active_nav(
     for pattern in patterns:
         if not pattern:
             continue
-        if path.startswith(pattern):
+        matches = False
+        if pattern == "/":
+            matches = path == "/"
+        else:
+            matches = path.startswith(pattern)
+        if matches:
             return css_class
     return ""

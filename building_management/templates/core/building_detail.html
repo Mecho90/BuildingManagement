@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n table_helpers %}
 
 {% block title %}{{ building.name }} · {% trans "Buildings" %}{% endblock %}
 
@@ -91,27 +91,29 @@
             {% endif %}
           </div>
 
-          <form method="get" class="filter-panel space-y-5">
+          <form method="get" class="filter-panel">
             <input type="hidden" name="tab" value="units"/>
-            <div class="space-y-2">
-              <label for="id_u_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">Търсене на апартаменти</label>
-              <input id="id_u_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="u_q" value="{{ u_q }}" placeholder="{% trans "Number, floor, owner or contact" %}"/>
+            <input type="hidden" name="u_sort" value="{{ u_sort }}"/>
+            <div class="filter-panel__grid md:grid-cols-2">
+              <div class="space-y-2 md:col-span-2">
+                <label for="id_u_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">Търсене на апартаменти</label>
+                <input id="id_u_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="u_q" value="{{ u_q }}" placeholder="{% trans "Number, floor, owner or contact" %}"/>
+              </div>
+              <div class="space-y-2">
+                <label for="id_u_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+                <select id="id_u_per" name="u_per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+                  <option value="25"  {% if u_per == 25  %}selected{% endif %}>25</option>
+                  <option value="50"  {% if u_per == 50  %}selected{% endif %}>50</option>
+                  <option value="100" {% if u_per == 100 %}selected{% endif %}>100</option>
+                  <option value="200" {% if u_per == 200 %}selected{% endif %}>200</option>
+                </select>
+              </div>
             </div>
-            <div class="space-y-2">
-              <label for="id_u_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-              <select id="id_u_per" name="u_per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-                <option value="25"  {% if u_per == 25  %}selected{% endif %}>25</option>
-                <option value="50"  {% if u_per == 50  %}selected{% endif %}>50</option>
-                <option value="100" {% if u_per == 100 %}selected{% endif %}>100</option>
-                <option value="200" {% if u_per == 200 %}selected{% endif %}>200</option>
-              </select>
-            </div>
-            <div class="flex items-center justify-end gap-2">
-              <input type="hidden" name="u_sort" value="{{ u_sort }}"/>
-              <button class="btn" type="submit">{% trans "Filter" %}</button>
+            <div class="filter-panel__actions">
               {% if u_q or u_per != 25 or u_sort != 'number' %}
                 <a class="btn btn-secondary" href="{{ tab_urls.units }}">{% trans "Reset" %}</a>
               {% endif %}
+              <button class="btn" type="submit">{% trans "Apply filters" %}</button>
             </div>
           </form>
 
@@ -149,27 +151,13 @@
             <table class="min-w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900">
               <thead class="bg-slate-50 dark:bg-slate-800">
                 <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                  <th class="px-4 py-3">
-                    {% with field='number' %}
-                      {% if u_sort == field %}
-                        <a class="flex items-center gap-1 text-sky-600" href="?tab=units&u_sort=-number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Number" %} ▲</a>
-                      {% elif u_sort == '-'|add:field %}
-                        <a class="flex items-center gap-1 text-sky-600" href="?tab=units&u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Number" %} ▼</a>
-                      {% else %}
-                        <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?tab=units&u_sort=number{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Number" %}</a>
-                      {% endif %}
-                    {% endwith %}
+                  {% sortable_heading 'Number' 'number' current_sort=u_sort param='u_sort' page_param='u_page' as unit_number_sort %}
+                  <th class="px-4 py-3" {% if unit_number_sort.aria_sort %}aria-sort="{{ unit_number_sort.aria_sort }}"{% endif %}>
+                    {{ unit_number_sort.html }}
                   </th>
-                  <th class="px-4 py-3">
-                    {% with field='floor' %}
-                      {% if u_sort == field %}
-                        <a class="flex items-center gap-1 text-sky-600" href="?tab=units&u_sort=-floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Floor" %} ▲</a>
-                      {% elif u_sort == '-'|add:field %}
-                        <a class="flex items-center gap-1 text-sky-600" href="?tab=units&u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Floor" %} ▼</a>
-                      {% else %}
-                        <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?tab=units&u_sort=floor{% if u_q %}&u_q={{ u_q|urlencode }}{% endif %}{% if u_per %}&u_per={{ u_per }}{% endif %}">{% trans "Floor" %}</a>
-                      {% endif %}
-                    {% endwith %}
+                  {% sortable_heading 'Floor' 'floor' current_sort=u_sort param='u_sort' page_param='u_page' as unit_floor_sort %}
+                  <th class="px-4 py-3" {% if unit_floor_sort.aria_sort %}aria-sort="{{ unit_floor_sort.aria_sort }}"{% endif %}>
+                    {{ unit_floor_sort.html }}
                   </th>
                   <th class="px-4 py-3">{% trans "Apartment owner" %}</th>
                   <th class="px-4 py-3">{% trans "Contact" %}</th>
@@ -212,45 +200,47 @@
             {% endif %}
           </div>
 
-          <form method="get" class="filter-panel space-y-5">
+          <form method="get" class="filter-panel">
             <input type="hidden" name="tab" value="work_orders"/>
-            <div class="space-y-2">
-              <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search working orders" %}</label>
-              <input id="id_w_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
+            <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-3">
+              <div class="space-y-2 md:col-span-2 lg:col-span-3">
+                <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search working orders" %}</label>
+                <input id="id_w_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
+              </div>
+              <div class="space-y-2">
+                <label for="id_w_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
+                <select id="id_w_status" name="w_status" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+                  <option value="" {% if not w_status %}selected{% endif %}>{% trans "All" %}</option>
+                  {% for value,label in w_status_choices %}
+                    <option value="{{ value }}" {% if w_status == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="space-y-2">
+                <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+                <select id="id_w_per" name="w_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+                  <option value="25"  {% if w_per == 25  %}selected{% endif %}>25</option>
+                  <option value="50"  {% if w_per == 50  %}selected{% endif %}>50</option>
+                  <option value="100" {% if w_per == 100 %}selected{% endif %}>100</option>
+                  <option value="200" {% if w_per == 200 %}selected{% endif %}>200</option>
+                </select>
+              </div>
+              <div class="space-y-2">
+                <label for="id_w_deadline_range" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Deadline range" %}</label>
+                <input id="id_w_deadline_range"
+                       name="w_deadline_range"
+                       type="text"
+                       value="{{ w_deadline_range }}"
+                       placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}"
+                       class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+                       onchange="this.form.submit()"/>
+              </div>
             </div>
-            <div class="space-y-2">
-              <label for="id_w_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
-              <select id="id_w_status" name="w_status" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
-                <option value="" {% if not w_status %}selected{% endif %}>{% trans "All" %}</option>
-                {% for value,label in w_status_choices %}
-                  <option value="{{ value }}" {% if w_status == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="space-y-2">
-              <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-              <select id="id_w_per" name="w_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
-                <option value="25"  {% if w_per == 25  %}selected{% endif %}>25</option>
-                <option value="50"  {% if w_per == 50  %}selected{% endif %}>50</option>
-                <option value="100" {% if w_per == 100 %}selected{% endif %}>100</option>
-                <option value="200" {% if w_per == 200 %}selected{% endif %}>200</option>
-              </select>
-            </div>
-            <div class="space-y-2">
-              <label for="id_w_deadline_range" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Deadline range" %}</label>
-              <input id="id_w_deadline_range"
-                     name="w_deadline_range"
-                     type="text"
-                     value="{{ w_deadline_range }}"
-                     placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}"
-                     class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-                     onchange="this.form.submit()"/>
-            </div>
-            <div class="flex items-center justify-end gap-2">
-              <button class="btn" type="submit">{% trans "Filter" %}</button>
+            <div class="filter-panel__actions">
               {% if w_q or w_status or w_per != 25 or w_deadline_range %}
                 <a class="btn btn-secondary" href="{{ tab_urls.work_orders }}">{% trans "Reset" %}</a>
               {% endif %}
+              <button class="btn" type="submit">{% trans "Apply filters" %}</button>
             </div>
           </form>
 
@@ -266,7 +256,7 @@
                     </h3>
                     <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
                       {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
-                      <span class="priority-badge {% if w.priority == 'HIGH' %}priority-badge--high{% elif w.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">{{ w.get_priority_display }}</span>
+                      {% include "components/badges/priority.html" with level=w.priority label=w.get_priority_display size="sm" %}
                     </div>
                   </div>
                   <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -322,12 +312,10 @@
                       </td>
                       <td class="px-4 py-3">{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</td>
                       <td class="px-4 py-3">
-                        <span class="priority-badge {% if w.priority == 'HIGH' %}priority-badge--high{% elif w.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">
-                          {{ w.get_priority_display }}
-                        </span>
+                        {% include "components/badges/priority.html" with level=w.priority label=w.get_priority_display size="sm" %}
                       </td>
-                      <td class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                        {{ w.get_status_display }}
+                      <td class="px-4 py-3">
+                        {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
                       </td>
                       <td class="px-4 py-3">{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
                       <td class="px-4 py-3">{{ w.created_at|date:"Y-m-d" }}</td>

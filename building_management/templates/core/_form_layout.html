@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n form_helpers %}
 {# Generic form layout used by all create/update pages #}
 <section class="space-y-6">
   <header class="space-y-1">
@@ -13,9 +13,7 @@
     {% endif %}
 
     {% if form.non_field_errors %}
-      <div class="alert alert--danger">
-        {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
-      </div>
+      {% include "components/alert.html" with variant="danger" items=form.non_field_errors aria_live="assertive" %}
     {% endif %}
 
     {% for h in form.hidden_fields %}
@@ -26,19 +24,27 @@
     {% endfor %}
 
     <div class="grid gap-5">
-      {% if form.owner %}
-        {% include "core/includes/form_field.html" with field=form.owner only %}
-      {% endif %}
-      {% for field in form.visible_fields %}
-        {% if not form.owner or field.name != 'owner' %}
-          {% include "core/includes/form_field.html" with field=field %}
+      {% with icons=field_icons %}
+        {% if form.owner %}
+          {% with owner_icon=icons|dict_get:"owner" %}
+            {% include "components/form_field.html" with field=form.owner icon=owner_icon %}
+          {% endwith %}
         {% endif %}
-      {% endfor %}
+        {% for field in form.visible_fields %}
+          {% if not form.owner or field.name != 'owner' %}
+            {% with icon_name=icons|dict_get:field.name %}
+              {% include "components/form_field.html" with field=field icon=icon_name %}
+            {% endwith %}
+          {% endif %}
+        {% endfor %}
+      {% endwith %}
     </div>
 
-    <div class="flex flex-wrap justify-end gap-3">
-      <button class="btn" type="submit">{% trans "Save" %}</button>
-      <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>
-    </div>
+    {% with submit_text=submit_label|default:_("Save") cancel_text=cancel_label|default:_("Cancel") %}
+      <div class="form-actions">
+        <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{{ cancel_text }}</a>
+        <button class="btn" type="submit">{{ submit_text }}</button>
+      </div>
+    {% endwith %}
   </form>
 </section>

@@ -167,7 +167,7 @@
   }
 
   .form-actions {
-    @apply mt-2 flex gap-4;
+    @apply mt-2 flex flex-wrap items-center justify-end gap-4;
   }
 
   table thead th {

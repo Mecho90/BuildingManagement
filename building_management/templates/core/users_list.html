@@ -15,33 +15,35 @@
     </div>
   </header>
 
-  <form method="get" class="filter-panel space-y-4">
-    <div class="space-y-2">
-      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_search">{% trans "Search users" %}</label>
-      <input
-        id="id_search"
-        class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-        type="text"
-        name="q"
-        value="{{ q }}"
-        placeholder="{% trans "Search username, email, or name" %}"
-        autocomplete="off"
-      />
+  <form method="get" class="filter-panel">
+    <div class="filter-panel__grid md:grid-cols-2">
+      <div class="space-y-2 md:col-span-2">
+        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_search">{% trans "Search users" %}</label>
+        <input
+          id="id_search"
+          class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+          type="text"
+          name="q"
+          value="{{ q }}"
+          placeholder="{% trans "Search username, email, or name" %}"
+          autocomplete="off"
+        />
+      </div>
+      <div class="space-y-2">
+        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_per">{% trans "Page size" %}</label>
+        <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+          <option value="25" {% if per == 25 %}selected{% endif %}>25</option>
+          <option value="50" {% if per == 50 %}selected{% endif %}>50</option>
+          <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
+          <option value="200" {% if per == 200 %}selected{% endif %}>200</option>
+        </select>
+      </div>
     </div>
-    <div class="space-y-2">
-      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_per">{% trans "Page size" %}</label>
-      <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
-        <option value="25" {% if per == 25 %}selected{% endif %}>25</option>
-        <option value="50" {% if per == 50 %}selected{% endif %}>50</option>
-        <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
-        <option value="200" {% if per == 200 %}selected{% endif %}>200</option>
-      </select>
-    </div>
-    <div class="flex justify-end gap-2">
-      <button class="btn" type="submit">{% trans "Search" %}</button>
+    <div class="filter-panel__actions">
       {% if q or per != 25 %}
-        <a class="btn btn-secondary" href="{% url 'core:users_list' %}">{% trans "Clear" %}</a>
+        <a class="btn btn-secondary" href="{% url 'core:users_list' %}">{% trans "Reset" %}</a>
       {% endif %}
+      <button class="btn" type="submit">{% trans "Apply filters" %}</button>
     </div>
   </form>
 

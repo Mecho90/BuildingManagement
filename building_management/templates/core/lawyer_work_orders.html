@@ -16,21 +16,21 @@
     </div>
   </header>
 
-  <form method="get" class="filter-panel space-y-5">
-    <div class="space-y-2">
-      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search lawyer work orders" %}</label>
-      <input
-        id="id_q"
-        class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-        type="text"
-        name="q"
-        value="{{ q }}"
-        placeholder="{% trans "Title or description" %}"
-        autocomplete="off"
-      />
-    </div>
+  <form method="get" class="filter-panel">
+    <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-3">
+      <div class="space-y-2 md:col-span-2 lg:col-span-3">
+        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search lawyer work orders" %}</label>
+        <input
+          id="id_q"
+          class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+          type="text"
+          name="q"
+          value="{{ q }}"
+          placeholder="{% trans "Title or description" %}"
+          autocomplete="off"
+        />
+      </div>
 
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <div class="space-y-2">
         <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
         <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
@@ -95,11 +95,11 @@
       </div>
     </div>
 
-    <div class="flex justify-end gap-2">
-      <button class="btn" type="submit">{% trans "Filter" %}</button>
+    <div class="filter-panel__actions">
       {% if q or status or owner or sort != 'priority' or per != 25 or priority or deadline_range %}
         <a class="btn btn-secondary" href="{% url 'core:lawyer_work_orders' %}">{% trans "Reset" %}</a>
       {% endif %}
+      <button class="btn" type="submit">{% trans "Apply filters" %}</button>
     </div>
   </form>
 
@@ -127,11 +127,11 @@
             <td class="px-4 py-3">{{ order.building.name|default:"—" }}</td>
             <td class="px-4 py-3">{{ order.deadline|date:"Y-m-d" }}</td>
             <td class="px-4 py-3">
-              <span class="priority-badge {% if order.priority == 'HIGH' %}priority-badge--high{% elif order.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">
-                {{ order.get_priority_display }}
-              </span>
+              {% include "components/badges/priority.html" with level=order.priority label=order.get_priority_display size="sm" %}
             </td>
-            <td class="px-4 py-3">{{ order.get_status_display }}</td>
+            <td class="px-4 py-3">
+              {% include "core/includes/status_badge.html" with status=order.status label=order.get_status_display %}
+            </td>
             <td class="px-4 py-3">
               {% if order.created_by %}
                 {{ order.created_by.get_full_name|default:order.created_by.username }}

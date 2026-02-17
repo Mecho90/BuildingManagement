@@ -9,115 +9,129 @@
 
     <title>{% block title %}{% trans "Building Management" %}{% endblock %}</title>
 
+    <link rel="preload" href="{% static 'css/dist.css' %}" as="style"/>
+    <link rel="preload" href="{% static 'css/theme-overrides.css' %}" as="style"/>
     <link rel="stylesheet" href="{% static 'css/dist.css' %}"/>
     <link rel="stylesheet" href="{% static 'css/theme-overrides.css' %}"/>
     <script src="{% url 'javascript-catalog' %}" crossorigin="anonymous"></script>
-    <style>
-      body::before {
-        content: "";
-        position: fixed;
-        inset: 0;
-        background-image: url("{% static 'img/slide-1.jpg' %}");
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-position: center;
-        background-attachment: fixed;
-        opacity: 0.4;
-        pointer-events: none;
-        z-index: 0;
-      }
-
-      html.dark body::before {
-        opacity: 0.5;
-        filter: brightness(0.75);
-      }
-    </style>
     {% block extra_css %}{% endblock %}
   </head>
 
-  <body class="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50 text-brand-foreground transition-colors dark:bg-gradient-to-br dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100">
+  <body class="min-h-screen text-brand-foreground transition-colors dark:text-slate-100 {% block body_class %}{% endblock %}" style="--ui-hero-bg-image: url('{% static 'img/slide-1.jpg' %}');">
     <div class="relative z-10 flex min-h-screen flex-col">
-      <header class="border-b border-emerald-100/60 bg-white/80 shadow-md backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/80">
-        <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <nav class="flex flex-1 flex-col items-start gap-3" aria-label="Primary">
-            <a href="{% url 'core:dashboard' %}" class="inline-flex items-center" aria-label="{% trans 'Dashboard' %}">
+      <header class="site-header border-b border-emerald-100/60 bg-white/90 shadow-md backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/85">
+        <div class="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+          <div class="header-row">
+            <a href="{% url 'core:dashboard' %}" class="inline-flex items-center gap-3" aria-label="{% trans 'Dashboard' %}">
               <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" class="h-9 w-auto"/>
             </a>
-            <div class="flex flex-wrap items-center gap-4">
+          <div class="header-meta">
+            {% block header_meta %}
+              <div class="header-meta__pill">
+                <time datetime="{% now 'c' %}" class="body-sm text-muted font-semibold">{% now 'D, M j, Y' %}</time>
+                {% if user.is_authenticated %}
+                  <span class="body-sm text-muted hidden sm:inline-flex font-semibold">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>
+                {% endif %}
+              </div>
+            {% endblock %}
+          </div>
+            <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle>
+              <span class="sr-only">{% trans "Toggle navigation" %}</span>
+              <svg class="nav-toggle__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              <span class="nav-toggle__label">{% trans "Menu" %}</span>
+            </button>
+          </div>
+
+          <nav id="primary-navigation" class="primary-nav" data-nav-menu data-open="false" aria-label="{% trans 'Primary navigation' %}">
+            <div class="nav-links">
               {% block topbar_left %}
-                <a href="{% url 'core:dashboard' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/' %}">
+                <a href="{% url 'core:dashboard' %}" class="nav-link {% active_nav '/' css_class='nav-link--active' %}">
                   {% trans "Dashboard" %}
                 </a>
                 {% if todos_enabled and todos_url %}
-                  <a href="{{ todos_url }}" class="relative inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/todos/' %}">
+                  <a href="{{ todos_url }}" class="nav-link {% active_nav '/todos/' css_class='nav-link--active' %}">
                     {% trans "To-Dos" %}
                   </a>
                 {% endif %}
-                <a href="{% url 'core:buildings_list' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/buildings/' %}">
+                <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/' css_class='nav-link--active' %}">
                   {% trans "Buildings" %}
                 </a>
                 {% if work_orders_enabled and work_orders_url %}
-                  <a href="{{ work_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav work_orders_url %}">
+                  <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url css_class='nav-link--active' %}">
                     {% trans "Work Orders" %}
                   </a>
                 {% endif %}
                 {% if lawyer_orders_enabled and lawyer_orders_url %}
-                  <a href="{{ lawyer_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav lawyer_orders_url %}">
+                  <a href="{{ lawyer_orders_url }}" class="nav-link {% active_nav lawyer_orders_url css_class='nav-link--active' %}">
                     {% trans "Lawyer Orders" %}
                   </a>
                 {% endif %}
                 {% if work_orders_archive_enabled and work_orders_archive_url %}
-                  <a href="{{ work_orders_archive_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav work_orders_archive_url %}">
+                  <a href="{{ work_orders_archive_url }}" class="nav-link {% active_nav work_orders_archive_url css_class='nav-link--active' %}">
                     {% trans "Archive" %}
                   </a>
                 {% endif %}
                 {% if mass_assign_work_orders_enabled and mass_assign_work_orders_url %}
-                  <a href="{{ mass_assign_work_orders_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav mass_assign_work_orders_url %}">
+                  <a href="{{ mass_assign_work_orders_url }}" class="nav-link {% active_nav mass_assign_work_orders_url css_class='nav-link--active' %}">
                     {% trans "Mass Assign" %}
                   </a>
                 {% endif %}
                 {% if can_view_user_management and user_management_url %}
-                  <a href="{{ user_management_url }}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/manage/users/' %}">
+                  <a href="{{ user_management_url }}" class="nav-link {% active_nav '/manage/users/' css_class='nav-link--active' %}">
                     {% trans "User Management" %}
                   </a>
                 {% elif user.is_staff %}
-                  <a href="{% url 'admin:index' %}" class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200 border-b-2 border-transparent pb-1 transition-colors {% active_nav '/admin/' %}">
+                  <a href="{% url 'admin:index' %}" class="nav-link {% active_nav '/admin/' css_class='nav-link--active' %}">
                     {% trans "Admin Panel" %}
                   </a>
                 {% endif %}
               {% endblock %}
             </div>
-          </nav>
 
-          <div class="flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-300">
-            {% block topbar_right %}
-              {% if user.is_authenticated %}
-                <time datetime="{% now 'c' %}" class="font-medium">{% now 'D, M j, Y' %}</time>
-                <span class="hidden sm:inline-flex">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>
-                <form action="{% url 'logout' %}" method="post" class="inline-flex">
-                  {% csrf_token %}
-                  <button type="submit" class="btn btn-secondary btn-sm">{% trans "Logout" %}</button>
-                </form>
-                <a class="btn btn-secondary btn-sm" href="{% url 'core:toggle_theme' %}">
-                  {% if theme == 'dark' %}{% trans "Light mode" %}{% else %}{% trans "Dark mode" %}{% endif %}
+            <div class="header-actions">
+              {% block topbar_right %}
+                <a class="action-btn" href="{% url 'core:toggle_theme' %}" aria-label="{% if theme == 'dark' %}{% trans 'Switch to light mode' %}{% else %}{% trans 'Switch to dark mode' %}{% endif %}">
+                  {% if theme == 'dark' %}
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a1 1 0 0 1 1 1v2.07a5 5 0 0 1 4.93 4.93H20a1 1 0 0 1 0 2h-2.07A5 5 0 0 1 13 18.93V21a1 1 0 0 1-2 0v-2.07A5 5 0 0 1 6.07 14H4a1 1 0 0 1 0-2h2.07A5 5 0 0 1 11 7.07V5a1 1 0 0 1 1-1Z" fill="currentColor"/></svg>
+                    <span class="action-btn__label">{% trans "Light" %}</span>
+                  {% else %}
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 0 1 11.21 3 7.002 7.002 0 0 0 12 17a7 7 0 0 0 9-4.21Z" fill="currentColor"/></svg>
+                    <span class="action-btn__label">{% trans "Dark" %}</span>
+                  {% endif %}
                 </a>
-              {% else %}
-                <a class="btn btn-secondary btn-sm" href="{% url 'core:toggle_theme' %}">
-                  {% if theme == 'dark' %}{% trans "Light mode" %}{% else %}{% trans "Dark mode" %}{% endif %}
-                </a>
-                <a class="btn" href="{% url 'login' %}">{% trans "Login" %}</a>
-              {% endif %}
-            {% endblock %}
-          </div>
+                {% if user.is_authenticated %}
+                  <form action="{% url 'logout' %}" method="post" class="header-actions__form">
+                    {% csrf_token %}
+                    <button type="submit" class="action-btn action-btn--outline" aria-label="{% trans 'Logout' %}">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7v-2a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      <span class="action-btn__label">{% trans "Logout" %}</span>
+                    </button>
+                  </form>
+                {% else %}
+                  <a class="btn btn-secondary" href="{% url 'login' %}">{% trans "Login" %}</a>
+                {% endif %}
+              {% endblock %}
+            </div>
+          </nav>
         </div>
 
         {% if messages %}
           <div class="mx-auto w-full max-w-7xl px-4 pb-4 sm:px-6 lg:px-8">
-            <div class="space-y-2">
+            <div class="space-y-3">
               {% for message in messages %}
-                <div class="alert{% if message.tags %} alert--{{ message.tags }}{% endif %}">
-                  {{ message }}
-                </div>
+                {% with tags=message.tags|default:"" %}
+                  {% if "error" in tags or "danger" in tags %}
+                    {% include "components/alert.html" with variant="danger" message=message aria_live="assertive" %}
+                  {% elif "warning" in tags %}
+                    {% include "components/alert.html" with variant="warning" message=message aria_live="assertive" %}
+                  {% elif "success" in tags %}
+                    {% include "components/alert.html" with variant="success" message=message %}
+                  {% else %}
+                    {% include "components/alert.html" with variant="info" message=message %}
+                  {% endif %}
+                {% endwith %}
               {% endfor %}
             </div>
           </div>
@@ -125,12 +139,67 @@
       </header>
 
       <main class="flex-1">
-        <div class="mx-auto my-6 w-full max-w-7xl rounded-3xl border border-emerald-100/70 bg-white/80 px-4 py-8 shadow-card backdrop-blur sm:px-6 lg:px-10 dark:border-slate-800/70 dark:bg-slate-900/70">
+        <div class="layout-shell mx-auto my-6 w-full max-w-7xl rounded-3xl border border-emerald-100/70 bg-white/95 px-4 py-8 shadow-card backdrop-blur sm:px-6 lg:px-10 dark:border-slate-800/70 dark:bg-slate-900/85">
           {% block content %}{% endblock %}
         </div>
       </main>
 
       {% block extra_js %}{% endblock %}
     </div>
+    <script>
+      (() => {
+        const toggle = document.querySelector("[data-nav-toggle]");
+        const menu = document.querySelector("[data-nav-menu]");
+        if (!toggle || !menu) return;
+        const mobileQuery = window.matchMedia("(max-width: 1023px)");
+        const desktopQuery = window.matchMedia("(min-width: 1024px)");
+        const setState = (open) => {
+          menu.setAttribute("data-open", String(open));
+          toggle.setAttribute("aria-expanded", String(open));
+        };
+        menu.setAttribute("data-js-ready", "true");
+        const collapseForViewport = () => {
+          if (desktopQuery.matches) {
+            setState(true);
+          } else {
+            setState(false);
+          }
+        };
+        collapseForViewport();
+        toggle.addEventListener("click", () => {
+          const open = menu.getAttribute("data-open") === "true";
+          setState(!open);
+        });
+        menu.querySelectorAll("a").forEach((link) => {
+          link.addEventListener("click", () => {
+            if (mobileQuery.matches) {
+              setState(false);
+            }
+          });
+        });
+        desktopQuery.addEventListener
+          ? desktopQuery.addEventListener("change", collapseForViewport)
+          : desktopQuery.addListener(collapseForViewport);
+        mobileQuery.addEventListener
+          ? mobileQuery.addEventListener("change", collapseForViewport)
+          : mobileQuery.addListener(collapseForViewport);
+      })();
+      (() => {
+        document.addEventListener("click", (event) => {
+          const dismissButton = event.target.closest("[data-alert-close]");
+          if (!dismissButton) {
+            return;
+          }
+          const alert = dismissButton.closest("[data-alert]");
+          if (!alert) {
+            return;
+          }
+          alert.setAttribute("data-dismissed", "true");
+          const removeAlert = () => alert.remove();
+          alert.addEventListener("transitionend", removeAlert, { once: true });
+          window.setTimeout(removeAlert, 250);
+        });
+      })();
+    </script>
   </body>
 </html>

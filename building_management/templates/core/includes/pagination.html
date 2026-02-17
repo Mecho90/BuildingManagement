@@ -12,7 +12,7 @@ Expected variables:
     {% if current_paginator %}
       {% if current_paginator.num_pages > 1 or show_single_page %}
         {% with param=page_param|default:'page' %}
-          <nav class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <nav class="pagination-nav flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div class="flex flex-wrap items-center gap-2">
             {% if page_obj.has_previous %}
               <a class="btn btn-secondary btn-sm" href="?{% if query_string %}{{ query_string }}&{% endif %}{{ param }}=1">« {% trans "First" %}</a>

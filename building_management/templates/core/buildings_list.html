@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n table_helpers %}
 
 {% block title %}{% trans "Buildings" %}{% endblock %}
 
@@ -18,48 +18,50 @@
     </div>
 
     <div>
-      <form method="get" class="filter-panel space-y-5">
+      <form method="get" class="filter-panel">
         {% url 'core:buildings_list' as buildings_reset_url %}
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search buildings" %}</label>
-          <input
-            id="id_q"
-            class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-            type="text"
-            name="q"
-            value="{{ q }}"
-            placeholder="{% trans 'Name, address or owner' %}"
-            autocomplete="off"
-          />
-        </div>
+        <div class="filter-panel__grid md:grid-cols-2">
+          <div class="space-y-2 md:col-span-2">
+            <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search buildings" %}</label>
+            <input
+              id="id_q"
+              class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+              type="text"
+              name="q"
+              value="{{ q }}"
+              placeholder="{% trans 'Name, address or owner' %}"
+              autocomplete="off"
+            />
+          </div>
 
-        {% if owner_options %}
+          {% if owner_options %}
+            <div class="space-y-2">
+              <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+              <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+                <option value="" {% if not owner_filter %}selected{% endif %}>{% trans "All owners" %}</option>
+                {% for opt in owner_options %}
+                  <option value="{{ opt.value }}" {% if owner_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+
           <div class="space-y-2">
-            <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
-            <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-              <option value="" {% if not owner_filter %}selected{% endif %}>{% trans "All owners" %}</option>
-              {% for opt in owner_options %}
-                <option value="{{ opt.value }}" {% if owner_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
-              {% endfor %}
+            <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+            <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+              <option value="25"  {% if per == 25  %}selected{% endif %}>25</option>
+              <option value="50"  {% if per == 50  %}selected{% endif %}>50</option>
+              <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
+              <option value="200" {% if per == 200 %}selected{% endif %}>200</option>
             </select>
           </div>
-        {% endif %}
-
-        <div class="space-y-2">
-          <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-          <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-            <option value="25"  {% if per == 25  %}selected{% endif %}>25</option>
-            <option value="50"  {% if per == 50  %}selected{% endif %}>50</option>
-            <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
-            <option value="200" {% if per == 200 %}selected{% endif %}>200</option>
-          </select>
         </div>
 
-        <div class="flex justify-end gap-2">
-          <button class="btn" type="submit">{% trans "Filter" %}</button>
+        <div class="filter-panel__actions">
           {% if q or owner_filter or sort != 'name' or per != 25 %}
             <a class="btn btn-secondary" href="{{ buildings_reset_url }}">{% trans "Reset" %}</a>
           {% endif %}
+          <button class="btn" type="submit">{% trans "Apply filters" %}</button>
         </div>
       </form>
     </div>
@@ -73,16 +75,18 @@
               <p class="text-sm text-slate-500 dark:text-slate-400">{{ b.get_role_display }}</p>
             </div>
             {% if show_owner_column %}
-              <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                {% trans "Owner" %}:
-                {% with owner=b.owner %}
-                  {% if owner %}
-                    {{ owner.get_full_name|default:owner.username }}
-                  {% else %}
-                    &mdash;
-                  {% endif %}
-                {% endwith %}
-              </span>
+              {% with owner=b.owner %}
+                <span class="meta-badge">
+                  <span class="meta-badge__label">{% trans "Owner" %}</span>
+                  <span class="meta-badge__value">
+                    {% if owner %}
+                      {{ owner.get_full_name|default:owner.username }}
+                    {% else %}
+                      &mdash;
+                    {% endif %}
+                  </span>
+                </span>
+              {% endwith %}
             {% endif %}
           </div>
 
@@ -110,73 +114,31 @@
       <table class="min-w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900">
         <thead class="bg-slate-50 dark:bg-slate-800">
           <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-            <th class="px-4 py-3">
-              {% with field='name' %}
-                {% if sort == field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-name&per={{ per }}">{% trans "Name" %} ▲</a>
-                {% elif sort == '-'|add:field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=name&per={{ per }}">{% trans "Name" %} ▼</a>
-                {% else %}
-                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=name&per={{ per }}">{% trans "Name" %}</a>
-                {% endif %}
-              {% endwith %}
+            {% sortable_heading 'Name' 'name' current_sort=sort as name_sort %}
+            <th class="px-4 py-3" {% if name_sort.aria_sort %}aria-sort="{{ name_sort.aria_sort }}"{% endif %}>
+              {{ name_sort.html }}
             </th>
             {% if show_owner_column %}
-              <th class="px-4 py-3">
-                {% with field='owner' %}
-                  {% if sort == field %}
-                    <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-owner&per={{ per }}">{% trans "Owner" %} ▲</a>
-                  {% elif sort == '-'|add:field %}
-                    <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=owner&per={{ per }}">{% trans "Owner" %} ▼</a>
-                  {% else %}
-                    <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=owner&per={{ per }}">{% trans "Owner" %}</a>
-                  {% endif %}
-                {% endwith %}
+              {% sortable_heading 'Owner' 'owner' current_sort=sort as owner_sort %}
+              <th class="px-4 py-3" {% if owner_sort.aria_sort %}aria-sort="{{ owner_sort.aria_sort }}"{% endif %}>
+                {{ owner_sort.html }}
               </th>
             {% endif %}
-            <th class="px-4 py-3">
-              {% with field='role' %}
-                {% if sort == field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-role&per={{ per }}">{% trans "Role" %} ▲</a>
-                {% elif sort == '-'|add:field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=role&per={{ per }}">{% trans "Role" %} ▼</a>
-                {% else %}
-                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=role&per={{ per }}">{% trans "Role" %}</a>
-                {% endif %}
-              {% endwith %}
+            {% sortable_heading 'Role' 'role' current_sort=sort as role_sort %}
+            <th class="px-4 py-3" {% if role_sort.aria_sort %}aria-sort="{{ role_sort.aria_sort }}"{% endif %}>
+              {{ role_sort.html }}
             </th>
-            <th class="px-4 py-3">
-              {% with field='address' %}
-                {% if sort == field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-address&per={{ per }}">{% trans "Address" %} ▲</a>
-                {% elif sort == '-'|add:field %}
-                  <a class="flex items-center gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=address&per={{ per }}">{% trans "Address" %} ▼</a>
-                {% else %}
-                  <a class="flex items-center gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=address&per={{ per }}">{% trans "Address" %}</a>
-                {% endif %}
-              {% endwith %}
+            {% sortable_heading 'Address' 'address' current_sort=sort as address_sort %}
+            <th class="px-4 py-3" {% if address_sort.aria_sort %}aria-sort="{{ address_sort.aria_sort }}"{% endif %}>
+              {{ address_sort.html }}
             </th>
-            <th class="px-4 py-3 text-right">
-              {% with field='units_count' %}
-                {% if sort == field %}
-                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-units_count&per={{ per }}">{% trans "Units" %} ▲</a>
-                {% elif sort == '-'|add:field %}
-                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=units_count&per={{ per }}">{% trans "Units" %} ▼</a>
-                {% else %}
-                  <a class="flex justify-end gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=units_count&per={{ per }}">{% trans "Units" %}</a>
-                {% endif %}
-              {% endwith %}
+            {% sortable_heading 'Units' 'units_count' current_sort=sort align='right' as units_sort %}
+            <th class="px-4 py-3 text-right" {% if units_sort.aria_sort %}aria-sort="{{ units_sort.aria_sort }}"{% endif %}>
+              {{ units_sort.html }}
             </th>
-            <th class="px-4 py-3 text-right">
-              {% with field='work_orders_count' %}
-                {% if sort == field %}
-                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=-work_orders_count&per={{ per }}">{% trans "Work Orders" %} ▲</a>
-                {% elif sort == '-'|add:field %}
-                  <a class="flex justify-end gap-1 text-sky-600" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=work_orders_count&per={{ per }}">{% trans "Work Orders" %} ▼</a>
-                {% else %}
-                  <a class="flex justify-end gap-1 text-slate-600 hover:text-sky-600 dark:text-slate-200" href="?q={{ q|urlencode }}{% if owner_filter %}&owner={{ owner_filter|urlencode }}{% endif %}&sort=work_orders_count&per={{ per }}">{% trans "Work Orders" %}</a>
-                {% endif %}
-              {% endwith %}
+            {% sortable_heading 'Work Orders' 'work_orders_count' current_sort=sort align='right' as work_orders_sort %}
+            <th class="px-4 py-3 text-right" {% if work_orders_sort.aria_sort %}aria-sort="{{ work_orders_sort.aria_sort }}"{% endif %}>
+              {{ work_orders_sort.html }}
             </th>
           </tr>
         </thead>
@@ -189,11 +151,16 @@
               {% if show_owner_column %}
                 <td class="px-4 py-3">
                   {% with owner=b.owner %}
-                    {% if owner %}
-                      {{ owner.get_full_name|default:owner.username }}
-                    {% else %}
-                      &mdash;
-                    {% endif %}
+                    <span class="meta-badge">
+                      <span class="meta-badge__label">{% trans "Owner" %}</span>
+                      <span class="meta-badge__value">
+                        {% if owner %}
+                          {{ owner.get_full_name|default:owner.username }}
+                        {% else %}
+                          &mdash;
+                        {% endif %}
+                      </span>
+                    </span>
                   {% endwith %}
                 </td>
               {% endif %}

@@ -20,6 +20,7 @@ from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 
+from ..authz import Capability
 from ..models import (
     Building,
     BuildingMembership,
@@ -32,7 +33,8 @@ from ..models import (
     start_of_week,
 )
 from ..services import NotificationPayload, NotificationService, validate_work_order_attachment
-from .common import _user_can_access_building, format_attachment_delete_confirm
+from .common import _user_has_building_capability, format_attachment_delete_confirm
+from .work_orders import _log_attachment_activity
 
 User = get_user_model()
 
@@ -551,6 +553,8 @@ def _todo_update_view(request, item: TodoItem):
             new_due = _parse_date_field(payload.get("due_date"), "due_date")
         except ValueError as exc:
             return JsonResponse({"error": str(exc)}, status=400)
+        if new_due and new_due < timezone.localdate():
+            return JsonResponse({"error": _("Due date cannot be in the past.")}, status=400)
         if new_due != item.due_date:
             item.due_date = new_due
             fields_changed.append("due_date")
@@ -563,6 +567,9 @@ def _todo_update_view(request, item: TodoItem):
                 return JsonResponse({"error": _("Invalid week_start. Use YYYY-MM-DD.")}, status=400)
         else:
             new_week = start_of_week()
+        current_week = start_of_week(timezone.localdate())
+        if new_week and new_week < current_week:
+            return JsonResponse({"error": _("Week start cannot be in the past.")}, status=400)
         if new_week != item.week_start:
             item.week_start = new_week
             fields_changed.append("week_start")
@@ -643,6 +650,28 @@ def api_todo_completed_clear(request):
 
     params = request.GET
     qs = _todo_queryset_for(request).filter(status=TodoItem.Status.DONE)
+
+    owner_param = (params.get("owner") or "").strip()
+    owner = request.user
+    if owner_param:
+        if owner_param.lower() in {"me", "self"}:
+            owner_id = getattr(request.user, "pk", None)
+        else:
+            try:
+                owner_id = int(owner_param)
+            except (TypeError, ValueError):
+                return JsonResponse({"error": _("Invalid owner filter.")}, status=400)
+        if owner_id != getattr(request.user, "pk", None):
+            if not _user_can_assign_todo_owner(request.user):
+                return JsonResponse(
+                    {"error": _("You do not have permission to clear tasks for this owner.")},
+                    status=403,
+                )
+        try:
+            owner = User.objects.get(pk=owner_id)
+        except User.DoesNotExist:
+            return JsonResponse({"error": _("Owner not found.")}, status=404)
+    qs = qs.filter(user=owner)
 
     week_start_param = params.get("week_start")
     if week_start_param:
@@ -805,7 +834,12 @@ def api_workorder_attachments(request, pk: int):
         ]
         return JsonResponse({"attachments": attachments}, status=200)
 
-    if not _user_can_access_building(request.user, order.building):
+    if not _user_has_building_capability(
+        request.user,
+        order.building,
+        Capability.CREATE_WORK_ORDERS,
+        Capability.MANAGE_BUILDINGS,
+    ):
         return JsonResponse(
             {"error": _("You do not have permission to modify attachments for this work order.")},
             status=403,
@@ -834,6 +868,7 @@ def api_workorder_attachments(request, pk: int):
         return JsonResponse({"errors": errors}, status=400)
 
     created_payloads: list[dict[str, object]] = []
+    added_names: list[str] = []
     for uploaded in valid_files:
         attachment = WorkOrderAttachment(
             work_order=order,
@@ -841,11 +876,21 @@ def api_workorder_attachments(request, pk: int):
             original_name=getattr(uploaded, "name", ""),
         )
         attachment.save()
+        display_name = (attachment.original_name or "").strip()
+        if not display_name and attachment.file:
+            display_name = Path(attachment.file.name).name
+        added_names.append(display_name)
         created_payloads.append(_attachment_payload(request, attachment, order))
 
     body: dict[str, object] = {"attachments": created_payloads}
     if errors:
         body["errors"] = errors
+    actor = request.user if request.user.is_authenticated else None
+    _log_attachment_activity(
+        actor=actor,
+        work_order=order,
+        changes={"added": added_names, "removed": []},
+    )
     return JsonResponse(body, status=207 if errors else 201)
 
 
@@ -853,12 +898,26 @@ def api_workorder_attachments(request, pk: int):
 def api_workorder_attachment_detail(request, pk: int, attachment_id: int):
     order = _get_work_order_or_404(request, pk)
 
-    if not _user_can_access_building(request.user, order.building):
+    if not _user_has_building_capability(
+        request.user,
+        order.building,
+        Capability.CREATE_WORK_ORDERS,
+        Capability.MANAGE_BUILDINGS,
+    ):
         return JsonResponse(
             {"error": _("You do not have permission to modify attachments for this work order.")},
             status=403,
         )
 
     attachment = get_object_or_404(order.attachments, pk=attachment_id)
+    display_name = (attachment.original_name or "").strip()
+    if not display_name and attachment.file:
+        display_name = Path(attachment.file.name).name
     attachment.delete()
+    actor = request.user if request.user.is_authenticated else None
+    _log_attachment_activity(
+        actor=actor,
+        work_order=order,
+        changes={"added": [], "removed": [display_name]},
+    )
     return JsonResponse({"status": "deleted"}, status=200)

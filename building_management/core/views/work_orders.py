@@ -1249,8 +1249,9 @@ class WorkOrderApprovalDecisionView(LoginRequiredMixin, View):
 class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
     """
     Archive a work order by setting archived_at (via WorkOrder.archive()).
-    - Only staff/owner of the building can archive.
-    - Only allowed when the work order status is DONE.
+    - Users with Capability.APPROVE_WORK_ORDERS or Capability.MANAGE_BUILDINGS
+      (e.g., building owners/managers) can archive.
+    - Only allowed when the work order status is DONE or APPROVED.
     """
     http_method_names = ["post"]
 
@@ -1269,6 +1270,7 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
             self.request.user,
             wo.building,
             Capability.APPROVE_WORK_ORDERS,
+            Capability.MANAGE_BUILDINGS,
         )
 
     def post(self, request, *args, **kwargs):
@@ -1755,6 +1757,7 @@ class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
     model = WorkOrderAttachment
     template_name = "core/attachment_confirm_delete.html"
     pk_url_kwarg = "attachment_pk"
+    raise_exception = True
 
     def dispatch(self, request, *args, **kwargs):
         self.work_order = get_object_or_404(
@@ -1769,7 +1772,12 @@ class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
         return qs.filter(work_order=self.work_order)
 
     def test_func(self):
-        return _user_can_access_building(self.request.user, self.work_order.building)
+        return _user_has_building_capability(
+            self.request.user,
+            self.work_order.building,
+            Capability.CREATE_WORK_ORDERS,
+            Capability.MANAGE_BUILDINGS,
+        )
 
     def get_success_url(self):
         if getattr(self, "next_url", None):
@@ -1781,6 +1789,12 @@ class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
         name = self._attachment_display_name(self.object)
         success_url = self.get_success_url()
         self.object.delete()
+        actor = request.user if request.user.is_authenticated else None
+        _log_attachment_activity(
+            actor=actor,
+            work_order=self.work_order,
+            changes={"added": [], "removed": [name]},
+        )
         messages.error(
             request,
             _("Attachment \"%(name)s\" deleted.") % {"name": name},

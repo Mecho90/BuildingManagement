@@ -4,6 +4,8 @@ import threading
 from typing import Set
 from urllib.parse import quote, urlparse
 
+import logging
+
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import logout
@@ -16,6 +18,7 @@ from django.utils import timezone
 
 _lock = threading.Lock()
 _bootstrapped = False  # process-level guard
+logger = logging.getLogger(__name__)
 
 
 def _model_required_columns(model) -> Set[str]:
@@ -56,7 +59,7 @@ def _missing_schema_for_core() -> tuple[set[str], dict[str, set[str]]]:
 class EnsureCoreSchemaMiddleware:
     """
     Dev-only guard: on first request, if ANY core tables OR columns are missing,
-    run `makemigrations core` and `migrate` once.
+    run `migrate` once when DEBUG=True.
 
     Why: avoid errors like "no such table: core_building" or
          "no such column: core_building.owner_id" on fresh setups.
@@ -64,30 +67,37 @@ class EnsureCoreSchemaMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
+        self.auto_fix_enabled = bool(getattr(settings, "AUTO_FIX_CORE_SCHEMA", False))
+
     def __call__(self, request):
         global _bootstrapped
-        if getattr(settings, "AUTO_FIX_CORE_SCHEMA", False) and not _bootstrapped:
+        if self.auto_fix_enabled and not _bootstrapped:
             with _lock:
                 if not _bootstrapped:
                     self._ensure_schema()
                     _bootstrapped = True
         return self.get_response(request)
 
-    @staticmethod
-    def _ensure_schema() -> None:
+    def _ensure_schema(self) -> None:
         try:
             missing_tables, missing_columns = _missing_schema_for_core()
             if missing_tables or missing_columns:
-                print(f"[core] Schema issues detected. "
-                      f"Missing tables: {sorted(missing_tables)}; "
-                      f"Missing columns: { {k: sorted(v) for k, v in missing_columns.items()} }")
-                # Create migrations if needed, then apply them (idempotent)
-                call_command("makemigrations", "core", interactive=False, verbosity=0)
-                call_command("migrate", interactive=False, verbosity=1)
-                print("[core] Auto-migrate complete. Core schema is ready.")
+                details = (
+                    f"Missing tables: {sorted(missing_tables)}; "
+                    f"Missing columns: { {k: sorted(v) for k, v in missing_columns.items()} }"
+                )
+                if settings.DEBUG:
+                    logger.warning("[core] Schema issues detected. %s", details)
+                    call_command("migrate", interactive=False, verbosity=1)
+                    logger.info("[core] Auto-migrate complete. Core schema is ready.")
+                else:
+                    logger.error(
+                        "[core] Schema drift detected but AUTO_FIX_CORE_SCHEMA is disabled outside "
+                        "DEBUG. %s. Please run `python manage.py migrate` manually.",
+                        details,
+                    )
         except Exception as exc:
-            # Non-fatal in dev; logs let you diagnose if needed
-            print(f"[core] Auto-migrate skipped due to error: {exc}")
+            logger.warning("[core] Auto-migrate skipped due to error: %s", exc)
 
 
 class SessionIdleTimeoutMiddleware:

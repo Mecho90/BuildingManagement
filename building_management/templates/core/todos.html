@@ -57,14 +57,14 @@
                 </button>
               {% endif %}
             </nav>
-            <form class="filter-panel space-y-5 rounded-2xl border border-emerald-100/80 bg-white/70 p-4 dark:border-emerald-500/40 dark:bg-slate-900/40">
+            <form class="filter-panel">
               <div class="flex items-center justify-between gap-3">
                 <span class="sr-only">{% trans "Filter controls" %}</span>
                 {% if show_completed_tab %}
                   <button class="btn btn-danger btn-sm hidden" id="todo-completed-delete-all" data-confirm="{% trans "Delete all completed tasks? This cannot be undone." %}">{% trans "Delete all" %}</button>
                 {% endif %}
               </div>
-              <div class="grid gap-5 md:grid-cols-{% if owner_filter_options %}3{% else %}2{% endif %}">
+              <div class="filter-panel__grid md:grid-cols-{% if owner_filter_options %}3{% else %}2{% endif %}">
                 <div class="space-y-2">
                   <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-search">{% trans "Search tasks" %}</label>
                   <input
@@ -95,8 +95,8 @@
                   </select>
                 </div>
               </div>
-              <div class="flex justify-end gap-3">
-                <button type="button" class="btn" id="todo-filter-apply">{% trans "Filter" %}</button>
+              <div class="filter-panel__actions">
+                <button type="button" class="btn" id="todo-filter-apply">{% trans "Apply filters" %}</button>
               </div>
             </form>
           </div>

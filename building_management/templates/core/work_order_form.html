@@ -17,9 +17,7 @@
     {% endif %}
 
     {% if form.non_field_errors %}
-      <div class="alert alert--danger">
-        {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
-      </div>
+      {% include "components/alert.html" with variant="danger" items=form.non_field_errors aria_live="assertive" %}
     {% endif %}
 
     {% for h in form.hidden_fields %}
@@ -32,36 +30,16 @@
     <div class="grid gap-5">
       {% for field in form.visible_fields %}
         {% if field.name != 'new_attachments' and field.name != 'remove_attachments' %}
-          {% if field.field.widget.input_type == 'checkbox' %}
-            <div class="space-y-1">
-              <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ field }}
-                <span>{{ field.label }}</span>
-              </label>
-              {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
-              {% if field.errors %}
-                <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
-              {% endif %}
-            </div>
-          {% else %}
-            <div class="space-y-1">
-              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {{ field }}
-              {% if field.help_text %}<div class="help">{{ field.help_text|safe }}</div>{% endif %}
-              {% if field.errors %}
-                <div class="errors">{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}</div>
-              {% endif %}
-            </div>
-          {% endif %}
+          {% include "components/form_field.html" with field=field %}
         {% endif %}
       {% endfor %}
     </div>
 
     {{ attachment_panel_html|safe }}
 
-    <div class="flex flex-wrap justify-end gap-3">
-      <button class="btn" type="submit">{% trans "Save" %}</button>
+    <div class="form-actions">
       <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>
+      <button class="btn" type="submit">{% trans "Save" %}</button>
     </div>
   </form>
 </section>

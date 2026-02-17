@@ -1,0 +1,58 @@
+{% load i18n %}
+{% with variant=variant|default:"info" %}
+  {% with aria=aria_live|default:"polite" %}
+    <div class="alert alert--{{ variant }}" data-alert role="{% if aria == 'assertive' %}alert{% else %}status{% endif %}" aria-live="{{ aria }}">
+      <span class="alert__icon" aria-hidden="true">
+        {% if variant == "success" %}
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.12"></circle>
+            <path d="M8.5 12.5l2.5 2.5 4.5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        {% elif variant == "warning" %}
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 4l8 14H4l8-14z" fill="currentColor" opacity="0.15"></path>
+            <path d="M12 9v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <circle cx="12" cy="16" r="1" fill="currentColor"></circle>
+          </svg>
+        {% elif variant == "danger" or variant == "error" %}
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.12"></circle>
+            <path d="M9 9l6 6m0-6l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+        {% else %}
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.12"></circle>
+            <path d="M12 7v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <circle cx="12" cy="16" r="1" fill="currentColor"></circle>
+          </svg>
+        {% endif %}
+      </span>
+      <div class="alert__body">
+        {% if title %}
+          <p class="alert__title">{{ title }}</p>
+        {% endif %}
+        {% if message %}
+          <p class="alert__message">{{ message }}</p>
+        {% endif %}
+        {% if content %}
+          <div class="alert__message">{{ content|safe }}</div>
+        {% endif %}
+        {% if items %}
+          <ul class="alert__list">
+            {% for item in items %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+      {% if dismissible|default_if_none:True %}
+        <button type="button" class="alert__close" data-alert-close>
+          <span class="sr-only">{% trans "Dismiss notification" %}</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      {% endif %}
+    </div>
+  {% endwith %}
+{% endwith %}

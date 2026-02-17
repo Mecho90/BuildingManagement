@@ -1,0 +1,13 @@
+{% with level=level|default:""|upper %}
+  {% if level %}
+    {% if level == "HIGH" %}
+      {% include "components/badge.html" with label=label|default:level tone="danger" size=size icon="components/icons/warning.svg" %}
+    {% elif level == "MEDIUM" %}
+      {% include "components/badge.html" with label=label|default:level tone="warning" size=size icon="components/icons/clock.svg" %}
+    {% elif level == "LOW" %}
+      {% include "components/badge.html" with label=label|default:level tone="success" size=size icon="components/icons/check-circle.svg" %}
+    {% else %}
+      {% include "components/badge.html" with label=label|default:level tone="info" size=size icon="components/icons/info.svg" %}
+    {% endif %}
+  {% endif %}
+{% endwith %}

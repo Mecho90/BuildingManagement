@@ -121,3 +121,30 @@ class TodoItemFormTests(TestCase):
         owner_field = form.fields.get("owner")
         self.assertIsNotNone(owner_field)
         self.assertTrue(owner_field.queryset.filter(pk=admin.pk).exists())
+
+    def test_admin_editing_without_owner_keeps_existing_owner(self):
+        admin = self.User.objects.create_user(username="manager3", password="pass1234")
+        BuildingMembership.objects.create(user=admin, building=None, role=MembershipRole.ADMINISTRATOR)
+        technician = self.User.objects.create_user(username="technician1", password="pass1234")
+        task = TodoItem.objects.create(
+            user=technician,
+            title="Tech task",
+            status=TodoItem.Status.PENDING,
+            week_start=timezone.localdate(),
+            due_date=timezone.localdate(),
+        )
+
+        form = TodoItemForm(
+            data={
+                "title": "Updated tech task",
+                "status": TodoItem.Status.IN_PROGRESS,
+                "due_date": (timezone.localdate() + timedelta(days=2)).isoformat(),
+                "description": "",
+            },
+            instance=task,
+            user=admin,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        updated = form.save()
+        self.assertEqual(updated.user, technician)

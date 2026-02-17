@@ -1,0 +1,15 @@
+{% firstof label content "" as text %}
+{% if text %}
+  {% firstof extra_classes classes class "" as classes_value %}
+  {% firstof icon icon_template "" as icon_value %}
+  {% with tone=variant|default:tone|default:"muted" extra_classes=classes_value icon_template=icon_value %}
+    <span class="badge badge--{{ tone }}{% if size %} badge--{{ size }}{% endif %}{% if extra_classes %} {{ extra_classes }}{% endif %}">
+      {% if icon_template %}
+        <span class="badge__icon" aria-hidden="true">
+          {% include icon_template %}
+        </span>
+      {% endif %}
+      <span class="badge__text">{{ text }}</span>
+    </span>
+  {% endwith %}
+{% endif %}

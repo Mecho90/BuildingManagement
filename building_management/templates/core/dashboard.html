@@ -11,38 +11,46 @@
     </div>
   </div>
 
-  {% with card_base="rounded-lg border border-slate-200 bg-white p-3 text-[13px] shadow-sm transition dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" section_shell="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-card dark:border-slate-700 dark:bg-slate-900/70" %}
+  {% with card_base="ui-card dashboard-card" section_shell="dashboard-panel space-y-4" %}
     <section class="space-y-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Предупреждения за крайни срокове" %}</h2>
         {% if deadline_alert_page and deadline_alert_page.paginator.count %}
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-            {{ deadline_alert_page.paginator.count }}{{ deadline_alert_page.paginator.count|pluralize:" ЕЛЕМЕНТ, ЕЛЕМЕНТА" }}
+            {% blocktrans count total=deadline_alert_page.paginator.count %}{{ total }} alert{% plural %}{{ total }} alerts{% endblocktrans %}
           </span>
         {% endif %}
       </div>
       <div class="{{ section_shell }}">
         {% if deadline_alert_cards %}
-          <div class="grid gap-3 md:grid-cols-2">
+          <div class="grid gap-4 md:grid-cols-2">
             {% for alert in deadline_alert_cards %}
               <article class="{{ card_base }}">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="space-y-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">{{ alert.building }}</p>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white truncate">{{ alert.title }}</h3>
+                <header class="dashboard-card__header">
+                  <div class="space-y-2">
+                    <p class="dashboard-card__eyebrow">{{ alert.building }}</p>
+                    <h3 class="dashboard-card__title">{{ alert.title }}</h3>
+                    {% if alert.reason %}
+                      <p class="dashboard-card__description">{{ alert.reason }}</p>
+                    {% endif %}
                   </div>
-                  <span class="priority-badge {% if alert.priority == 'HIGH' %}priority-badge--high{% elif alert.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">
-                    {{ alert.priority_label }}
+                  <div class="dashboard-card__badges">
+                    {% include "components/badges/priority.html" with level=alert.priority label=alert.priority_label %}
+                    {% include "components/badges/status.html" with code=alert.status_code label=alert.status_label size="sm" %}
+                  </div>
+                </header>
+                <p class="dashboard-card__support{% if alert.is_overdue %} dashboard-card__support--danger{% endif %}">
+                  {{ alert.timing_text }}
+                </p>
+                <div class="dashboard-card__meta">
+                  <span class="dashboard-card__meta-item">
+                    <span class="dashboard-card__meta-label">{% trans "Deadline" %}</span>
+                    <span>{{ alert.deadline_display }}</span>
                   </span>
                 </div>
-                <div class="mt-2 flex flex-wrap items-center gap-3 text-[12px] text-slate-600 dark:text-slate-300">
-                  <span class="font-semibold {% if alert.is_overdue %}text-rose-600 dark:text-rose-300{% else %}text-amber-600 dark:text-amber-300{% endif %}">{{ alert.timing_text }}</span>
-                  <span>{% trans "Deadline" %}: {{ alert.deadline_display }}</span>
-                  <span>{% trans "Status" %}: {{ alert.status_label }}</span>
-                </div>
-                <div class="mt-3 flex gap-2">
-                  <a class="btn btn-xs" href="{% url 'core:work_order_detail' alert.id %}">{% trans "View" %}</a>
-                  <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' alert.id %}">{% trans "Update" %}</a>
+                <div class="dashboard-card__actions">
+                  <a class="btn btn-xs" href="{% url 'core:work_order_detail' alert.id %}" aria-label="{% blocktrans with title=alert.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
+                  <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' alert.id %}" aria-label="{% blocktrans with title=alert.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
                 </div>
               </article>
             {% endfor %}
@@ -64,35 +72,38 @@
           <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{{ technician_section_title }}</h2>
           {% if technician_cards_page and technician_cards_page.paginator.count %}
             <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              {{ technician_cards_page.paginator.count }}{{ technician_cards_page.paginator.count|pluralize:" ЗАДАЧА, ЗАДАЧИ" }}
+              {% blocktrans count total=technician_cards_page.paginator.count %}{{ total }} task{% plural %}{{ total }} tasks{% endblocktrans %}
             </span>
           {% endif %}
         </div>
         <div class="{{ section_shell }}">
           {% if technician_cards %}
-            <div class="grid gap-3 md:grid-cols-2">
+            <div class="grid gap-4 md:grid-cols-2">
               {% for job in technician_cards %}
                 <article class="{{ card_base }}">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="space-y-1">
-                      <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">{{ job.building }}</p>
-                      <h3 class="text-base font-semibold text-slate-900 dark:text-white truncate">{{ job.title }}</h3>
+                  <header class="dashboard-card__header">
+                    <div class="space-y-2">
+                      <p class="dashboard-card__eyebrow">{{ job.building }}</p>
+                      <h3 class="dashboard-card__title">{{ job.title }}</h3>
                       {% if job.description %}
-                        <p class="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{{ job.description }}</p>
+                        <p class="dashboard-card__description">{{ job.description }}</p>
                       {% endif %}
                     </div>
-                    <span class="priority-badge {% if job.priority == 'HIGH' %}priority-badge--high{% elif job.priority == 'MEDIUM' %}priority-badge--medium{% else %}priority-badge--low{% endif %}">
-                      {{ job.priority_label }}
+                    <div class="dashboard-card__badges">
+                      {% include "components/badges/priority.html" with level=job.priority label=job.priority_label %}
+                      {% include "components/badges/status.html" with code=job.status_code label=job.status_label size="sm" %}
+                    </div>
+                  </header>
+                  <div class="dashboard-card__meta">
+                    <span class="dashboard-card__meta-item">
+                      <span class="dashboard-card__meta-label">{% trans "Deadline" %}</span>
+                      <span>{{ job.deadline }}</span>
                     </span>
                   </div>
-                  <div class="mt-2 flex flex-wrap gap-3 text-[12px] text-slate-600 dark:text-slate-300">
-                    <span>{% trans "Deadline" %}: {{ job.deadline }}</span>
-                    <span>{% trans "Status" %}: {{ job.status_label }}</span>
-                  </div>
-                  <div class="mt-3 flex gap-2">
-                    <a class="btn btn-xs" href="{% url 'core:work_order_detail' job.id %}">{% trans "View" %}</a>
+                  <div class="dashboard-card__actions">
+                    <a class="btn btn-xs" href="{% url 'core:work_order_detail' job.id %}" aria-label="{% blocktrans with title=job.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
                     {% if job.can_update %}
-                      <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' job.id %}">{% trans "Update" %}</a>
+                      <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' job.id %}" aria-label="{% blocktrans with title=job.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
                     {% endif %}
                   </div>
                 </article>
@@ -120,28 +131,39 @@
         </div>
         <div class="{{ section_shell }}">
           {% if backoffice_cards %}
-            <div class="grid gap-3 md:grid-cols-2">
+            <div class="grid gap-4 md:grid-cols-2">
               {% for card in backoffice_cards %}
                 <article class="{{ card_base }}">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="space-y-1">
-                      <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">{{ card.building }}</p>
-                      <h3 class="text-base font-semibold text-slate-900 dark:text-white truncate">{{ card.title }}</h3>
+                  <header class="dashboard-card__header">
+                    <div class="space-y-2">
+                      <p class="dashboard-card__eyebrow text-amber-700 dark:text-amber-200">{{ card.building }}</p>
+                      <h3 class="dashboard-card__title">{{ card.title }}</h3>
                       {% if card.note %}
-                        <p class="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{{ card.note }}</p>
+                        <p class="dashboard-card__description">{{ card.note }}</p>
                       {% endif %}
                     </div>
-                    <span class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {{ card.awaiting_since }}
+                    <div class="dashboard-card__badges">
+                      {% include "components/badge.html" with tone="warning" label=_("Awaiting approval") size="sm" %}
+                      {% if card.awaiting_since %}
+                        <span class="badge badge--muted badge--sm">{{ card.awaiting_since }}</span>
+                      {% endif %}
+                    </div>
+                  </header>
+                  <div class="dashboard-card__meta">
+                    <span class="dashboard-card__meta-item">
+                      <span class="dashboard-card__meta-label">{% trans "Requested by" %}</span>
+                      <span>{{ card.requested_by|default:_("Unknown") }}</span>
                     </span>
+                    {% if card.deadline %}
+                      <span class="dashboard-card__meta-item">
+                        <span class="dashboard-card__meta-label">{% trans "Deadline" %}</span>
+                        <span>{{ card.deadline }}</span>
+                      </span>
+                    {% endif %}
                   </div>
-                  <div class="mt-2 flex flex-wrap gap-3 text-[12px] text-slate-600 dark:text-slate-300">
-                    <span>{% trans "Requested by" %}: {{ card.requested_by|default:_('Unknown') }}</span>
-                    <span>{% trans "Deadline" %}: {{ card.deadline }}</span>
-                  </div>
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    <a class="btn btn-xs" href="{% url 'core:work_order_detail' card.id %}">{% trans "Review" %}</a>
-                    <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' card.id %}">{% trans "Update" %}</a>
+                  <div class="dashboard-card__actions">
+                    <a class="btn btn-xs" href="{% url 'core:work_order_detail' card.id %}" aria-label="{% blocktrans with title=card.title %}Review work order {{ title }}{% endblocktrans %}">{% trans "Review" %}</a>
+                    <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' card.id %}" aria-label="{% blocktrans with title=card.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
                   </div>
                 </article>
               {% endfor %}
@@ -164,22 +186,25 @@
           {% endif %}
         </div>
         <div class="{{ section_shell }}">
-          <div class="grid gap-3 md:grid-cols-2">
+          <div class="grid gap-4 md:grid-cols-2">
             {% for task in todo_cards %}
               <article class="{{ card_base }}">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="space-y-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">{{ task.status_label }}</p>
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-white truncate">{{ task.title }}</h3>
+                <header class="dashboard-card__header">
+                  <div class="space-y-2">
+                    <p class="dashboard-card__eyebrow">{{ task.status_label }}</p>
+                    <h3 class="dashboard-card__title">{{ task.title }}</h3>
                     {% if task.description %}
-                      <p class="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{{ task.description }}</p>
+                      <p class="dashboard-card__description">{{ task.description }}</p>
                     {% endif %}
                   </div>
-                  <span class="text-xs font-semibold text-slate-500 dark:text-slate-300">{{ task.due_display }}</span>
-                </div>
-                <div class="mt-3 flex gap-2">
-                  <a class="btn btn-xs" href="{{ task.url }}">{% trans "Edit" %}</a>
-                  <a class="btn btn-danger btn-xs" href="{{ task.delete_url }}">{% trans "Delete" %}</a>
+                  <div class="dashboard-card__badges">
+                    {% include "components/badges/status.html" with code=task.status_code label=task.status_label size="sm" %}
+                    <span class="badge badge--muted badge--sm">{{ task.due_display }}</span>
+                  </div>
+                </header>
+                <div class="dashboard-card__actions">
+                  <a class="btn btn-xs" href="{{ task.url }}" aria-label="{% blocktrans with title=task.title %}Edit task {{ title }}{% endblocktrans %}">{% trans "Edit" %}</a>
+                  <a class="btn btn-danger btn-xs" href="{{ task.delete_url }}" aria-label="{% blocktrans with title=task.title %}Delete task {{ title }}{% endblocktrans %}">{% trans "Delete" %}</a>
                 </div>
               </article>
             {% endfor %}
@@ -220,7 +245,7 @@
                           hx-swap="delete"
                           class="mt-2 inline-flex sm:mt-0">
                       {% csrf_token %}
-                      <button type="submit" class="btn btn-secondary btn-xs">{% trans "Read" %}</button>
+                      <button type="submit" class="btn btn-secondary btn-xs" aria-label="{% blocktrans with message=note.message|striptags %}Mark notification {{ message }} as read{% endblocktrans %}">{% trans "Read" %}</button>
                     </form>
                 </div>
                 </article>

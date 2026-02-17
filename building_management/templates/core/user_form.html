@@ -5,47 +5,28 @@
 {% endblock %}
 {% block content %}
 <section class="space-y-6">
-  <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-2">
-    <h1 class="page-heading">
+  <header class="space-y-1">
+    <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">
       {% if form.instance.pk %}{% trans "Edit user" %}{% else %}{% trans "Add user" %}{% endif %}
     </h1>
-    <p class="text-sm text-slate-500 dark:text-slate-400">
-      {% if form.instance.pk %}
-        {% trans "Update account details, flags, and contact information." %}
-      {% else %}
+    {% if not form.instance.pk %}
+      <p class="text-sm text-slate-500 dark:text-slate-400">
         {% trans "Create a new account and assign the right access level." %}
-      {% endif %}
-    </p>
+      </p>
+    {% endif %}
   </header>
 
-  <form method="post" class="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+  <form method="post" class="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900" novalidate>
     {% csrf_token %}
     {% if form.non_field_errors %}
-      <div class="alert alert--error">
-        {{ form.non_field_errors }}
-      </div>
+      {% include "components/alert.html" with variant="danger" items=form.non_field_errors aria_live="assertive" %}
     {% endif %}
 
-    <div class="grid gap-4 md:grid-cols-2 md:items-start">
+    <div class="grid gap-5 md:grid-cols-2">
       {% for field in form %}
-        {% if field.field.widget.input_type == "checkbox" and field.name != "roles" %}
-          <div class="md:col-span-2">
-            <label class="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-              {{ field }}
-              <span>
-                {{ field.label }}
-                {% if field.help_text %}
-                  <span class="block text-xs font-normal text-slate-500 dark:text-slate-400">{{ field.help_text }}</span>
-                {% endif %}
-              </span>
-            </label>
-            {% if field.errors %}
-              <p class="mt-1 text-sm text-rose-600 dark:text-rose-400">{{ field.errors|striptags }}</p>
-            {% endif %}
-          </div>
-        {% elif field.name == "roles" %}
-          <div class="space-y-2 md:col-span-2">
-            <span class="block text-sm font-medium text-slate-600 dark:text-slate-300">{{ field.label }}</span>
+        {% if field.name == "roles" %}
+          <div class="space-y-3 md:col-span-2">
+            <span class="form-field__label">{{ field.label }}</span>
             <div class="grid gap-3 md:grid-cols-2">
               {% for choice in field %}
                 <label class="flex gap-3 rounded-2xl border border-slate-200 bg-white/90 p-4 text-sm text-slate-700 shadow-sm transition hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
@@ -55,36 +36,40 @@
                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ form.role_descriptions|dict_get:choice.data.value }}</p>
                   </span>
                 </label>
+              {% empty %}
+                <p class="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">{% trans "No roles available." %}</p>
               {% endfor %}
             </div>
             {% if field.errors %}
-              <p class="text-sm text-rose-600 dark:text-rose-400">{{ field.errors|striptags }}</p>
+              <div class="form-field__errors">
+                {% for error in field.errors %}<div>{{ error }}</div>{% endfor %}
+              </div>
             {% endif %}
           </div>
+        {% elif field.field.widget.input_type == "checkbox" %}
+          <div class="md:col-span-2">
+            {% include "components/form_field.html" with field=field %}
+          </div>
+        {% elif field.name == "email" %}
+          {% trans "Optional, used for contact and password resets." as email_hint %}
+          <div>
+            {% include "components/form_field.html" with field=field help_text=field.help_text|default:email_hint icon="mail" %}
+          </div>
+        {% elif field.name == "first_name" or field.name == "last_name" or field.name == "username" %}
+          <div>
+            {% include "components/form_field.html" with field=field icon="user" %}
+          </div>
         {% else %}
-          <div class="space-y-2">
-            <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-600 dark:text-slate-300">
-              {{ field.label }}
-            </label>
-            {{ field }}
-            {% if field.help_text %}
-              <div class="text-xs text-slate-500 dark:text-slate-400 [&>ul]:list-disc [&>ul]:list-inside [&>ul]:space-y-1 [&>ul]:pl-4">
-                {{ field.help_text|safe }}
-              </div>
-            {% elif field.name == "email" %}
-              <p class="text-xs text-slate-500 dark:text-slate-400">{% trans "Optional, used for contact and password resets." %}</p>
-            {% endif %}
-            {% if field.errors %}
-              <p class="text-sm text-rose-600 dark:text-rose-400">{{ field.errors|striptags }}</p>
-            {% endif %}
+          <div>
+            {% include "components/form_field.html" with field=field %}
           </div>
         {% endif %}
       {% endfor %}
     </div>
 
-    <div class="flex flex-wrap justify-end gap-3">
-      <button class="btn" type="submit">{% trans "Save" %}</button>
+    <div class="form-actions">
       <a class="btn btn-secondary" href="{% url 'core:users_list' %}">{% trans "Cancel" %}</a>
+      <button class="btn" type="submit">{% trans "Save" %}</button>
     </div>
   </form>
 </section>
