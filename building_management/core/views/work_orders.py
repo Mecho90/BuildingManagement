@@ -1317,12 +1317,16 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def test_func(self):
         wo = self.get_object()
-        return _user_has_building_capability(
+        if _user_has_building_capability(
             self.request.user,
             wo.building,
             Capability.APPROVE_WORK_ORDERS,
             Capability.MANAGE_BUILDINGS,
-        )
+        ):
+            return True
+        if wo.lawyer_only and user_is_lawyer(self.request.user, building_id=wo.building_id):
+            return True
+        return False
 
     def post(self, request, *args, **kwargs):
         wo = self.get_object()

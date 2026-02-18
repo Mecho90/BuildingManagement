@@ -1,0 +1,13 @@
+{% load i18n %}
+{% if count %}
+  {% blocktrans count counter=count asvar indicator_label %}{{ counter }} lawyer-only work order{% plural %}{{ counter }} lawyer-only work orders{% endblocktrans %}
+  <span
+    class="lawyer-alert-indicator"
+    role="status"
+    title="{{ title|default:indicator_label }}"
+    aria-label="{{ indicator_label }}"
+  >
+    <span class="lawyer-alert-indicator__icon" aria-hidden="true">⚠</span>
+    <span class="lawyer-alert-indicator__count">{{ count }}</span>
+  </span>
+{% endif %}

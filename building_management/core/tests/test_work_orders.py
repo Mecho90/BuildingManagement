@@ -7,8 +7,64 @@ from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from core.forms import WorkOrderForm
-from core.models import Building, WorkOrder, WorkOrderAuditLog
+from core.models import Building, Unit, WorkOrder, WorkOrderAuditLog
 from core.views.work_orders import _maybe_handle_forwarding_change
+
+
+class LawyerOrderIndicatorTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.owner = User.objects.create_user(username="owner", password="pass")
+        self.secondary_owner = User.objects.create_user(username="owner-2", password="pass")
+        self.building = Building.objects.create(owner=self.owner, name="Alpha")
+        self.other_building = Building.objects.create(owner=self.secondary_owner, name="Beta")
+        self.unit_a = Unit.objects.create(building=self.building, number="1A")
+        self.unit_b = Unit.objects.create(building=self.building, number="2B")
+        self.other_unit = Unit.objects.create(building=self.other_building, number="9Z")
+
+    def _make_order(self, *, unit=None, building=None, lawyer_only=True, archived=False, title_suffix=""):
+        if unit is not None:
+            building = unit.building
+        building = building or self.building
+        order = WorkOrder.objects.create(
+            building=building,
+            unit=unit,
+            title=f"Order {WorkOrder.objects.count() + 1}{title_suffix}",
+            deadline=timezone.localdate(),
+            lawyer_only=lawyer_only,
+        )
+        if archived:
+            order.archived_at = timezone.now()
+            order.save(update_fields=["archived_at"])
+        return order
+
+    def test_building_annotation_counts_active_lawyer_orders(self):
+        self._make_order(unit=self.unit_a)
+        self._make_order(unit=self.unit_b, archived=True)
+        self._make_order(unit=self.unit_a, lawyer_only=False)
+        self._make_order(unit=self.other_unit)
+
+        annotated = (
+            Building.objects.filter(pk=self.building.pk)
+            .with_lawyer_alerts()
+            .get()
+        )
+        self.assertEqual(annotated.lawyer_orders_count, 1)
+
+    def test_unit_annotation_counts_active_lawyer_orders(self):
+        self._make_order(unit=self.unit_a)
+        self._make_order(unit=self.unit_a, title_suffix="-2")
+        self._make_order(unit=self.unit_a, archived=True, title_suffix="-archived")
+        self._make_order(unit=self.unit_b, lawyer_only=False)
+        self._make_order(unit=self.other_unit)
+
+        units = (
+            Unit.objects.filter(pk__in=[self.unit_a.pk, self.unit_b.pk])
+            .with_lawyer_alerts()
+        )
+        counts = {u.pk: u.lawyer_orders_count for u in units}
+        self.assertEqual(counts[self.unit_a.pk], 2)
+        self.assertEqual(counts[self.unit_b.pk], 0)
 
 
 class WorkOrderFormForwardingTests(TestCase):

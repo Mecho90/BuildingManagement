@@ -64,7 +64,7 @@
                   </a>
                 {% endif %}
                 {% if work_orders_enabled and work_orders_url %}
-                  <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url css_class='nav-link--active' %}">
+                  <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url|add:'$' css_class='nav-link--active' %}">
                     {% trans "Work Orders" %}
                   </a>
                 {% endif %}

@@ -80,6 +80,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
         qs = (
             Building.objects.visible_to(user)
             .with_unit_stats()
+            .with_lawyer_alerts()
             .select_related("owner")
         )
 
@@ -184,7 +185,10 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
 
     # Only buildings the user may see
     def get_queryset(self):
-        return Building.objects.visible_to(self.request.user)
+        return (
+            Building.objects.visible_to(self.request.user)
+            .with_lawyer_alerts()
+        )
 
     # Owner/assigned members only
     def test_func(self):
@@ -289,7 +293,10 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             if u_sort.lstrip("-") not in {"number", "floor", "owner_name"}:
                 u_sort = "number"
 
-            units_qs = Unit.objects.filter(building=bld)
+            units_qs = (
+                Unit.objects.filter(building=bld)
+                .with_lawyer_alerts()
+            )
 
             if u_q:
                 filters = (

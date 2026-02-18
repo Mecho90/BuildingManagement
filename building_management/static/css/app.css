@@ -186,6 +186,19 @@
   table tbody tr:hover td {
     @apply bg-emerald-50/70 dark:bg-slate-800/70;
   }
+
+  .lawyer-alert-indicator {
+    @apply inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-orange-700 shadow-sm
+           dark:border-orange-500/60 dark:bg-orange-500/10 dark:text-orange-200;
+  }
+
+  .lawyer-alert-indicator__icon {
+    @apply text-base leading-none;
+  }
+
+  .lawyer-alert-indicator__count {
+    @apply leading-none;
+  }
 }
 
 @layer utilities {

@@ -94,6 +94,21 @@ class BuildingQuerySet(models.QuerySet):
             ),
         )
 
+    def with_lawyer_alerts(self):
+        """
+        Annotate each Building with the number of active lawyer-only work orders.
+        """
+        return self.annotate(
+            _lawyer_orders_count=Count(
+                "work_orders",
+                filter=Q(
+                    work_orders__lawyer_only=True,
+                    work_orders__archived_at__isnull=True,
+                ),
+                distinct=True,
+            )
+        )
+
 
 class UnitQuerySet(models.QuerySet):
     def visible_to(self, user):
@@ -113,6 +128,19 @@ class UnitQuerySet(models.QuerySet):
         if not building_ids:
             return qs.none()
         return qs.filter(building_id__in=building_ids)
+
+    def with_lawyer_alerts(self):
+        """Annotate units with their active lawyer-only work-order counts."""
+        return self.annotate(
+            _lawyer_orders_count=Count(
+                "work_orders",
+                filter=Q(
+                    work_orders__lawyer_only=True,
+                    work_orders__archived_at__isnull=True,
+                ),
+                distinct=True,
+            )
+        )
 
 
 class WorkOrderQuerySet(models.QuerySet):
@@ -338,6 +366,14 @@ class Building(TimeStampedModel):
             ],
         ).count()
 
+    @property
+    def lawyer_orders_count(self) -> int:
+        """Total active lawyer-only work orders associated with this building."""
+        val = getattr(self, "_lawyer_orders_count", None)
+        if val is not None:
+            return int(val)
+        return self.work_orders.filter(lawyer_only=True, archived_at__isnull=True).count()
+
 
 phone_validator = RegexValidator(
     r"^\+?\d{7,15}$",
@@ -399,6 +435,14 @@ class Unit(TimeStampedModel):
 
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.number} @ {self.building.name}"
+
+    @property
+    def lawyer_orders_count(self) -> int:
+        """Active lawyer-only work orders associated with this unit."""
+        val = getattr(self, "_lawyer_orders_count", None)
+        if val is not None:
+            return int(val)
+        return self.work_orders.filter(lawyer_only=True, archived_at__isnull=True).count()
 
     def clean(self):
         super().clean()

@@ -49,7 +49,7 @@ class WorkOrderArchiveViewTests(TestCase):
         order.refresh_from_db()
         self.assertIsNotNone(order.archived_at)
 
-    def test_user_without_manage_or_approve_is_denied(self):
+    def test_lawyer_denied_for_non_lawyer_only_order(self):
         user = self.User.objects.create_user(username="lawyer", password="pass1234")
         BuildingMembership.objects.create(
             user=user,
@@ -66,3 +66,23 @@ class WorkOrderArchiveViewTests(TestCase):
         self.assertIn(response.status_code, (302, 403))
         order.refresh_from_db()
         self.assertIsNone(order.archived_at)
+
+    def test_lawyer_can_archive_lawyer_only_order(self):
+        user = self.User.objects.create_user(username="lawyer2", password="pass1234")
+        BuildingMembership.objects.create(
+            user=user,
+            building=self.building,
+            role=MembershipRole.LAWYER,
+        )
+        order = self._create_order()
+        order.lawyer_only = True
+        order.save(update_fields=["lawyer_only"])
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse("core:work_order_archive", args=[order.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
+        order.refresh_from_db()
+        self.assertIsNotNone(order.archived_at)
