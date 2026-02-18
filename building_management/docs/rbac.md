@@ -33,7 +33,7 @@ Use `BuildingMembership.capabilities_override` to fine-tune privileges. Its stru
 
 ## Work order workflow
 
-Technicians progress requests from **Open → In progress → Awaiting approval**, optionally adding a replacement request note so approvers know which materials or budget are needed. Backoffice employees or administrators (roles with the `approve_work_orders` capability) review orders in the awaiting queue and either approve them (transition to **Done**) or send them back to **In progress** with any follow-up work. The actor who submitted the approval request cannot self-approve unless they also hold an approver role.
+Technicians progress requests from **Open → In progress → Awaiting approval from backoffice**, optionally adding a replacement request note so approvers know which materials or budget are needed. Backoffice employees or administrators (roles with the `approve_work_orders` capability) review orders in the awaiting queue and either approve them (transition to **Done**) or send them back to **In progress** with any follow-up work. The actor who submitted the approval request cannot self-approve unless they also hold an approver role.
 
 ## Auditing
 

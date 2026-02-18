@@ -124,7 +124,7 @@
     {% if backoffice_cards %}
       <section class="space-y-4">
         <div class="flex items-center justify-between gap-3">
-          <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Awaiting approval" %}</h2>
+          <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Очаква одобрение от бекофиса" %}</h2>
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
             {% blocktrans count total=backoffice_cards|length %}{{ total }} request{% plural %}{{ total }} requests{% endblocktrans %}
           </span>
@@ -143,7 +143,7 @@
                       {% endif %}
                     </div>
                     <div class="dashboard-card__badges">
-                      {% include "components/badge.html" with tone="warning" label=_("Awaiting approval") size="sm" %}
+                      {% include "components/badge.html" with tone="warning" label=_("Очаква одобрение от бекофиса") size="sm" %}
                       {% if card.awaiting_since %}
                         <span class="badge badge--muted badge--sm">{{ card.awaiting_since }}</span>
                       {% endif %}

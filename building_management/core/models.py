@@ -4,10 +4,12 @@ from __future__ import annotations
 import mimetypes
 import uuid
 from datetime import date, datetime, timedelta
+import time
 from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
@@ -39,17 +41,32 @@ def start_of_week(value: date | datetime | None = None) -> date:
 # QuerySets with per-user visibility helpers
 # ---------------------------------------------------------------------------
 
+def _resolve_visibility_scope(user):
+    """
+    Returns a tuple of (scope, resolver, ids) where scope can be:
+    - "none": unauthenticated users
+    - "all": unrestricted access (superuser or VIEW_ALL buildings)
+    - "subset": filter to provided building ids
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return "none", None, set()
+    if getattr(user, "is_superuser", False):
+        return "all", None, set()
+    from .authz import CapabilityResolver  # avoid circular import
+
+    resolver = CapabilityResolver(user)
+    building_ids = resolver.visible_building_ids()
+    if building_ids is None:
+        return "all", resolver, set()
+    return "subset", resolver, set(building_ids or [])
+
+
 class BuildingQuerySet(models.QuerySet):
     def visible_to(self, user):
-        if not user or not user.is_authenticated:
+        scope, _, building_ids = _resolve_visibility_scope(user)
+        if scope == "none":
             return self.none()
-        if user.is_superuser:
-            return self
-        from .authz import CapabilityResolver
-
-        resolver = CapabilityResolver(user)
-        building_ids = resolver.visible_building_ids()
-        if building_ids is None:
+        if scope == "all":
             return self
         if not building_ids:
             return self.none()
@@ -80,36 +97,43 @@ class BuildingQuerySet(models.QuerySet):
 
 class UnitQuerySet(models.QuerySet):
     def visible_to(self, user):
-        if not user or not user.is_authenticated:
-            return self.none()
-        if user.is_superuser:
-            return self
-        from .authz import CapabilityResolver
-
-        resolver = CapabilityResolver(user)
-        building_ids = resolver.visible_building_ids()
-        if building_ids is None:
-            return self
+        scope, _, building_ids = _resolve_visibility_scope(user)
+        try:
+            office_id = Building.system_default_id()
+        except Exception:
+            office_id = None
+        qs = self
+        if office_id:
+            qs = qs.exclude(building_id=office_id)
+            building_ids.discard(office_id)
+        if scope == "none":
+            return qs.none()
+        if scope == "all":
+            return qs
         if not building_ids:
-            return self.none()
-        return self.filter(building_id__in=building_ids)
+            return qs.none()
+        return qs.filter(building_id__in=building_ids)
 
 
 class WorkOrderQuerySet(models.QuerySet):
     def visible_to(self, user):
-        if not user or not user.is_authenticated:
+        scope, resolver, building_ids = _resolve_visibility_scope(user)
+        if scope == "none":
             return self.none()
-        if user.is_superuser:
+        if getattr(user, "is_superuser", False):
             return self
-        from .authz import CapabilityResolver
+        if resolver is None:
+            from .authz import CapabilityResolver  # avoid circular import
 
-        resolver = CapabilityResolver(user)
+            resolver = CapabilityResolver(user)
         qs = self
-        building_ids = resolver.visible_building_ids()
-        if building_ids is not None:
+        if scope == "subset":
             if not building_ids:
                 return self.none()
-            qs = qs.filter(building_id__in=building_ids)
+            qs = qs.filter(
+                Q(building_id__in=building_ids)
+                | Q(forwarded_to_building_id__in=building_ids)
+            )
         can_view_confidential = resolver.has(Capability.VIEW_CONFIDENTIAL_WORK_ORDERS)
         if not can_view_confidential and _user_can_view_confidential_orders(user):
             can_view_confidential = True
@@ -178,6 +202,11 @@ class TimeStampedModel(models.Model):
 
 
 class Building(TimeStampedModel):
+    _system_default_id_cache: int | None = None
+    _system_default_cache_loaded = False
+    _system_default_cache_key = "core:system_default_building_id"
+    _system_default_cache_timestamp: float | None = None
+
     class Role(models.TextChoices):
         TECH_SUPPORT = "TECH_SUPPORT", _("Technical Support")
         PROPERTY_MANAGER = "PROPERTY_MANAGER", _("Property Manager")
@@ -198,6 +227,11 @@ class Building(TimeStampedModel):
         default=Role.TECH_SUPPORT,
         verbose_name=_("Role"),
     )
+    is_system_default = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=_("Marks the singleton Office building that remains unit-less."),
+    )
 
     objects = BuildingQuerySet.as_manager()
 
@@ -205,9 +239,78 @@ class Building(TimeStampedModel):
         ordering = ["name", "id"]
         verbose_name = _("Building")
         verbose_name_plural = _("Buildings")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("is_system_default",),
+                condition=Q(is_system_default=True),
+                name="unique_system_default_building",
+            )
+        ]
 
     def __str__(self) -> str:  # pragma: no cover
         return self.name
+
+    @classmethod
+    def _system_default_cache_timeout(cls) -> int | None:
+        raw = getattr(settings, "SYSTEM_DEFAULT_BUILDING_CACHE_TIMEOUT", 300)
+        if raw is None:
+            return None
+        try:
+            timeout = int(raw)
+        except (TypeError, ValueError):
+            return 300
+        return max(timeout, 0)
+
+    @classmethod
+    def get_system_default(cls) -> "Building | None":
+        pk = cls.system_default_id()
+        if not pk:
+            return None
+        return cls.objects.filter(pk=pk).first()
+
+    @classmethod
+    def system_default_id(cls, *, force_refresh: bool = False) -> int | None:
+        now = time.monotonic()
+        ttl = cls._system_default_cache_timeout()
+        if (
+            cls._system_default_cache_loaded
+            and not force_refresh
+            and ttl
+            and cls._system_default_cache_timestamp is not None
+            and now - cls._system_default_cache_timestamp >= ttl
+        ):
+            force_refresh = True
+
+        if cls._system_default_cache_loaded and not force_refresh:
+            return cls._system_default_id_cache
+
+        cache_key = cls._system_default_cache_key
+        sentinel = object()
+        if not force_refresh:
+            cached_value = cache.get(cache_key, sentinel)
+            if cached_value is not sentinel:
+                cls._system_default_id_cache = cached_value
+                cls._system_default_cache_loaded = True
+                cls._system_default_cache_timestamp = now
+                return cached_value
+
+        cls._system_default_id_cache = (
+            cls.objects.filter(is_system_default=True)
+            .values_list("id", flat=True)
+            .first()
+        )
+        cls._system_default_cache_loaded = True
+        cls._system_default_cache_timestamp = now
+        cache_timeout = ttl or None
+        cache.set(cache_key, cls._system_default_id_cache, cache_timeout)
+        return cls._system_default_id_cache
+
+    @classmethod
+    def clear_system_default_cache(cls) -> None:
+        cls._system_default_id_cache = None
+        cls._system_default_cache_loaded = False
+        cls._system_default_cache_timestamp = None
+        cache.delete(cls._system_default_cache_key)
 
     # ---------------------- Derived counters (for templates) -----------------
 
@@ -297,12 +400,27 @@ class Unit(TimeStampedModel):
     def __str__(self) -> str:  # pragma: no cover
         return f"{self.number} @ {self.building.name}"
 
+    def clean(self):
+        super().clean()
+        building = self.building if isinstance(self.building, Building) else None
+        is_system_default = getattr(building, "is_system_default", None)
+        if is_system_default is None and self.building_id:
+            is_system_default = Building.objects.filter(
+                pk=self.building_id,
+                is_system_default=True,
+            ).exists()
+        if is_system_default:
+            raise ValidationError({"building": _("Units cannot be added to the Office building.")})
+
     def save(self, *args, **kwargs):
+        validate = kwargs.pop("validate", True)
         # light normalization to avoid surprises
         if self.number is not None:
             self.number = self.number.strip()
         if self.contact_phone:
             self.contact_phone = self.contact_phone.strip()
+        if validate:
+            self.full_clean()
         super().save(*args, **kwargs)
 
 
@@ -310,7 +428,7 @@ class WorkOrder(TimeStampedModel):
     class Status(models.TextChoices):
         OPEN = "OPEN", _("Open")
         IN_PROGRESS = "IN_PROGRESS", _("In progress")
-        AWAITING_APPROVAL = "AWAITING_APPROVAL", _("Awaiting approval")
+        AWAITING_APPROVAL = "AWAITING_APPROVAL", _("Очаква одобрение от бекофиса")
         APPROVED = "APPROVED", _("Approved")
         REJECTED = "REJECTED", _("Rejected")
         DONE = "DONE", _("Done")
@@ -342,6 +460,7 @@ class WorkOrder(TimeStampedModel):
     title = models.CharField(max_length=255, verbose_name=_("Title"))
     description = models.TextField(blank=True, verbose_name=_("Description"))
     replacement_request_note = models.TextField(blank=True, verbose_name=_("Replacement request note"))
+    forward_note = models.TextField(blank=True, verbose_name=_("Forwarding note"))
 
     status = models.CharField(
         max_length=20,
@@ -373,6 +492,23 @@ class WorkOrder(TimeStampedModel):
 
     # Archiving toggle (when done and user archives)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    forwarded_to_building = models.ForeignKey(
+        Building,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="forwarded_work_orders",
+        verbose_name=_("Forwarded to building"),
+    )
+    forwarded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="work_orders_forwarded",
+        verbose_name=_("Forwarded by"),
+    )
+    forwarded_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Forwarded at"))
     awaiting_approval_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -400,6 +536,12 @@ class WorkOrder(TimeStampedModel):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=("forwarded_to_building", "archived_at"),
+                name="core_wo_forwarded_archived_idx",
+            ),
+        ]
 
     def __str__(self) -> str:  # pragma: no cover
         return self.title
@@ -418,6 +560,23 @@ class WorkOrder(TimeStampedModel):
             raise ValidationError(
                 {"unit": _("Selected unit does not belong to the selected building.")}
             )
+        if self.forwarded_to_building_id:
+            origin = self.building
+            if not origin or not origin.is_system_default:
+                raise ValidationError(
+                    {"forwarded_to_building": _("Only Office work orders can be forwarded.")}
+                )
+            if self.forwarded_to_building_id == self.building_id:
+                raise ValidationError(
+                    {"forwarded_to_building": _("Forwarded building must differ from the origin.")}
+                )
+            if not self.forwarded_at:
+                self.forwarded_at = timezone.now()
+        else:
+            if self.forwarded_by_id or self.forwarded_at or self.forward_note:
+                raise ValidationError(
+                    {"forwarded_to_building": _("Forwarded metadata requires a destination building.")}
+                )
 
     def save(self, *args, **kwargs):
         """
@@ -427,6 +586,13 @@ class WorkOrder(TimeStampedModel):
         - Run `full_clean()` to enforce model validation (deadline required, etc.)
         """
         validate = kwargs.pop("validate", True)
+        previous_forward_target = None
+        if self.pk:
+            previous_forward_target = (
+                WorkOrder.objects.filter(pk=self.pk)
+                .values_list("forwarded_to_building_id", flat=True)
+                .first()
+            )
         if self.title:
             self.title = self.title.strip()
 
@@ -442,7 +608,9 @@ class WorkOrder(TimeStampedModel):
         # Always validate
         if validate:
             self.full_clean()
-        return super().save(*args, **kwargs)
+        result = super().save(*args, **kwargs)
+        self._maybe_log_forwarding(previous_forward_target)
+        return result
 
     # ---------------------------- Convenience API ---------------------------
 
@@ -455,6 +623,26 @@ class WorkOrder(TimeStampedModel):
         if not self.is_archived:
             self.archived_at = timezone.now()
             self.save(update_fields=["archived_at"], validate=False)
+
+    def _maybe_log_forwarding(self, previous_target_id: int | None):
+        new_target_id = self.forwarded_to_building_id
+        if not new_target_id or new_target_id == previous_target_id:
+            return
+        forwarded_at = self.forwarded_at or timezone.now()
+        if not self.forwarded_at:
+            WorkOrder.objects.filter(pk=self.pk).update(forwarded_at=forwarded_at)
+            self.forwarded_at = forwarded_at
+        from_building_id = previous_target_id or self.building_id
+        if not from_building_id:
+            return
+        WorkOrderForwarding.objects.create(
+            work_order=self,
+            from_building_id=from_building_id,
+            to_building_id=new_target_id,
+            forwarded_by=self.forwarded_by,
+            forwarded_at=forwarded_at,
+            note=self.forward_note or "",
+        )
 
 
 def work_order_attachment_upload_to(instance, filename: str) -> str:
@@ -525,6 +713,51 @@ class WorkOrderAttachment(TimeStampedModel):
                 self.size = 0
 
         super().save(*args, **kwargs)
+
+
+class WorkOrderForwarding(TimeStampedModel):
+    work_order = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name="forwarding_history",
+    )
+    from_building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        related_name="forwarding_origins",
+    )
+    to_building = models.ForeignKey(
+        Building,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="forwarding_targets",
+    )
+    forwarded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="forwarding_events",
+    )
+    forwarded_at = models.DateTimeField(default=timezone.now)
+    note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-forwarded_at", "-id")
+        indexes = [
+            models.Index(
+                fields=("to_building", "forwarded_at"),
+                name="core_forwarding_target_idx",
+            ),
+        ]
+        verbose_name = _("Work order forwarding event")
+        verbose_name_plural = _("Work order forwarding events")
+
+    def __str__(self):  # pragma: no cover
+        from_name = getattr(self.from_building, "name", "—")
+        to_name = getattr(self.to_building, "name", "—")
+        return f"{self.work_order} :: {from_name} → {to_name}"
 
 
 class TodoList(TimeStampedModel):

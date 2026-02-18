@@ -55,9 +55,14 @@
                     {% trans "To-Dos" %}
                   </a>
                 {% endif %}
-                <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/' css_class='nav-link--active' %}">
+                <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/$' css_class='nav-link--active' %}">
                   {% trans "Buildings" %}
                 </a>
+                {% if office_building_enabled and office_building_url %}
+                  <a href="{{ office_building_url }}" class="nav-link {% active_nav office_building_pattern css_class='nav-link--active' %}">
+                  {% trans "Офис" %}
+                  </a>
+                {% endif %}
                 {% if work_orders_enabled and work_orders_url %}
                   <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url css_class='nav-link--active' %}">
                     {% trans "Work Orders" %}
@@ -139,7 +144,7 @@
       </header>
 
       <main class="flex-1">
-        <div class="layout-shell mx-auto my-6 w-full max-w-7xl rounded-3xl border border-emerald-100/70 bg-white/95 px-4 py-8 shadow-card backdrop-blur sm:px-6 lg:px-10 dark:border-slate-800/70 dark:bg-slate-900/85">
+        <div class="layout-shell mx-auto my-6 w-full max-w-[90rem] rounded-3xl border border-emerald-100/70 bg-white/95 px-4 py-8 shadow-card backdrop-blur sm:px-8 lg:px-14 dark:border-slate-800/70 dark:bg-slate-900/85">
           {% block content %}{% endblock %}
         </div>
       </main>

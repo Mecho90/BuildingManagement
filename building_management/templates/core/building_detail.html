@@ -8,21 +8,28 @@
   <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-4">
     <nav aria-label="{% trans 'Breadcrumb' %}">
       <ol class="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-        <li>
-          <a href="{% url 'core:buildings_list' %}" class="hover:text-emerald-600 dark:hover:text-emerald-300">
-            {% trans "Buildings" %}
-          </a>
-        </li>
-        <li aria-hidden="true">/</li>
-        <li class="text-slate-700 dark:text-slate-200 font-medium break-words hyphens-auto">
-          {{ building.name }}
+        <li class="text-slate-700 dark:text-slate-200 font-medium">
+          {% trans "Детайли" %}
         </li>
       </ol>
     </nav>
 
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div class="space-y-2">
-        <h1 class="page-heading break-words hyphens-auto">{{ building.name }}</h1>
+        <div class="flex flex-wrap items-center gap-3">
+          <h1 class="page-heading break-words hyphens-auto">
+            {% if building.is_system_default %}
+              {% trans "Офис" %}
+            {% else %}
+              {{ building.name }}
+            {% endif %}
+          </h1>
+          {% if building.is_system_default %}
+            <span class="inline-flex items-center rounded-full border border-orange-300/80 bg-orange-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-700 dark:border-orange-500/60 dark:bg-orange-500/10 dark:text-orange-200">
+              {% trans "Офис (системен по подразбиране)" %}
+            </span>
+          {% endif %}
+        </div>
         <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
           {% if building.address %}
             <div class="space-y-1">
@@ -38,7 +45,7 @@
           {% endif %}
           {% if technician_subrole_label %}
             <div class="space-y-1">
-              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "My technician role" %}</dt>
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Моята технишка роля" %}</dt>
               <dd>{{ technician_subrole_label }}</dd>
             </div>
           {% endif %}
@@ -64,7 +71,9 @@
       </div>
       <div class="flex flex-wrap items-center gap-3">
         {% if can_manage_building %}
-          <a class="btn" href="{% url 'core:building_update' building.id %}">{% trans "Edit building" %}</a>
+          {% if not building.is_system_default %}
+            <a class="btn" href="{% url 'core:building_update' building.id %}">{% trans "Edit building" %}</a>
+          {% endif %}
           <a class="btn btn-danger" href="{% url 'core:building_delete' building.id %}">{% trans "Delete" %}</a>
         {% endif %}
       </div>
@@ -76,14 +85,16 @@
       <a href="{{ tab_urls.work_orders }}" class="rounded-t-2xl px-6 py-3 text-base font-semibold uppercase tracking-wide border-b-4 transition-all duration-200 relative {% if active_tab == 'work_orders' %}border-orange-500 bg-orange-50 text-orange-600 shadow-sm dark:border-orange-400 dark:bg-orange-500/10 dark:text-orange-200{% else %}border-transparent text-slate-500 hover:text-orange-600 hover:border-orange-300 dark:text-slate-300 dark:hover:text-orange-200{% endif %}">
         {% trans "Work Orders" %}
       </a>
-      <span class="h-10 w-px rounded-full bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700" aria-hidden="true"></span>
-      <a href="{{ tab_urls.units }}" class="rounded-t-2xl px-6 py-3 text-base font-semibold uppercase tracking-wide border-b-4 transition-all duration-200 relative {% if active_tab == 'units' %}border-orange-500 bg-orange-50 text-orange-600 shadow-sm dark:border-orange-400 dark:bg-orange-500/10 dark:text-orange-200{% else %}border-transparent text-slate-500 hover:text-orange-600 hover:border-orange-300 dark:text-slate-300 dark:hover:text-orange-200{% endif %}">
-        {% trans "Units" %}
-      </a>
+      {% if show_units_tab %}
+        <span class="h-10 w-px rounded-full bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700" aria-hidden="true"></span>
+        <a href="{{ tab_urls.units }}" class="rounded-t-2xl px-6 py-3 text-base font-semibold uppercase tracking-wide border-b-4 transition-all duration-200 relative {% if active_tab == 'units' %}border-orange-500 bg-orange-50 text-orange-600 shadow-sm dark:border-orange-400 dark:bg-orange-500/10 dark:text-orange-200{% else %}border-transparent text-slate-500 hover:text-orange-600 hover:border-orange-300 dark:text-slate-300 dark:hover:text-orange-200{% endif %}">
+          {% trans "Units" %}
+        </a>
+      {% endif %}
     </nav>
 
     <div class="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      {% if active_tab == 'units' %}
+      {% if show_units_tab and active_tab == 'units' %}
         <section class="space-y-5">
           <div class="flex flex-wrap items-center justify-end gap-3">
             {% if can_manage_units %}
@@ -113,9 +124,23 @@
               {% if u_q or u_per != 25 or u_sort != 'number' %}
                 <a class="btn btn-secondary" href="{{ tab_urls.units }}">{% trans "Reset" %}</a>
               {% endif %}
-              <button class="btn" type="submit">{% trans "Apply filters" %}</button>
+              <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
             </div>
           </form>
+          {% if building.is_system_default and awaiting_queue_badges %}
+            <div class="flex flex-wrap gap-3 rounded-2xl border border-dashed border-emerald-200/70 bg-emerald-50/60 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/5">
+              {% for badge in awaiting_queue_badges %}
+                <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 shadow-sm dark:border-emerald-400/40 dark:bg-slate-900 dark:text-emerald-200">
+                  <span>
+                    {% blocktrans with origin=badge.origin %}Очаква одобрение от бекофиса · {{ origin }}{% endblocktrans %}
+                  </span>
+                  <span class="inline-flex min-w-[1.75rem] items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white dark:bg-emerald-400 dark:text-emerald-950">
+                    {{ badge.count }}
+                  </span>
+                </span>
+              {% endfor %}
+            </div>
+          {% endif %}
 
           <div class="grid gap-4 md:hidden">
             {% for u in units_page %}
@@ -240,7 +265,7 @@
               {% if w_q or w_status or w_per != 25 or w_deadline_range %}
                 <a class="btn btn-secondary" href="{{ tab_urls.work_orders }}">{% trans "Reset" %}</a>
               {% endif %}
-              <button class="btn" type="submit">{% trans "Apply filters" %}</button>
+              <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
             </div>
           </form>
 
@@ -248,17 +273,43 @@
             {% if workorders_page and workorders_page.object_list %}
               {% for w in workorders_page.object_list %}
                 <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
-                  <div class="space-y-1">
-                    <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
-                      <a href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
-                        {{ w.title }}
-                      </a>
-                    </h3>
-                    <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
-                      {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
-                      {% include "components/badges/priority.html" with level=w.priority label=w.get_priority_display size="sm" %}
-                    </div>
+                <div class="space-y-1">
+                  <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
+                    <a href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+                      {{ w.title }}
+                    </a>
+                  </h3>
+                  {% if building.is_system_default and w.awaiting_queue_entry %}
+                    <p class="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-200">
+                    {% blocktrans with origin=w.building.name %}Очаква одобрение от бекофиса · {{ origin }}{% endblocktrans %}
+                    </p>
+                  {% elif building.is_system_default and w.forwarded_to_building %}
+                    <p class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                      {% blocktrans with destination=w.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
+                    </p>
+                  {% elif building.is_system_default and not w.forwarded_to_building %}
+                    <p class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                      {% trans "Forwarding target removed – reassign required" %}
+                    </p>
+                  {% elif w.forwarded_from_office %}
+                    <p class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                      <span>
+                      {% blocktrans with origin=w.building.name %}Произход · {{ origin }}{% endblocktrans %}
+                      </span>
+                      <span>
+                        {% if w.forwarded_to_building %}
+                          {% blocktrans with destination=w.forwarded_to_building.name %}Destination · {{ destination }}{% endblocktrans %}
+                        {% else %}
+                          {% trans "Destination · Removed" %}
+                        {% endif %}
+                      </span>
+                    </p>
+                  {% endif %}
+                  <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
+                    {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
+                    {% include "components/badges/priority.html" with level=w.priority label=w.get_priority_display size="sm" %}
                   </div>
+                </div>
                   <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <div>
                       <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Unit" %}</dt>
@@ -295,6 +346,9 @@
               <thead class="bg-slate-50 dark:bg-slate-800">
                 <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
                   <th class="px-4 py-3">{% trans "Title" %}</th>
+                  {% if building.is_system_default %}
+                    <th class="px-4 py-3">{% trans "Произход" %}</th>
+                  {% endif %}
                   <th class="px-4 py-3">{% trans "Unit" %}</th>
                   <th class="px-4 py-3">{% trans "Priority" %}</th>
                   <th class="px-4 py-3">{% trans "Status" %}</th>
@@ -309,7 +363,42 @@
                     <tr class="text-sm text-slate-700 dark:text-slate-200">
                       <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
                         <a class="break-words hyphens-auto" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
+                        {% if building.is_system_default and w.awaiting_queue_entry %}
+                          <div class="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-200">
+                            {% blocktrans with origin=w.building.name %}Очаква одобрение от бекофиса · {{ origin }}{% endblocktrans %}
+                          </div>
+                        {% elif building.is_system_default and w.forwarded_to_building %}
+                          <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                            {% blocktrans with destination=w.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
+                          </div>
+                        {% elif building.is_system_default and not w.forwarded_to_building %}
+                          <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                            {% trans "Forwarding target removed – reassign required" %}
+                          </div>
+                        {% elif w.forwarded_from_office %}
+                          <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                            <span>
+                              {% blocktrans with origin=w.building.name %}Произход · {{ origin }}{% endblocktrans %}
+                            </span>
+                            <span>
+                              {% if w.forwarded_to_building %}
+                                {% blocktrans with destination=w.forwarded_to_building.name %}Destination · {{ destination }}{% endblocktrans %}
+                              {% else %}
+                                {% trans "Destination · Removed" %}
+                              {% endif %}
+                            </span>
+                          </div>
+                        {% endif %}
                       </td>
+                      {% if building.is_system_default %}
+                        <td class="px-4 py-3">
+                          {% if w.awaiting_queue_entry %}
+                            {{ w.building.name }}
+                          {% else %}
+                            {{ building.name }}
+                          {% endif %}
+                        </td>
+                      {% endif %}
                       <td class="px-4 py-3">{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</td>
                       <td class="px-4 py-3">
                         {% include "components/badges/priority.html" with level=w.priority label=w.get_priority_display size="sm" %}

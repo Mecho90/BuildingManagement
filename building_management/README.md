@@ -3,6 +3,18 @@
 Responsive Django/Tailwind UI for managing buildings, units, and work orders.
 
 Role-based access control (RBAC) is described in [docs/rbac.md](docs/rbac.md).
+Logging and timing instrumentation guidelines live in [docs/logging.md](docs/logging.md), and the release QA checklist is tracked in [docs/qa_checklist.md](docs/qa_checklist.md).
+
+## System Office Building
+
+The application now ships with a singleton **Office** building that acts as the shared workspace for administrators and backoffice employees. It is enforced in the data model through `Building.is_system_default`, cannot contain units, and its work orders are visible to every administrator/backoffice user.
+
+- A schema/data migration auto-creates the Office record (or upgrades an existing one) and purges units accidentally linked to it.
+- Use `python manage.py ensure_office_building` whenever you deploy or rotate staff. The command re-syncs the canonical owner, removes stray units, and provisions memberships for every ADMINISTRATOR/BACKOFFICE user plus owner-level (technician) memberships for all administrator accounts.
+- Control the canonical owner and copy via env vars or flags: `DJANGO_OFFICE_OWNER_USERNAME` / `DJANGO_OFFICE_OWNER_EMAIL` pick the owner account, `DJANGO_OFFICE_BUILDING_NAME`, `DJANGO_OFFICE_BUILDING_ADDRESS`, and `DJANGO_OFFICE_BUILDING_DESCRIPTION` customise the record. Override on demand with `--owner`, `--name`, etc.
+- Owner rotation runbook: set the desired username/email (env or flag) and run `python manage.py ensure_office_building`. The command updates the FK owner, regenerates owner memberships for every administrator, and keeps backoffice memberships in sync.
+- Office work orders are always created inside the Office building and must be forwarded to a destination. The work-order form pins the Office entry at the top, disables units when Office is selected, and exposes a dedicated forwarding panel with owner previews. Forwarded tickets stay visible to the Office owner/backoffice plus the destination owner/backoffice/technicians; confidentiality (`lawyer_only`) still applies as usual.
+- See [docs/office_forwarding.md](docs/office_forwarding.md) for the full forwarding runbook (how to forward, re-route, deal with deleted destinations, and recover from mis-forwarding).
 
 ## Dependencies
 

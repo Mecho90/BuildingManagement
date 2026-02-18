@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Case, IntegerField, Q, When
+from django.db.models import BooleanField, Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
@@ -24,6 +26,7 @@ from ..models import (
     Unit,
     WorkOrder,
 )
+from ..utils.metrics import log_duration
 from .common import (
     CachedObjectMixin,
     CapabilityRequiredMixin,
@@ -47,18 +50,14 @@ __all__ = [
     "UnitDeleteView",
 ]
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
 def _user_can_filter_building_owner(user) -> bool:
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    if getattr(user, "is_superuser", False):
-        return True
-    return BuildingMembership.objects.filter(
-        user=user,
-        role__in=[MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE],
-    ).exists()
+    # All authenticated users can narrow their view by owner; visibility
+    # is still constrained by Building.objects.visible_to in the queryset.
+    return bool(user and getattr(user, "is_authenticated", False))
 
 class BuildingListView(LoginRequiredMixin, ListView):
     model = Building
@@ -153,7 +152,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
             sort_field = "-" + base if sort.startswith("-") else base
 
         self._effective_sort = sort
-        return qs.order_by(sort_field, "id")
+        return qs.order_by("-is_system_default", sort_field, "id")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -207,6 +206,9 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         bld = self.object
         request = self.request
 
+        show_units_tab = not bld.is_system_default
+        ctx["show_units_tab"] = show_units_tab
+
         resolver = CapabilityResolver(request.user) if request.user.is_authenticated else None
         can_manage_building = resolver.has(Capability.MANAGE_BUILDINGS, building_id=bld.pk) if resolver else False
         can_manage_units = can_manage_building or (resolver.has(Capability.CREATE_UNITS, building_id=bld.pk) if resolver else False)
@@ -250,7 +252,9 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         if active_tab == "overview":
             active_tab = "work_orders"
 
-        if active_tab not in {"units", "work_orders"}:
+        if not show_units_tab:
+            active_tab = "work_orders"
+        elif active_tab not in {"units", "work_orders"}:
             active_tab = _tab_hint_from_params()
 
         ctx["active_tab"] = active_tab
@@ -270,107 +274,157 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             base = request.path
             return f"{base}?{query}" if query else base
 
-        ctx["tab_urls"] = {
-            "units": _tab_url("units"),
+        tab_urls = {
             "work_orders": _tab_url("work_orders"),
         }
+        if show_units_tab:
+            tab_urls["units"] = _tab_url("units")
+        ctx["tab_urls"] = tab_urls
 
         # ========================= Units =========================
-        u_q = (self.request.GET.get("u_q") or "").strip()
-        u_per = self._get_int("u_per", 25)
-        u_sort = (self.request.GET.get("u_sort") or "number").strip()
-        if u_sort.lstrip("-") not in {"number", "floor", "owner_name"}:
-            u_sort = "number"
+        if show_units_tab:
+            u_q = (self.request.GET.get("u_q") or "").strip()
+            u_per = self._get_int("u_per", 25)
+            u_sort = (self.request.GET.get("u_sort") or "number").strip()
+            if u_sort.lstrip("-") not in {"number", "floor", "owner_name"}:
+                u_sort = "number"
 
-        units_qs = Unit.objects.filter(building=bld)
+            units_qs = Unit.objects.filter(building=bld)
 
-        if u_q:
-            filters = (
-                Q(number__icontains=u_q)
-                | Q(owner_name__icontains=u_q)
-                | Q(contact_phone__icontains=u_q)
+            if u_q:
+                filters = (
+                    Q(number__icontains=u_q)
+                    | Q(owner_name__icontains=u_q)
+                    | Q(contact_phone__icontains=u_q)
+                )
+                # allow numeric floor match
+                try:
+                    filters |= Q(floor=int(u_q))
+                except (TypeError, ValueError):
+                    pass
+                units_qs = units_qs.filter(filters)
+
+            units_qs = units_qs.order_by(u_sort, "id")
+            units_page = Paginator(units_qs, u_per).get_page(self.request.GET.get("u_page"))
+
+            ctx.update(
+                {
+                    "units_page": units_page,
+                    "u_q": u_q,
+                    "u_per": u_per,
+                    "u_sort": u_sort,
+                    "u_active": active_tab == "units",
+                }
             )
-            # allow numeric floor match
-            try:
-                filters |= Q(floor=int(u_q))
-            except (TypeError, ValueError):
-                pass
-            units_qs = units_qs.filter(filters)
+            ctx["units_pagination_query"] = _querystring_without(self.request, "u_page")
 
-        units_qs = units_qs.order_by(u_sort, "id")
-        units_page = Paginator(units_qs, u_per).get_page(self.request.GET.get("u_page"))
+        with log_duration(logger, "building_detail.work_orders", extra={"building_id": bld.pk}):
+            # ===================== Work Orders =======================
+            # EXACTLY the names your template uses
+            w_q = (self.request.GET.get("w_q") or "").strip()
+            w_per = self._get_int("w_per", 25)
+            w_status = (self.request.GET.get("w_status") or "").strip().upper()
+            w_deadline_range_raw = (self.request.GET.get("w_deadline_range") or "").strip()
+            w_deadline_from = None
+            w_deadline_to = None
+            if w_deadline_range_raw:
+                normalized = w_deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
+                parts = [part.strip() for part in normalized.split("/") if part.strip()]
+                if parts:
+                    w_deadline_from = parse_date(parts[0])
+                    if len(parts) > 1:
+                        w_deadline_to = parse_date(parts[1])
 
-        ctx.update(
-            {
-                "units_page": units_page,
-                "u_q": u_q,
-                "u_per": u_per,
-                "u_sort": u_sort,
-                "u_active": active_tab == "units",
-            }
-        )
-        ctx["units_pagination_query"] = _querystring_without(self.request, "u_page")
+            filter_expr = Q(building=bld)
+            awaiting_filter = Q(
+                status=WorkOrder.Status.AWAITING_APPROVAL,
+                archived_at__isnull=True,
+            )
+            awaiting_inbox_filter = awaiting_filter & ~Q(building_id=bld.pk)
+            awaiting_queue_badges: list[dict[str, object]] = []
+            if bld.is_system_default:
+                office_queue_filter = Q(building=bld, forwarded_to_building__isnull=True)
+                filter_expr = office_queue_filter | awaiting_inbox_filter
+                awaiting_counts = (
+                    WorkOrder.objects.visible_to(self.request.user)
+                    .filter(awaiting_inbox_filter)
+                    .values("building_id", "building__name")
+                    .annotate(total=Count("id"))
+                    .order_by(Lower("building__name"))
+                )
+                for entry in awaiting_counts:
+                    origin_name = entry.get("building__name") or _("Unknown building")
+                    awaiting_queue_badges.append(
+                        {
+                            "origin": origin_name,
+                            "count": entry["total"],
+                        }
+                    )
+            else:
+                # Include Office-origin orders that were forwarded to this building.
+                # Relying solely on the Office ID can fail when the default record is missing,
+                # so we fall back to checking the destination FK directly.
+                forwarded_filter = Q(forwarded_to_building=bld)
+                filter_expr |= forwarded_filter
 
-        # ===================== Work Orders =======================
-        # EXACTLY the names your template uses
-        w_q = (self.request.GET.get("w_q") or "").strip()
-        w_per = self._get_int("w_per", 25)
-        w_status = (self.request.GET.get("w_status") or "").strip().upper()
-        w_deadline_range_raw = (self.request.GET.get("w_deadline_range") or "").strip()
-        w_deadline_from = None
-        w_deadline_to = None
-        if w_deadline_range_raw:
-            normalized = w_deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
-            parts = [part.strip() for part in normalized.split("/") if part.strip()]
-            if parts:
-                w_deadline_from = parse_date(parts[0])
-                if len(parts) > 1:
-                    w_deadline_to = parse_date(parts[1])
-
-        wo_qs = (
-            WorkOrder.objects.visible_to(self.request.user)
-            .filter(building=bld)
-            .select_related("unit")
-            .annotate(
-                priority_order=Case(
-                    When(priority__iexact="HIGH", then=0),
-                    When(priority__iexact="MEDIUM", then=1),
-                    When(priority__iexact="LOW", then=2),
-                    default=3,
-                    output_field=IntegerField(),
+            wo_qs = (
+                WorkOrder.objects.visible_to(self.request.user)
+                .filter(filter_expr)
+                .select_related("building", "unit", "forwarded_to_building")
+                .annotate(
+                    priority_order=Case(
+                        When(priority__iexact="HIGH", then=0),
+                        When(priority__iexact="MEDIUM", then=1),
+                        When(priority__iexact="LOW", then=2),
+                        default=3,
+                        output_field=IntegerField(),
+                    ),
+                    forwarded_from_office=Case(
+                        When(forwarded_to_building_id=bld.pk, then=Value(True)),
+                        default=Value(False),
+                        output_field=BooleanField(),
+                    ),
+                    awaiting_queue_entry=Case(
+                        When(
+                            awaiting_inbox_filter,
+                            then=Value(True),
+                        ),
+                        default=Value(False),
+                        output_field=BooleanField(),
+                    ),
                 )
             )
-        )
 
-        wo_qs = wo_qs.filter(archived_at__isnull=True)
+            wo_qs = wo_qs.filter(archived_at__isnull=True)
 
-        if w_q:
-            wo_qs = wo_qs.filter(Q(title__icontains=w_q) | Q(description__icontains=w_q))
+            if w_q:
+                wo_qs = wo_qs.filter(Q(title__icontains=w_q) | Q(description__icontains=w_q))
 
-        valid_status = {choice[0] for choice in WorkOrder.Status.choices}
-        if w_status and w_status in valid_status:
-            wo_qs = wo_qs.filter(status=w_status)
-        if w_deadline_from:
-            wo_qs = wo_qs.filter(deadline__gte=w_deadline_from)
-        if w_deadline_to:
-            wo_qs = wo_qs.filter(deadline__lte=w_deadline_to)
-        if not (w_deadline_from or w_deadline_to):
-            w_deadline_range_raw = ""
+            valid_status = {choice[0] for choice in WorkOrder.Status.choices}
+            if w_status and w_status in valid_status:
+                wo_qs = wo_qs.filter(status=w_status)
+            if w_deadline_from:
+                wo_qs = wo_qs.filter(deadline__gte=w_deadline_from)
+            if w_deadline_to:
+                wo_qs = wo_qs.filter(deadline__lte=w_deadline_to)
+            if not (w_deadline_from or w_deadline_to):
+                w_deadline_range_raw = ""
 
-        wo_qs = wo_qs.order_by("priority_order", "deadline", "-id")
-        workorders_page = Paginator(wo_qs, w_per).get_page(self.request.GET.get("w_page"))
-        ctx.update(
-            {
-                "workorders_page": workorders_page,
-                "w_q": w_q,
-                "w_per": w_per,
-                "w_status": w_status,
-                "w_status_choices": WorkOrder.Status.choices,
-                "w_deadline_range": w_deadline_range_raw,
-                "w_active": active_tab == "work_orders",
-            }
-        )
-        ctx["workorders_pagination_query"] = _querystring_without(self.request, "w_page")
+            wo_qs = wo_qs.order_by("priority_order", "deadline", "-id")
+            workorders_page = Paginator(wo_qs, w_per).get_page(self.request.GET.get("w_page"))
+            ctx.update(
+                {
+                    "workorders_page": workorders_page,
+                    "w_q": w_q,
+                    "w_per": w_per,
+                    "w_status": w_status,
+                    "w_status_choices": WorkOrder.Status.choices,
+                    "w_deadline_range": w_deadline_range_raw,
+                    "w_active": active_tab == "work_orders",
+                    "awaiting_queue_badges": awaiting_queue_badges,
+                }
+            )
+            ctx["workorders_pagination_query"] = _querystring_without(self.request, "w_page")
 
         return ctx
 

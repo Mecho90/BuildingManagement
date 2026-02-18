@@ -39,6 +39,7 @@ from .buildings import (
 )
 from .audit import AuditTrailView
 from .dashboard import DashboardView
+from .health import forwarding_health
 from .notifications import NotificationSnoozeView
 from .todos import TodoListPageView, TodoCreateView, TodoUpdateView, TodoDeleteView
 from .work_orders import (
@@ -104,4 +105,5 @@ __all__ = [
     "WorkOrderDetailView",
     "WorkOrderListView",
     "WorkOrderUpdateView",
+    "forwarding_health",
 ]

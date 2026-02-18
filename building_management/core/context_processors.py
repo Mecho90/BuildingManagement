@@ -4,7 +4,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from .authz import Capability, CapabilityResolver
-from .models import MembershipRole, TodoItem, start_of_week
+from .models import Building, MembershipRole, TodoItem, start_of_week
 from .utils.roles import user_has_role, user_is_lawyer
 
 
@@ -26,6 +26,9 @@ def theme(request):
         "todos_enabled": False,
         "todos_url": "",
         "todos_badge_count": 0,
+        "office_building_enabled": False,
+        "office_building_url": "",
+        "office_building_pattern": "",
     }
 
     user = getattr(request, "user", None)
@@ -86,4 +89,20 @@ def theme(request):
             data["todos_badge_count"] = badge_count
         except Exception:
             data["todos_badge_count"] = 0
+
+        is_admin_role = user_has_role(user, MembershipRole.ADMINISTRATOR)
+        is_backoffice_role = user_has_role(user, MembershipRole.BACKOFFICE)
+        if is_admin_role or is_backoffice_role or getattr(user, "is_superuser", False):
+            office_id = None
+            try:
+                office_id = Building.system_default_id()
+            except Exception:
+                office_id = None
+            if office_id:
+                try:
+                    data["office_building_url"] = reverse("core:building_detail", args=[office_id])
+                    data["office_building_pattern"] = f"/buildings/{office_id}/"
+                    data["office_building_enabled"] = True
+                except NoReverseMatch:
+                    pass
     return data

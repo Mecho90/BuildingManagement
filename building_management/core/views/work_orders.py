@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from functools import lru_cache
@@ -12,7 +13,7 @@ from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import FieldDoesNotExist
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Case, Count, IntegerField, Max, Min, OuterRef, Q, Subquery, Value, When
+from django.db.models import Case, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Value, When
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
@@ -28,10 +29,13 @@ from django.views.generic import CreateView, DeleteView, DetailView, FormView, L
 from ..authz import Capability, CapabilityResolver, log_workorder_action
 from ..forms import MassAssignWorkOrdersForm, WorkOrderForm
 from ..models import Building, BuildingMembership, MembershipRole, WorkOrder, WorkOrderAttachment, WorkOrderAuditLog
+from ..utils.metrics import log_duration
 from ..utils.roles import user_can_approve_work_orders, user_has_role, user_is_lawyer
 from ..services.notifications import (
     notify_approvers_of_pending_order,
     notify_building_technicians_of_mass_assignment,
+    notify_forwarded_work_order,
+    notify_forwarding_reset,
 )
 from .common import (
     CachedObjectMixin,
@@ -43,6 +47,7 @@ from .common import (
     format_attachment_delete_confirm,
 )
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -71,6 +76,39 @@ def _user_can_filter_owner(user):
         user=user,
         role__in=[MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE],
     ).exists()
+
+
+def _maybe_handle_forwarding_change(request, form, work_order):
+    if not getattr(form, "forwarding_changed", False):
+        return
+    actor = request.user if request.user.is_authenticated else None
+    target = getattr(work_order, "forwarded_to_building", None)
+    previous_target_id = getattr(form, "forwarding_previous_id", None)
+    previous_target = None
+    if previous_target_id:
+        previous_target = Building.objects.filter(pk=previous_target_id).first()
+    payload = {
+        "target_id": getattr(target, "pk", None),
+        "target_name": getattr(target, "name", ""),
+        "previous_target_id": previous_target_id,
+        "previous_target_name": getattr(previous_target, "name", "") if previous_target else "",
+        "note": work_order.forward_note or "",
+        "cleared": target is None,
+    }
+    log_workorder_action(
+        actor=actor,
+        work_order=work_order,
+        action=WorkOrderAuditLog.Action.REASSIGNED,
+        payload=payload,
+    )
+    if target:
+        notify_forwarded_work_order(work_order, actor=actor)
+    else:
+        notify_forwarding_reset(
+            work_order,
+            previous_building=previous_target,
+            actor=actor,
+        )
 
 
 class LawyerOrAdminRequiredMixin(UserPassesTestMixin):
@@ -127,15 +165,13 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
         qs = (
             WorkOrder.objects.visible_to(user)
             .filter(lawyer_only=True, archived_at__isnull=True)
-            .select_related("building__owner", "created_by", "unit")
+            .select_related("building__owner", "created_by", "unit", "forwarded_to_building", "forwarded_by")
         )
 
         # owner choices
         self._owner_choices = []
-        owner_ids = (
-            qs.values_list("building__owner_id", flat=True)
-            .distinct()
-        )
+        owner_ids = set(qs.values_list("building__owner_id", flat=True))
+        owner_ids.update(qs.values_list("forwarded_to_building__owner_id", flat=True))
         owner_ids = [oid for oid in owner_ids if oid]
         self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
 
@@ -146,7 +182,12 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
                 When(priority__iexact="low", then=2),
                 default=3,
                 output_field=IntegerField(),
-            )
+            ),
+            effective_owner_id=Case(
+                When(forwarded_to_building__owner_id__isnull=False, then=F("forwarded_to_building__owner_id")),
+                default=F("building__owner_id"),
+                output_field=IntegerField(),
+            ),
         )
 
         if search:
@@ -171,7 +212,7 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
                 owner_param = ""
                 owner_filter = None
         if owner_filter:
-            qs = qs.filter(building__owner_id=owner_filter)
+            qs = qs.filter(effective_owner_id=owner_filter)
         else:
             owner_param = ""
 
@@ -535,131 +576,139 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
     _per_choices = (25, 50, 100, 200)
 
     def get_queryset(self):
-        request = self.request
-        user = request.user
-        resolver = CapabilityResolver(user) if user.is_authenticated else None
-        self._can_view_all = resolver.has(Capability.VIEW_ALL_BUILDINGS) if resolver else False
-        self._can_filter_owner = self._can_view_all or _user_can_filter_owner(user)
+        extra = {"user_id": getattr(getattr(self.request, "user", None), "pk", None)}
+        with log_duration(logger, "work_orders.list_queryset", extra=extra):
+            request = self.request
+            user = request.user
+            resolver = CapabilityResolver(user) if user.is_authenticated else None
+            self._can_view_all = resolver.has(Capability.VIEW_ALL_BUILDINGS) if resolver else False
+            self._can_filter_owner = self._can_view_all or _user_can_filter_owner(user)
 
-        # Page size (validated later in get_paginate_by)
-        try:
-            per = int(request.GET.get("per", self.paginate_by))
-        except (TypeError, ValueError):
-            per = self.paginate_by
-        self._per = per
-
-        search = (request.GET.get("q") or "").strip()
-        status = (request.GET.get("status") or "").strip().upper()
-        priority = (request.GET.get("priority") or "").strip().upper()
-        deadline_range_raw = (request.GET.get("deadline_range") or "").strip()
-        deadline_from = None
-        deadline_to = None
-        if deadline_range_raw:
-            normalized = deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
-            parts = [part.strip() for part in normalized.split("/") if part.strip()]
-            if parts:
-                deadline_from = parse_date(parts[0])
-                if len(parts) > 1:
-                    deadline_to = parse_date(parts[1])
-        valid_status = {choice[0] for choice in WorkOrder.Status.choices}
-        valid_priority = {choice[0] for choice in WorkOrder.Priority.choices}
-        if status and status not in valid_status:
-            status = ""
-        if priority and priority not in valid_priority:
-            priority = ""
-
-        # Use visibility helper + pull related objects
-        base_qs = (
-            WorkOrder.objects.visible_to(user)
-            .filter(archived_at__isnull=True)
-        )
-        qs = base_qs.select_related("building__owner", "unit")
-
-        # Build owner choices for staff (before additional filters)
-        self._owner_choices: list[dict[str, str]] = []
-        if self._can_filter_owner:
-            owner_ids = (
-                Building.objects.filter(work_orders__in=base_qs)
-                .values_list("owner_id", flat=True)
-                .distinct()
-            )
-            owner_ids = [oid for oid in owner_ids if oid]
-            self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
-        else:
-            self._owner_choices = []
-
-        # Priority ordering: High > Medium > Low, then by deadline asc, then newest
-        qs = qs.annotate(
-            priority_order=Case(
-                When(priority__iexact="high", then=0),
-                When(priority__iexact="medium", then=1),
-                When(priority__iexact="low", then=2),
-                default=3,
-                output_field=IntegerField(),
-            )
-        )
-
-        if search:
-            qs = qs.filter(
-                Q(title__icontains=search) | Q(description__icontains=search)
-            )
-
-        if status:
-            qs = qs.filter(status=status)
-        if priority:
-            qs = qs.filter(priority=priority)
-        if deadline_from:
-            qs = qs.filter(deadline__gte=deadline_from)
-        if deadline_to:
-            qs = qs.filter(deadline__lte=deadline_to)
-        if (deadline_from is None) and (deadline_to is None):
-            deadline_range_raw = ""
-
-        owner_param = (request.GET.get("owner") or "").strip()
-        owner_filter = None
-        if owner_param:
+            # Page size (validated later in get_paginate_by)
             try:
-                owner_filter = int(owner_param)
+                per = int(request.GET.get("per", self.paginate_by))
             except (TypeError, ValueError):
-                owner_param = ""
-                owner_filter = None
+                per = self.paginate_by
+            self._per = per
 
-        if owner_filter:
+            search = (request.GET.get("q") or "").strip()
+            status = (request.GET.get("status") or "").strip().upper()
+            priority = (request.GET.get("priority") or "").strip().upper()
+            deadline_range_raw = (request.GET.get("deadline_range") or "").strip()
+            deadline_from = None
+            deadline_to = None
+            if deadline_range_raw:
+                normalized = deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
+                parts = [part.strip() for part in normalized.split("/") if part.strip()]
+                if parts:
+                    deadline_from = parse_date(parts[0])
+                    if len(parts) > 1:
+                        deadline_to = parse_date(parts[1])
+            valid_status = {choice[0] for choice in WorkOrder.Status.choices}
+            valid_priority = {choice[0] for choice in WorkOrder.Priority.choices}
+            if status and status not in valid_status:
+                status = ""
+            if priority and priority not in valid_priority:
+                priority = ""
+
+            # Use visibility helper + pull related objects
+            base_qs = (
+                WorkOrder.objects.visible_to(user)
+                .filter(archived_at__isnull=True)
+            )
+            qs = base_qs.select_related("building__owner", "unit", "forwarded_to_building", "forwarded_by")
+
+            # Build owner choices for staff (before additional filters)
+            self._owner_choices: list[dict[str, str]] = []
             if self._can_filter_owner:
-                qs = qs.filter(building__owner_id=owner_filter)
+                owner_ids = set(
+                    base_qs.values_list("building__owner_id", flat=True)
+                )
+                owner_ids.update(
+                    base_qs.values_list("forwarded_to_building__owner_id", flat=True)
+                )
+                owner_ids = [oid for oid in owner_ids if oid]
+                self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
             else:
-                owner_param = ""
-                owner_filter = None
+                self._owner_choices = []
 
-        sort_param = (request.GET.get("sort") or "priority").strip()
-        sort_map = {
-            "priority": ("priority_order", "deadline", "-pk"),
-            "priority_desc": ("-priority_order", "-deadline", "-pk"),
-            "deadline": ("deadline", "priority_order", "-pk"),
-            "deadline_desc": ("-deadline", "priority_order", "-pk"),
-            "created": ("-created_at",),
-            "created_asc": ("created_at",),
-            "building": ("building__name", "priority_order", "deadline", "-pk"),
-            "building_desc": ("-building__name", "priority_order", "deadline", "-pk"),
-            "owner": ("building__owner__username", "priority_order", "deadline", "-pk"),
-            "owner_desc": ("-building__owner__username", "priority_order", "deadline", "-pk"),
-        }
-        if sort_param not in sort_map:
-            sort_param = "priority"
+            # Priority ordering: High > Medium > Low, then by deadline asc, then newest
+            qs = qs.annotate(
+                priority_order=Case(
+                    When(priority__iexact="high", then=0),
+                    When(priority__iexact="medium", then=1),
+                    When(priority__iexact="low", then=2),
+                    default=3,
+                    output_field=IntegerField(),
+                ),
+                effective_owner_id=Case(
+                    When(forwarded_to_building__owner_id__isnull=False, then=F("forwarded_to_building__owner_id")),
+                    default=F("building__owner_id"),
+                    output_field=IntegerField(),
+                ),
+            )
 
-        if sort_param in {"owner", "owner_desc"} and not self._can_filter_owner:
-            sort_param = "priority"
+            if search:
+                qs = qs.filter(
+                    Q(title__icontains=search) | Q(description__icontains=search)
+                )
 
-        qs = qs.order_by(*sort_map[sort_param])
+            if status:
+                qs = qs.filter(status=status)
+            if priority:
+                qs = qs.filter(priority=priority)
+            if deadline_from:
+                qs = qs.filter(deadline__gte=deadline_from)
+            if deadline_to:
+                qs = qs.filter(deadline__lte=deadline_to)
+            if (deadline_from is None) and (deadline_to is None):
+                deadline_range_raw = ""
 
-        self._search = search
-        self._status = status
-        self._priority = priority
-        self._owner = owner_param
-        self._sort = sort_param
-        self._deadline_range = deadline_range_raw
+            owner_param = (request.GET.get("owner") or "").strip()
+            owner_filter = None
+            if owner_param:
+                try:
+                    owner_filter = int(owner_param)
+                except (TypeError, ValueError):
+                    owner_param = ""
+                    owner_filter = None
 
-        return qs
+            if owner_filter:
+                if self._can_filter_owner:
+                    qs = qs.filter(effective_owner_id=owner_filter)
+                else:
+                    owner_param = ""
+                    owner_filter = None
+
+            sort_param = (request.GET.get("sort") or "priority").strip()
+            sort_map = {
+                "priority": ("priority_order", "deadline", "-pk"),
+                "priority_desc": ("-priority_order", "-deadline", "-pk"),
+                "deadline": ("deadline", "priority_order", "-pk"),
+                "deadline_desc": ("-deadline", "priority_order", "-pk"),
+                "created": ("-created_at",),
+                "created_asc": ("created_at",),
+                "building": ("building__name", "priority_order", "deadline", "-pk"),
+                "building_desc": ("-building__name", "priority_order", "deadline", "-pk"),
+                "owner": ("building__owner__username", "priority_order", "deadline", "-pk"),
+                "owner_desc": ("-building__owner__username", "priority_order", "-pk"),
+            }
+            if sort_param not in sort_map:
+                sort_param = "priority"
+
+            if sort_param in {"owner", "owner_desc"} and not self._can_filter_owner:
+                sort_param = "priority"
+
+            qs = qs.order_by(*sort_map[sort_param])
+
+            self._search = search
+            self._status = status
+            self._priority = priority
+            self._owner = owner_param
+            self._sort = sort_param
+            self._deadline_range = deadline_range_raw
+
+            return qs
 
     def get_paginate_by(self, queryset):
         per = getattr(self, "_per", self.paginate_by)
@@ -720,7 +769,7 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
     def get_queryset(self):
         base = WorkOrder.objects.visible_to(self.request.user)
         return (
-            base.select_related("building__owner", "unit")
+            base.select_related("building__owner", "unit", "forwarded_to_building", "forwarded_by")
             .prefetch_related("attachments", "audit_entries__actor")
         )
 
@@ -962,6 +1011,7 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
             response = super().form_valid(form)
             attachment_changes = form.save_attachments(self.object)
         self._log_creation()
+        _maybe_handle_forwarding_change(self.request, form, self.object)
         actor = self.request.user if self.request.user.is_authenticated else None
         _log_attachment_activity(
             actor=actor,
@@ -1066,6 +1116,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             obj.save()
             attachment_changes = form.save_attachments(obj)
         self.object = obj
+        _maybe_handle_forwarding_change(self.request, form, obj)
         self._after_status_change(previous_status)
         if previous_obj:
             self._log_general_updates(previous_obj, obj, form.changed_data or [])
@@ -1506,7 +1557,7 @@ class ArchivedWorkOrderFilterMixin:
         qs = (
             WorkOrder.objects.visible_to(request.user)
             .filter(archived_at__isnull=False)
-            .select_related("building__owner", "unit")
+            .select_related("building__owner", "unit", "forwarded_to_building", "forwarded_by")
         )
 
         self._summary_per = self._parse_per_param(
@@ -1604,6 +1655,10 @@ class ArchivedWorkOrderFilterMixin:
             earliest_created=Min("created_at"),
             min_priority=Min("priority_order"),
             max_priority=Max("priority_order"),
+            forwarded_total=Count(
+                "id",
+                filter=Q(forwarded_to_building__isnull=False),
+            ),
         )
 
         summary_sort_map = {
@@ -1662,6 +1717,7 @@ class ArchivedWorkOrderFilterMixin:
                         "name": item.get("building__name"),
                         "total": item.get("total"),
                         "owner": owner_label,
+                        "forwarded_total": item.get("forwarded_total") or 0,
                     }
                 )
             summary_page.object_list = processed

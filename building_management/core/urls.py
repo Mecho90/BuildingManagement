@@ -99,4 +99,5 @@ urlpatterns = [
         views.api_workorder_attachment_detail,
         name="api_workorder_attachment_detail",
     ),
+    path("health/forwarding/", views.forwarding_health, name="forwarding_health"),
 ]

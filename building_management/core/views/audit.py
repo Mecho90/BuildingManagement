@@ -80,7 +80,12 @@ class AuditTrailView(LoginRequiredMixin, TemplateView):
         return qs
 
     def _workorder_queryset(self, filters):
-        qs = WorkOrderAuditLog.objects.select_related("actor", "work_order", "building").order_by("-created_at")
+        qs = WorkOrderAuditLog.objects.select_related(
+            "actor",
+            "work_order__forwarded_to_building",
+            "work_order__forwarded_by",
+            "building",
+        ).order_by("-created_at")
         q = filters["q"]
         if q:
             qs = qs.filter(
@@ -115,7 +120,18 @@ class AuditTrailView(LoginRequiredMixin, TemplateView):
             filename = "role-audit.csv"
         else:
             rows = self._workorder_queryset(filters)[:filters["per"]]
-            header = ["timestamp", "actor", "work_order", "action", "building", "payload"]
+            header = [
+                "timestamp",
+                "actor",
+                "work_order",
+                "action",
+                "building",
+                "forwarded_to",
+                "forwarded_by",
+                "forwarded_at",
+                "forward_note",
+                "payload",
+            ]
             data = [
                 [
                     timezone.localtime(entry.created_at).isoformat(),
@@ -123,6 +139,12 @@ class AuditTrailView(LoginRequiredMixin, TemplateView):
                     entry.work_order.title,
                     entry.get_action_display(),
                     getattr(entry.building, "name", ""),
+                    getattr(getattr(entry.work_order, "forwarded_to_building", None), "name", ""),
+                    getattr(getattr(entry.work_order, "forwarded_by", None), "username", ""),
+                    timezone.localtime(entry.work_order.forwarded_at).isoformat()
+                    if getattr(entry.work_order, "forwarded_at", None)
+                    else "",
+                    (entry.work_order.forward_note or "").strip(),
                     entry.payload,
                 ]
                 for entry in rows

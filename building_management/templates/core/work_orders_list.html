@@ -98,7 +98,7 @@
       {% if q or status or owner or sort != 'priority' or per != 25 or priority or deadline_range %}
         <a class="btn btn-secondary" href="{% url 'core:work_orders_list' %}">{% trans "Reset" %}</a>
       {% endif %}
-      <button class="btn" type="submit">{% trans "Apply filters" %}</button>
+      <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
     </div>
   </form>
 
@@ -112,6 +112,11 @@
                 {{ w.title }}
               </a>
             </h2>
+            {% if w.forwarded_to_building %}
+              <p class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                {% blocktrans with destination=w.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
+              </p>
+            {% endif %}
             <p class="text-sm text-slate-500 dark:text-slate-400">
               <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Building" %}:</span>
               <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'core:building_detail' w.building_id %}">
@@ -129,6 +134,12 @@
                   {% endif %}
                 {% endwith %}
               </p>
+              {% if w.forwarded_to_building and w.forwarded_to_building.owner %}
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                  <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Destination owner" %}:</span>
+                  {{ w.forwarded_to_building.owner.get_full_name|default:w.forwarded_to_building.owner.username }}
+                </p>
+              {% endif %}
               <p class="text-sm text-slate-500 dark:text-slate-400">
                 <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Role" %}:</span>
                 {{ w.building.get_role_display|default:"—" }}
@@ -201,21 +212,46 @@
           <tr class="text-sm text-slate-700 dark:text-slate-200">
             <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
               <a class="break-words hyphens-auto" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
+              {% if w.forwarded_to_building %}
+                <div class="mt-1 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                  {% blocktrans with destination=w.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
+                </div>
+              {% endif %}
             </td>
             <td class="px-4 py-3">
-              <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'core:building_detail' w.building_id %}">
-                {{ w.building.name }}
-              </a>
+              <div class="space-y-1">
+                <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300 break-words hyphens-auto" href="{% url 'core:building_detail' w.building_id %}">
+                  {{ w.building.name }}
+                </a>
+                {% if w.forwarded_to_building %}
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {% blocktrans with destination=w.forwarded_to_building.name %}→ {{ destination }}{% endblocktrans %}
+                  </div>
+                {% endif %}
+              </div>
             </td>
             {% if show_owner_info %}
               <td class="px-4 py-3">
-                {% with owner=w.building.owner %}
-                  {% if owner %}
-                    {{ owner.get_full_name|default:owner.username }}
-                  {% else %}
-                    —
+                <div class="space-y-2">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Origin" %}</p>
+                    <p>
+                      {% with owner=w.building.owner %}
+                        {% if owner %}
+                          {{ owner.get_full_name|default:owner.username }}
+                        {% else %}
+                          —
+                        {% endif %}
+                      {% endwith %}
+                    </p>
+                  </div>
+                  {% if w.forwarded_to_building and w.forwarded_to_building.owner %}
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Destination" %}</p>
+                      <p>{{ w.forwarded_to_building.owner.get_full_name|default:w.forwarded_to_building.owner.username }}</p>
+                    </div>
                   {% endif %}
-                {% endwith %}
+                </div>
               </td>
               <td class="px-4 py-3">{{ w.building.get_role_display|default:"—" }}</td>
             {% endif %}

@@ -194,7 +194,7 @@ class NotificationService:
                 deadline__lte=today + timedelta(days=max_window),
             )
             .annotate(priority_window=priority_window)
-            .select_related("building__owner", "unit")
+            .select_related("building__owner", "unit", "forwarded_to_building")
             .order_by("deadline", "-pk")
         )
 
@@ -218,6 +218,12 @@ class NotificationService:
 
             building = wo.building
             building_name = building.name if wo.building_id else _("your building")
+            if wo.forwarded_to_building_id:
+                target = getattr(wo.forwarded_to_building, "name", _("target building"))
+                building_name = _("%(origin)s → %(target)s") % {
+                    "origin": building_name,
+                    "target": target,
+                }
             owner_label = None
             if is_admin and wo.building_id:
                 owner = getattr(building, "owner", None)
@@ -357,6 +363,85 @@ class NotificationService:
         )
 
 
+def _notify_owner_and_backoffice(building, *, key: str, title: str, body: str, notified: set[int] | None = None) -> set[int]:
+    """
+    Helper to fan out notifications to a building owner and its backoffice members.
+    Returns the set of user IDs that were notified so callers can avoid duplicates.
+    """
+    if not building:
+        return set()
+    notified_ids: set[int] = set(notified or [])
+    owner = getattr(building, "owner", None)
+    if owner and owner.is_active and owner.pk not in notified_ids:
+        NotificationService(owner).upsert(
+            NotificationPayload(
+                key=key,
+                category="forwarding",
+                title=title,
+                body=body,
+                level=Notification.Level.INFO,
+            )
+        )
+        notified_ids.add(owner.pk)
+
+    backoffice_members = BuildingMembership.objects.filter(
+        building=building,
+        role=MembershipRole.BACKOFFICE,
+    ).select_related("user")
+    for membership in backoffice_members:
+        user = membership.user
+        if not user or not user.is_active or user.pk in notified_ids:
+            continue
+        NotificationService(user).upsert(
+            NotificationPayload(
+                key=key,
+                category="forwarding",
+                title=title,
+                body=body,
+                level=Notification.Level.INFO,
+            )
+        )
+        notified_ids.add(user.pk)
+    return notified_ids
+
+
+def _notify_building_technicians(
+    building,
+    *,
+    key: str,
+    title: str,
+    body: str,
+    exclude_user_ids: set[int] | None = None,
+    category: str = "forwarding",
+) -> set[int]:
+    """Reusable helper that alerts technicians assigned to ``building``."""
+    if not building:
+        return set()
+    exclude = set(exclude_user_ids or [])
+    notified: set[int] = set()
+    technicians = BuildingMembership.objects.filter(
+        building=building,
+        role=MembershipRole.TECHNICIAN,
+    ).select_related("user")
+    for membership in technicians:
+        user = membership.user
+        if not user or not user.is_active:
+            continue
+        if user.pk in exclude or user.pk in notified:
+            continue
+        NotificationService(user).upsert(
+            NotificationPayload(
+                key=key,
+                category=category,
+                title=title,
+                body=body,
+                level=Notification.Level.INFO,
+            )
+        )
+        notified.add(user.pk)
+    return notified
+
+
 def notify_approvers_of_pending_order(order: WorkOrder, *, exclude_user_id: int | None = None) -> None:
     """Send notifications to users who can approve work orders for the given building."""
     if not order.building_id:
@@ -381,10 +466,19 @@ def notify_approvers_of_pending_order(order: WorkOrder, *, exclude_user_id: int 
         return
 
     building_name = getattr(order.building, "name", _("their building"))
+    if order.forwarded_to_building_id:
+        destination = getattr(order.forwarded_to_building, "name", _("target building"))
+        building_name = _("%(origin)s → %(target)s") % {
+            "origin": building_name,
+            "target": destination,
+        }
     note = (order.replacement_request_note or "").strip()
     note_section = ""
     if note:
         note_section = "\n\n" + _("Technician request:") + f" {note}"
+    forwarding_note = (order.forward_note or "").strip()
+    if forwarding_note:
+        note_section += "\n\n" + _("Forwarding note:") + f" {forwarding_note}"
 
     body = _(
         'Work order "%(title)s" in %(building)s is awaiting approval.'
@@ -406,32 +500,132 @@ def notify_approvers_of_pending_order(order: WorkOrder, *, exclude_user_id: int 
         )
 
 
-def notify_building_technicians_of_mass_assignment(order: WorkOrder) -> None:
-    if not order.building_id:
-        return
-    technicians = BuildingMembership.objects.filter(
-        building=order.building,
-        role=MembershipRole.TECHNICIAN,
-    ).select_related("user")
-    if not technicians:
+def notify_building_technicians_of_mass_assignment(
+    order: WorkOrder,
+    *,
+    building=None,
+    exclude_user_ids: set[int] | None = None,
+) -> None:
+    building = building or order.building
+    if not building:
         return
     body = _(
         'New work order "%(title)s" was created for %(building)s with deadline %(deadline)s.'
     ) % {
         "title": order.title,
-        "building": getattr(order.building, "name", _("your building")),
+        "building": getattr(building, "name", _("your building")),
         "deadline": formats.date_format(order.deadline, "DATE_FORMAT"),
     }
-    for membership in technicians:
-        user = membership.user
-        if not user or not user.is_active:
-            continue
-        NotificationService(user).upsert(
-            NotificationPayload(
-                key=f"wo-mass-{order.pk}",
-                category="mass_assign",
-                title=order.title,
-                body=body,
-                level=Notification.Level.INFO,
-            )
+    _notify_building_technicians(
+        building,
+        key=f"wo-mass-{order.pk}",
+        title=order.title,
+        body=body,
+        category="mass_assign",
+        exclude_user_ids=exclude_user_ids,
+    )
+
+
+def notify_forwarded_work_order(order: WorkOrder, *, actor=None) -> None:
+    target = getattr(order, "forwarded_to_building", None)
+    if not target or not target.pk:
+        return
+    origin = order.building
+    origin_label = getattr(origin, "name", _("Office"))
+    destination_label = getattr(target, "name", _("destination building"))
+    actor_label = ""
+    if actor and getattr(actor, "is_authenticated", False):
+        actor_label = actor.get_full_name() or actor.username or ""
+    note = (order.forward_note or "").strip()
+    note_section = ""
+    if note:
+        note_section = "\n\n" + _("Forwarding note:") + f" {note}"
+    by_clause = ""
+    if actor_label:
+        by_clause = " " + _("by %(actor)s") % {"actor": actor_label}
+    body = _(
+        'Work order "%(title)s" was forwarded from %(origin)s to %(destination)s%(by)s.'
+    ) % {
+        "title": order.title,
+        "origin": origin_label,
+        "destination": destination_label,
+        "by": by_clause,
+    }
+    body += note_section
+    title = _("Forwarded to %(destination)s") % {"destination": destination_label}
+    notified = _notify_owner_and_backoffice(
+        target,
+        key=f"wo-forward-{order.pk}-{target.pk}",
+        title=title,
+        body=body,
+    )
+
+    notify_building_technicians_of_mass_assignment(
+        order,
+        building=target,
+        exclude_user_ids=notified,
+    )
+
+    if origin and getattr(origin, "is_system_default", False):
+        _notify_owner_and_backoffice(
+            origin,
+            key=f"wo-forward-office-{order.pk}",
+            title=_('Forwarded "%(title)s" to %(destination)s') % {
+                "title": order.title,
+                "destination": destination_label,
+            },
+            body=body,
+        )
+
+
+def notify_forwarding_reset(order: WorkOrder, *, previous_building=None, actor=None) -> None:
+    origin = getattr(order, "building", None)
+    if not origin or not getattr(origin, "is_system_default", False):
+        return
+    origin_label = getattr(origin, "name", _("Office"))
+    destination_label = (
+        getattr(previous_building, "name", _("the previous destination"))
+        if previous_building
+        else _("the previous destination")
+    )
+    actor_label = ""
+    if actor and getattr(actor, "is_authenticated", False):
+        actor_label = actor.get_full_name() or actor.username or ""
+    by_clause = ""
+    if actor_label:
+        by_clause = " " + _("by %(actor)s") % {"actor": actor_label}
+    body = _(
+        'Work order "%(title)s" was returned to %(origin)s from %(destination)s%(by)s.'
+    ) % {
+        "title": order.title,
+        "origin": origin_label,
+        "destination": destination_label,
+        "by": by_clause,
+    }
+    note = (order.forward_note or "").strip()
+    if note:
+        body += "\n\n" + _("Forwarding note:") + f" {note}"
+
+    base_key = f"wo-forward-reset-{order.pk}"
+    office_title = _("Returned to %(origin)s") % {"origin": origin_label}
+    _notify_owner_and_backoffice(
+        origin,
+        key=f"{base_key}-office",
+        title=office_title,
+        body=body,
+    )
+
+    if previous_building and previous_building.pk:
+        previous_title = _("Removed from %(destination)s") % {"destination": destination_label}
+        _notify_owner_and_backoffice(
+            previous_building,
+            key=f"{base_key}-{previous_building.pk}",
+            title=previous_title,
+            body=body,
+        )
+        _notify_building_technicians(
+            previous_building,
+            key=f"{base_key}-{previous_building.pk}-tech",
+            title=previous_title,
+            body=body,
         )

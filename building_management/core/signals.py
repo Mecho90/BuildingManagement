@@ -1,36 +1,16 @@
 from django.contrib.auth import get_user_model
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_migrate, post_save
 from django.dispatch import receiver
 
 from .authz import log_role_action
 from .models import (
     Building,
     BuildingMembership,
-    Capability,
     MembershipRole,
     RoleAuditLog,
     UserSecurityProfile,
 )
-
-OWNER_OVERRIDE_CAPS = {
-    Capability.MASS_ASSIGN,
-    Capability.APPROVE_WORK_ORDERS,
-    Capability.MANAGE_MEMBERSHIPS,
-}
-
-
-def _owner_capability_overrides(current_override=None):
-    override = current_override or {}
-    add = set(override.get("add") or [])
-    updated = False
-    for capability in OWNER_OVERRIDE_CAPS:
-        if capability not in add:
-            add.add(capability)
-            updated = True
-    override["add"] = sorted(add)
-    remove = override.get("remove") or []
-    override["remove"] = list(dict.fromkeys(remove))
-    return override, updated
+from .utils.ownership import owner_capability_overrides
 
 
 def _assign_backoffice_membership(user, building):
@@ -81,7 +61,7 @@ def ensure_owner_membership(sender, instance: Building, created, **kwargs):
     if not instance.owner_id:
         return
     desired_role = MembershipRole.TECHNICIAN
-    cap_overrides, _ = _owner_capability_overrides({})
+    cap_overrides, _ = owner_capability_overrides({})
     defaults = {
         "capabilities_override": cap_overrides,
         "technician_subrole": instance.role or "",
@@ -94,7 +74,7 @@ def ensure_owner_membership(sender, instance: Building, created, **kwargs):
     )
     updated_fields = []
     desired_subrole = instance.role or ""
-    overrides, overrides_changed = _owner_capability_overrides(membership.capabilities_override)
+    overrides, overrides_changed = owner_capability_overrides(membership.capabilities_override)
     if overrides_changed:
         membership.capabilities_override = overrides
         updated_fields.append("capabilities_override")
@@ -121,6 +101,12 @@ def ensure_owner_membership(sender, instance: Building, created, **kwargs):
             payload={"reason": "owner_auto_assign"},
         )
     ensure_backoffice_memberships_for_building(instance)
+    Building.clear_system_default_cache()
+
+
+@receiver(post_delete, sender=Building)
+def clear_office_cache_on_delete(sender, instance, **kwargs):
+    Building.clear_system_default_cache()
 
 
 @receiver(post_save, sender=BuildingMembership)
@@ -145,3 +131,8 @@ def cleanup_backoffice_memberships(sender, instance: BuildingMembership, **kwarg
         role=MembershipRole.BACKOFFICE,
         building__isnull=False,
     ).delete()
+
+
+@receiver(post_migrate)
+def clear_office_cache_post_migrate(**kwargs):
+    Building.clear_system_default_cache()

@@ -387,6 +387,15 @@
   function renderCalendar() {
     if (!els.calendarGrid) return;
     const { weeks, monthLabel } = calendarRange(state.calendar.current);
+    const highlightSourceDate = config.currentWeek
+      ? new Date(`${config.currentWeek}T00:00:00`)
+      : config.today
+      ? new Date(`${config.today}T00:00:00`)
+      : new Date();
+    const highlightWeekKey = calendarDateString(startOfWeek(highlightSourceDate));
+    const highlightWeekNumber = isoWeekNumber(highlightSourceDate);
+    const highlightYear = highlightSourceDate.getFullYear();
+    const todayKey = config.today ? calendarDateString(new Date(`${config.today}T00:00:00`)) : null;
     if (els.calendarMonth) {
       els.calendarMonth.textContent = monthLabel;
     }
@@ -411,7 +420,17 @@
     const body = weeks
       .map((week) => {
         const weekNum = isoWeekNumber(week[0]);
-        const weekCell = `<th scope="row" class="border border-emerald-50 px-2 py-1 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">${weekNum}</th>`;
+        const weekStartKey = calendarDateString(startOfWeek(week[0]));
+        const currentWeekNumber = isoWeekNumber(week[0]);
+        let isActiveWeek =
+          weekStartKey === highlightWeekKey ||
+          (currentWeekNumber === highlightWeekNumber && week[0].getFullYear() === highlightYear);
+        if (!isActiveWeek && todayKey) {
+          isActiveWeek = week.some((day) => calendarDateString(day) === todayKey);
+        }
+        const weekCell = `<th scope="row" class="border border-emerald-50 px-2 py-1 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 ${
+          isActiveWeek ? "todo-calendar-week__num--active" : ""
+        }">${weekNum}</th>`;
         const cells = week
           .map((day) => {
             const dateKey = calendarDateString(day);
@@ -428,6 +447,7 @@
                   : "bg-white/90 dark:bg-transparent"
                 : "bg-transparent text-transparent border-transparent pointer-events-none",
               isPending ? "ring-2 ring-amber-400" : "",
+              isActiveWeek ? "todo-calendar-week-cell--active" : "",
             ].join(" ");
             if (!isCurrentMonth) {
               return `<td role="presentation" class="${classes}"></td>`;
@@ -455,7 +475,7 @@
             `;
           })
           .join("");
-        return `<tr>${weekCell}${cells}</tr>`;
+        return `<tr class="${isActiveWeek ? "todo-calendar-week--active" : ""}">${weekCell}${cells}</tr>`;
       })
       .join("");
 

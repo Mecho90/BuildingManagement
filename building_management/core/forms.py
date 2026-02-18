@@ -455,10 +455,13 @@ class WorkOrderForm(forms.ModelForm):
             "deadline",
             "description",
             "replacement_request_note",
+            "forwarded_to_building",
+            "forward_note",
         ]
         widgets = {
             "deadline": forms.DateInput(attrs={"type": "date", "class": "input-date"}),
             "description": forms.Textarea(attrs={"rows": 6}),
+            "forward_note": forms.Textarea(attrs={"rows": 3}),
         }
 
     # ---------- helpers ----------
@@ -484,6 +487,18 @@ class WorkOrderForm(forms.ModelForm):
         except (Building.DoesNotExist, TypeError, ValueError):
             return None
 
+    def _resolve_forward_target_obj(self) -> Building | None:
+        value = None
+        if self.data and self.data.get("forwarded_to_building"):
+            value = self.data.get("forwarded_to_building")
+        elif self.initial.get("forwarded_to_building"):
+            value = self.initial.get("forwarded_to_building")
+        elif getattr(self.instance, "forwarded_to_building_id", None):
+            value = getattr(self.instance, "forwarded_to_building")
+        if value in (None, ""):
+            return None
+        return self._coerce_building(value)
+
     # ---------- init ----------
     def __init__(self, *args, user=None, building=None, **kwargs):
         self._user = user
@@ -493,6 +508,10 @@ class WorkOrderForm(forms.ModelForm):
         self._existing_attachments = []
         self._attachment_lookup: dict[str, WorkOrderAttachment] = {}
         self._resolver = CapabilityResolver(user) if user and user.is_authenticated else None
+        self._forward_target_initial = getattr(kwargs.get("instance"), "forwarded_to_building_id", None)
+        self._forward_target_obj = None
+        self._forwarding_owner_map: dict[str, str] = {}
+        self._forwarding_changed = False
         super().__init__(*args, **kwargs)
 
         # 1) Building choices / lock + hide if provided
@@ -508,6 +527,10 @@ class WorkOrderForm(forms.ModelForm):
             else:
                 bqs = Building.objects.none()
             self.fields["building"].queryset = bqs
+
+        field_qs = self.fields["building"].queryset
+        if field_qs is not None:
+            self.fields["building"].queryset = field_qs.order_by("-is_system_default", "name", "id")
 
         self.fields["building"].label = _("Building")
 
@@ -530,6 +553,12 @@ class WorkOrderForm(forms.ModelForm):
         else:
             self.fields["unit"].widget.attrs["disabled"] = "disabled"
             self.fields["unit"].empty_label = _("Select a building first")
+        if effective_building_obj and getattr(effective_building_obj, "is_system_default", False):
+            unit_field = self.fields["unit"]
+            unit_field.queryset = Unit.objects.none()
+            unit_field.widget = forms.HiddenInput()
+            unit_field.required = False
+            unit_field.initial = None
 
         self.fields["unit"].label = _("Unit")
         self.fields["priority"].label = _("Priority")
@@ -556,12 +585,59 @@ class WorkOrderForm(forms.ModelForm):
                     self.fields["status"].widget.attrs.get("class", "") + " cursor-not-allowed opacity-70"
                 ).strip()
                 self.fields["status"].help_text = _(
-                    "Awaiting approval. Only backoffice users can change this status."
+                    "Очаква одобрение от бекофиса. Само бекофис потребители могат да променят този статус."
                 )
-        self.fields["replacement_request_note"].label = "Заявка за подмяна"
-        self.fields["replacement_request_note"].widget = forms.Textarea(attrs={"rows": 3})
+        self.fields["replacement_request_note"].label = ""
+        self.fields["replacement_request_note"].widget = forms.HiddenInput()
+        self.fields["replacement_request_note"].required = False
+        self.fields["replacement_request_note"].initial = ""
         self._approver_queryset = self._build_approver_queryset(self._effective_building)
         self._approvers_available = self._approver_queryset.exists()
+
+        self.forwarding_enabled = bool(
+            effective_building_obj
+            and effective_building_obj.is_system_default
+            and getattr(self.instance, "pk", None)
+            and not getattr(self.instance, "forwarded_to_building_id", None)
+        )
+        forward_field = self.fields["forwarded_to_building"]
+        forward_field.required = False
+        forward_field.label = _("Forward to building")
+        forward_field.help_text = ""
+        note_field = self.fields["forward_note"]
+        note_field.required = False
+        note_field.label = _("Forwarding note")
+        note_field.help_text = ""
+        if self.forwarding_enabled:
+            if user and user.is_authenticated:
+                target_qs = (
+                    Building.objects.visible_to(user)
+                    .exclude(is_system_default=True)
+                    .select_related("owner")
+                    .order_by("name", "id")
+                )
+            else:
+                target_qs = Building.objects.none()
+            forward_field.queryset = target_qs
+            owner_map: dict[str, str] = {}
+            for target_building in target_qs:
+                owner_obj = getattr(target_building, "owner", None)
+                owner_label = ""
+                if owner_obj:
+                    owner_label = owner_obj.get_full_name() or owner_obj.username or ""
+                if not owner_label:
+                    owner_label = _("Unassigned owner")
+                owner_map[str(target_building.pk)] = owner_label
+            self._forwarding_owner_map = owner_map
+            self._forward_target_obj = self._resolve_forward_target_obj()
+        else:
+            forward_field.widget = forms.HiddenInput()
+            note_field.widget = forms.HiddenInput()
+            forward_field.queryset = Building.objects.none()
+            self.initial["forwarded_to_building"] = None
+            self.initial["forward_note"] = ""
+            self._forward_target_obj = None
+            self._forwarding_owner_map = {}
 
         # Attachments (upload)
         self.fields["new_attachments"] = MultipleFileField(
@@ -662,6 +738,27 @@ class WorkOrderForm(forms.ModelForm):
                 self.add_error("status", _("You do not have permission to complete this approval."))
 
         self._effective_building = building
+        if building is not None:
+            cleaned["building"] = building
+
+        forward_target = cleaned.get("forwarded_to_building")
+        if self.forwarding_enabled:
+            if not forward_target:
+                if self._forward_target_initial is not None:
+                    self.add_error(
+                        "forwarded_to_building",
+                        _(
+                            "Forwarded Office work orders must stay assigned. Select a different building instead of clearing the destination."
+                        ),
+                    )
+                else:
+                    self.add_error(
+                        "forwarded_to_building",
+                        _("Select a destination building for Office work orders."),
+                    )
+        else:
+            cleaned["forwarded_to_building"] = None
+            cleaned["forward_note"] = ""
         return cleaned
 
     def clean_remove_attachments(self):
@@ -696,9 +793,52 @@ class WorkOrderForm(forms.ModelForm):
         elif obj.status != WorkOrder.Status.AWAITING_APPROVAL and original_status == WorkOrder.Status.AWAITING_APPROVAL:
             obj.awaiting_approval_by = None
 
+        forward_target = None
+        note_value = ""
+        if self.forwarding_enabled:
+            forward_target = self.cleaned_data.get("forwarded_to_building")
+            note_value = (self.cleaned_data.get("forward_note") or "").strip()
+            obj.forwarded_to_building = forward_target
+            obj.forward_note = note_value
+            if forward_target and self._user and getattr(self._user, "is_authenticated", False):
+                obj.forwarded_by = self._user
+            elif not forward_target:
+                obj.forwarded_by = None
+                obj.forward_note = ""
+        else:
+            obj.forwarded_to_building = None
+            obj.forward_note = ""
+            if not obj.forwarded_to_building_id:
+                obj.forwarded_by = None
+
+        new_target_id = obj.forwarded_to_building_id or (forward_target.pk if forward_target else None)
+        self._forwarding_changed = new_target_id != self._forward_target_initial
+
         if commit:
             obj.save()
         return obj
+
+    @property
+    def forwarding_changed(self) -> bool:
+        return bool(getattr(self, "_forwarding_changed", False))
+
+    @property
+    def forwarding_previous_id(self):
+        return self._forward_target_initial
+
+    @property
+    def forwarding_owner_label(self) -> str:
+        target = getattr(self, "_forward_target_obj", None)
+        if not target:
+            return ""
+        owner = getattr(target, "owner", None)
+        if not owner:
+            return ""
+        return owner.get_full_name() or owner.username or ""
+
+    @property
+    def forwarding_owner_map(self) -> dict[str, str]:
+        return dict(self._forwarding_owner_map or {})
 
     def _user_is_lawyer(self) -> bool:
         if user_is_lawyer(self._user):

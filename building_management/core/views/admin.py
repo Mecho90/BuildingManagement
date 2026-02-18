@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Q
+from django.db.models.functions import Lower
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
@@ -13,7 +14,7 @@ from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
 from ..forms import AdminUserCreateForm, AdminUserPasswordForm, AdminUserUpdateForm
-from ..models import BuildingMembership, MembershipRole, WorkOrder
+from ..models import Building, BuildingMembership, MembershipRole, WorkOrder
 from .common import AdminRequiredMixin, _querystring_without
 
 User = get_user_model()
@@ -56,6 +57,15 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
                 | Q(last_name__icontains=search)
             )
         self._search = search
+
+        owner_param = (self.request.GET.get("owner") or "").strip()
+        owner_options = self._get_owner_options()
+        owner_ids = {opt["value"] for opt in owner_options}
+        if owner_param and owner_param in owner_ids:
+            qs = qs.filter(pk=int(owner_param))
+            self._owner_filter = owner_param
+        else:
+            self._owner_filter = ""
         return qs
 
     def get_context_data(self, **kwargs):
@@ -63,6 +73,8 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         ctx["q"] = getattr(self, "_search", "")
         ctx["pagination_query"] = _querystring_without(self.request, "page")
         ctx["per"] = getattr(self, "_per", self.paginate_by)
+        ctx["owner_options"] = self._get_owner_options()
+        ctx["owner_filter"] = getattr(self, "_owner_filter", "")
         object_list = list(ctx.get("object_list") or [])
         self._attach_roles(object_list)
         overview_data = self._build_overview(object_list)
@@ -75,6 +87,31 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         else:
             ctx["users_total"] = len(object_list)
         return ctx
+
+    def _get_owner_options(self) -> list[dict[str, str]]:
+        if hasattr(self, "_owner_options"):
+            return self._owner_options
+        owner_ids = (
+            Building.objects.exclude(owner__isnull=True)
+            .values_list("owner_id", flat=True)
+            .distinct()
+        )
+        owner_ids = [oid for oid in owner_ids if oid]
+        if not owner_ids:
+            self._owner_options = []
+            return self._owner_options
+        owners = (
+            User.objects.filter(pk__in=owner_ids)
+            .order_by(Lower("first_name"), Lower("last_name"), Lower("username"))
+        )
+        self._owner_options = [
+            {
+                "value": str(owner.pk),
+                "label": owner.get_full_name() or owner.username,
+            }
+            for owner in owners
+        ]
+        return self._owner_options
 
     def _attach_roles(self, users):
         user_ids = [user.pk for user in users if user.pk]

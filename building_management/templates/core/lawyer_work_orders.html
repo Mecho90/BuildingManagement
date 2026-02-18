@@ -99,7 +99,7 @@
       {% if q or status or owner or sort != 'priority' or per != 25 or priority or deadline_range %}
         <a class="btn btn-secondary" href="{% url 'core:lawyer_work_orders' %}">{% trans "Reset" %}</a>
       {% endif %}
-      <button class="btn" type="submit">{% trans "Apply filters" %}</button>
+      <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
     </div>
   </form>
 
@@ -123,8 +123,22 @@
               <a href="{% url 'core:work_order_detail' order.pk %}" class="text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">
                 {{ order.title }}
               </a>
+              {% if order.forwarded_to_building %}
+                <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
+                  {% blocktrans with destination=order.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
+                </div>
+              {% endif %}
             </td>
-            <td class="px-4 py-3">{{ order.building.name|default:"—" }}</td>
+            <td class="px-4 py-3">
+              <div class="space-y-1">
+                {{ order.building.name|default:"—" }}
+                {% if order.forwarded_to_building %}
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {% blocktrans with destination=order.forwarded_to_building.name %}→ {{ destination }}{% endblocktrans %}
+                  </div>
+                {% endif %}
+              </div>
+            </td>
             <td class="px-4 py-3">{{ order.deadline|date:"Y-m-d" }}</td>
             <td class="px-4 py-3">
               {% include "components/badges/priority.html" with level=order.priority label=order.get_priority_display size="sm" %}

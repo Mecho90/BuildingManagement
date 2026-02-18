@@ -3,7 +3,7 @@
 {% block title %}{% if form.instance.pk %}{% trans "Edit Work Order" %}{% else %}{% trans "New Work Order" %}{% endif %} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
-<section class="space-y-6">
+<section class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
   <header class="space-y-1">
     <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">
       {% if form.instance.pk %}{% trans "Edit Work Order" %}{% else %}{% trans "New Work Order" %}{% endif %}
@@ -29,11 +29,38 @@
 
     <div class="grid gap-5">
       {% for field in form.visible_fields %}
-        {% if field.name != 'new_attachments' and field.name != 'remove_attachments' %}
+        {% if field.name != 'new_attachments' and field.name != 'remove_attachments' and field.name != 'forwarded_to_building' and field.name != 'forward_note' %}
           {% include "components/form_field.html" with field=field %}
         {% endif %}
       {% endfor %}
     </div>
+
+    {% if form.forwarding_enabled %}
+      <section id="forwarding-section" class="space-y-4 rounded-2xl border border-orange-200/70 bg-orange-50/50 p-4 dark:border-orange-500/50 dark:bg-orange-500/10">
+        <div>
+          <h2 class="text-base font-semibold text-orange-700 dark:text-orange-200">{% trans "Forward to building/owner" %}</h2>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          {% include "components/form_field.html" with field=form.forwarded_to_building %}
+          <div class="space-y-2">
+            <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Destination owner" %}</span>
+            <p id="forwarding-owner-label"
+               data-fallback="{% trans 'Select a destination to preview the owner.' %}"
+               class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-700 shadow-sm transition focus-within:ring-2 focus-within:ring-orange-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+              {% if form.forwarding_owner_label %}
+                {{ form.forwarding_owner_label }}
+              {% else %}
+                {% trans "Select a destination to preview the owner." %}
+              {% endif %}
+            </p>
+          </div>
+          <div class="md:col-span-2">
+            {% include "components/form_field.html" with field=form.forward_note %}
+          </div>
+        </div>
+      </section>
+      {{ form.forwarding_owner_map|json_script:"forwarding-owner-map" }}
+    {% endif %}
 
     {{ attachment_panel_html|safe }}
 
@@ -50,6 +77,33 @@
   <script src="{% static 'js/attachments.js' %}" defer></script>
   {% if units_api_template %}
     <script src="{% static 'js/work-order-units.js' %}" defer></script>
+  {% endif %}
+  {% if form.forwarding_enabled %}
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const mapElement = document.getElementById("forwarding-owner-map");
+        const label = document.getElementById("forwarding-owner-label");
+        const select = document.getElementById("id_forwarded_to_building");
+        if (!mapElement || !label || !select) {
+          return;
+        }
+        const fallback = label.dataset.fallback || label.textContent || "";
+        let ownerMap = {};
+        try {
+          ownerMap = JSON.parse(mapElement.textContent);
+        } catch (err) {
+          ownerMap = {};
+        }
+
+        const updateOwnerLabel = () => {
+          const choice = select.value || "";
+          label.textContent = ownerMap[choice] || fallback;
+        };
+
+        select.addEventListener("change", updateOwnerLabel);
+        updateOwnerLabel();
+      });
+    </script>
   {% endif %}
 {% endblock %}
 

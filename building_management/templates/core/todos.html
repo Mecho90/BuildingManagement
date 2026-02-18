@@ -20,10 +20,10 @@
       <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Calendar" %}</h2>
       <div class="flex items-center gap-2">
         <div class="flex items-center gap-2" role="group" aria-label="{% trans 'Calendar navigation' %}">
-          <button type="button" id="todo-calendar-prev" class="btn btn-secondary btn-sm" aria-label="{% trans 'Previous month' %}">‹</button>
-          <div id="todo-calendar-month" class="min-w-[120px] text-center text-sm font-semibold text-slate-700 dark:text-slate-100"></div>
-          <button type="button" id="todo-calendar-next" class="btn btn-secondary btn-sm" aria-label="{% trans 'Next month' %}">›</button>
-          <button type="button" id="todo-calendar-today" class="btn">{% trans "Today" %}</button>
+          <button type="button" id="todo-calendar-prev" class="btn btn-secondary btn-sm todo-calendar-btn" aria-label="{% trans 'Previous month' %}">‹</button>
+          <div id="todo-calendar-month" class="todo-calendar-month-pill min-w-[120px] text-center text-sm font-semibold text-slate-700 dark:text-slate-100"></div>
+          <button type="button" id="todo-calendar-next" class="btn btn-secondary btn-sm todo-calendar-btn" aria-label="{% trans 'Next month' %}">›</button>
+          <button type="button" id="todo-calendar-today" class="btn btn-secondary btn-sm todo-calendar-btn">{% trans "Today" %}</button>
         </div>
       </div>
     </div>
@@ -96,7 +96,7 @@
                 </div>
               </div>
               <div class="filter-panel__actions">
-                <button type="button" class="btn" id="todo-filter-apply">{% trans "Apply filters" %}</button>
+                <button type="button" class="btn" id="todo-filter-apply">{% trans "Приложи филтрите" %}</button>
               </div>
             </form>
           </div>
@@ -121,6 +121,69 @@
 </section>
 
 {{ todo_config|json_script:"todo-config" }}
+{% endblock %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <style>
+    .todo-calendar-btn {
+      background-color: #ffffff;
+      color: #1f2937;
+      border-color: rgba(226, 232, 240, 1);
+      box-shadow: 0 3px 6px rgba(15, 23, 42, 0.08);
+    }
+    .todo-calendar-btn:hover {
+      background-color: #f8fafc;
+      border-color: rgba(148, 163, 184, 0.8);
+    }
+    html.dark .todo-calendar-btn {
+      background-color: #0f172a;
+      color: #f8fafc;
+      border-color: #1e293b;
+    }
+    html.dark .todo-calendar-btn:hover {
+      background-color: #1e293b;
+      border-color: #334155;
+    }
+    .todo-calendar-week-cell--active {
+      background-color: rgba(16, 185, 129, 0.15) !important;
+      border-color: rgba(16, 185, 129, 0.35) !important;
+    }
+    html.dark .todo-calendar-week-cell--active {
+      background-color: rgba(5, 150, 105, 0.25) !important;
+      border-color: rgba(16, 185, 129, 0.45) !important;
+    }
+    .todo-calendar-week__num--active {
+      background-color: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #047857;
+    }
+    html.dark .todo-calendar-week__num--active {
+      background-color: rgba(5, 150, 105, 0.2);
+      border-color: rgba(5, 150, 105, 0.35);
+      color: #a7f3d0;
+    }
+    .todo-calendar-week--active td {
+      background-color: rgba(16, 185, 129, 0.08) !important;
+      border-color: rgba(16, 185, 129, 0.3) !important;
+    }
+    html.dark .todo-calendar-week--active td {
+      background-color: rgba(5, 150, 105, 0.25) !important;
+      border-color: rgba(16, 185, 129, 0.45) !important;
+    }
+    .todo-calendar-month-pill {
+      background-color: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 1);
+      border-radius: 9999px;
+      padding: 0.35rem 1rem;
+      box-shadow: 0 3px 6px rgba(15, 23, 42, 0.08);
+    }
+    html.dark .todo-calendar-month-pill {
+      background-color: #0f172a;
+      border-color: #1e293b;
+      color: #f8fafc;
+    }
+  </style>
 {% endblock %}
 
 {% block extra_js %}

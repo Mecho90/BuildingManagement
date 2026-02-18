@@ -25,10 +25,14 @@ def active_nav(
         if not pattern:
             continue
         matches = False
-        if pattern == "/":
+        exact = pattern.endswith("$")
+        candidate = pattern[:-1] if exact else pattern
+        if candidate == "/":
             matches = path == "/"
+        elif exact:
+            matches = path == candidate
         else:
-            matches = path.startswith(pattern)
+            matches = path.startswith(candidate)
         if matches:
             return css_class
     return ""

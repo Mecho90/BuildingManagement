@@ -11,6 +11,7 @@ from .models import (
     Unit,
     WorkOrder,
     WorkOrderAttachment,
+    WorkOrderForwarding,
 )
 
 
@@ -20,6 +21,14 @@ class WorkOrderAttachmentInline(admin.TabularInline):
     fields = ("file", "original_name", "content_type", "size", "created_at", "updated_at")
     readonly_fields = ("original_name", "content_type", "size", "created_at", "updated_at")
     show_change_link = True
+
+
+class WorkOrderForwardingInline(admin.TabularInline):
+    model = WorkOrderForwarding
+    extra = 0
+    fields = ("from_building", "to_building", "forwarded_by", "forwarded_at", "note")
+    readonly_fields = ("from_building", "to_building", "forwarded_by", "forwarded_at", "note")
+    can_delete = False
 
 
 class BuildingMembershipInline(admin.TabularInline):
@@ -47,12 +56,21 @@ class UnitAdmin(admin.ModelAdmin):
 
 @admin.register(WorkOrder)
 class WorkOrderAdmin(admin.ModelAdmin):
-    list_display = ("title", "building", "unit", "priority", "status", "deadline", "archived_at")
-    list_filter = ("building", "priority", "status", "archived_at")
-    search_fields = ("title", "description", "unit__number", "building__name")
-    list_select_related = ("building", "unit")
-    autocomplete_fields = ("building", "unit")
-    inlines = (WorkOrderAttachmentInline,)
+    list_display = (
+        "title",
+        "building",
+        "forwarded_to_building",
+        "forwarded_by",
+        "priority",
+        "status",
+        "deadline",
+        "archived_at",
+    )
+    list_filter = ("building", "forwarded_to_building", "priority", "status", "archived_at")
+    search_fields = ("title", "description", "unit__number", "building__name", "forwarded_to_building__name")
+    list_select_related = ("building", "unit", "forwarded_to_building", "forwarded_by")
+    autocomplete_fields = ("building", "unit", "forwarded_to_building", "forwarded_by")
+    inlines = (WorkOrderAttachmentInline, WorkOrderForwardingInline)
 
 
 class TodoActivityInline(admin.TabularInline):

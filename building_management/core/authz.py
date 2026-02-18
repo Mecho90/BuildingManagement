@@ -4,7 +4,14 @@ from typing import Iterable, Optional, Set
 
 from django.utils.functional import cached_property
 
-from .models import BuildingMembership, Capability, RoleAuditLog, WorkOrderAuditLog
+from .models import (
+    Building,
+    BuildingMembership,
+    Capability,
+    MembershipRole,
+    RoleAuditLog,
+    WorkOrderAuditLog,
+)
 
 
 class CapabilityResolver:
@@ -29,10 +36,27 @@ class CapabilityResolver:
                 caps |= membership.resolved_capabilities
         return caps
 
+    @cached_property
+    def _office_building_id(self) -> int | None:
+        return Building.system_default_id()
+
+    @cached_property
+    def _has_office_visibility_role(self) -> bool:
+        allowed = {
+            MembershipRole.BACKOFFICE,
+            MembershipRole.ADMINISTRATOR,
+        }
+        for membership in self._memberships:
+            if membership.role in allowed:
+                return True
+        return False
+
     def visible_building_ids(self) -> Optional[Set[int]]:
         if Capability.VIEW_ALL_BUILDINGS in self._global_capabilities:
             return None
         building_ids = {m.building_id for m in self._memberships if m.building_id}
+        if self._office_building_id and self._has_office_visibility_role:
+            building_ids.add(self._office_building_id)
         return building_ids
 
     def capabilities_for(self, building_id: Optional[int] = None) -> Set[str]:

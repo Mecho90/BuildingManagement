@@ -37,6 +37,34 @@
           {{ order.get_status_display }}
         </span>
       </div>
+      {% if order.forwarded_to_building %}
+        <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-orange-200/70 bg-orange-50/80 px-4 py-3 text-sm text-orange-800 dark:border-orange-500/60 dark:bg-orange-500/10 dark:text-orange-100">
+          <div class="flex-1 space-y-1">
+            {% if order.building.is_system_default %}
+              <p class="font-semibold uppercase tracking-wide text-xs">{% trans "Forwarded to" %}</p>
+            {% else %}
+              <p class="font-semibold uppercase tracking-wide text-xs">{% trans "Forwarded from Office" %}</p>
+            {% endif %}
+            <p>
+              <a class="font-semibold text-orange-700 underline dark:text-orange-200" href="{% url 'core:building_detail' order.forwarded_to_building_id %}">
+                {{ order.forwarded_to_building.name }}
+              </a>
+            </p>
+            {% if order.forward_note %}
+              <p class="text-xs text-orange-700/80 dark:text-orange-100/80">
+                {{ order.forward_note }}
+              </p>
+            {% endif %}
+          </div>
+          {% if can_edit_order %}
+            {% if next_url %}
+              <a class="btn btn-sm" href="{% url 'core:work_order_update' order.id %}?next={{ next_url|urlencode }}#forwarding-section">{% trans "Re-route" %}</a>
+            {% else %}
+              <a class="btn btn-sm" href="{% url 'core:work_order_update' order.id %}#forwarding-section">{% trans "Re-route" %}</a>
+            {% endif %}
+          {% endif %}
+        </div>
+      {% endif %}
     </header>
 
     <dl class="grid gap-4 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
@@ -48,6 +76,19 @@
         <div>
           <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
           <dd>{{ order.building.owner.get_full_name|default:order.building.owner.username }}</dd>
+        </div>
+      {% endif %}
+      {% if order.forwarded_to_building %}
+        <div>
+          <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Destination building" %}</dt>
+          <dd>
+            <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'core:building_detail' order.forwarded_to_building_id %}">
+              {{ order.forwarded_to_building.name }}
+            </a>
+            {% if order.forwarded_to_building.owner %}
+              · {{ order.forwarded_to_building.owner.get_full_name|default:order.forwarded_to_building.owner.username }}
+            {% endif %}
+          </dd>
         </div>
       {% endif %}
       <div>

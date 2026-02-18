@@ -22,7 +22,7 @@
           {% endif %}
         {% endif %}
       </div>
-      <div class="rounded-2xl border border-slate-200 bg-white/80 shadow-card dark:border-slate-800 dark:bg-slate-900">
+      <div class="rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900">
         <table class="min-w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
           <thead class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
             <tr>
@@ -65,7 +65,7 @@
     {% if show_add_form and form %}
       <div class="space-y-4">
         <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Assign building roles" %}</h2>
-        <form method="post" class="space-y-4 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-card dark:border-slate-800 dark:bg-slate-900" id="manage-members-form">
+        <form method="post" class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-800 dark:bg-slate-900" id="manage-members-form">
           {% csrf_token %}
           <input type="hidden" name="action" value="add"/>
           {% if form.non_field_errors %}
@@ -90,7 +90,7 @@
                 {% for checkbox in form.user %}
                   {% with choice_val=checkbox|choice_value %}
                     {% with role_codes=role_map|dict_get:choice_val role_label_list=role_labels|dict_get:choice_val %}
-                      <label class="user-option relative flex cursor-pointer rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm transition" data-user-option data-roles="{% if role_codes %}{{ role_codes|join:',' }}{% endif %}">
+                      <label class="user-option relative flex cursor-pointer rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition" data-user-option data-roles="{% if role_codes %}{{ role_codes|join:',' }}{% endif %}">
                         <span class="flex items-start gap-3">
                           <span class="mt-1">{{ checkbox.tag }}</span>
                           <div class="flex flex-col">
@@ -116,7 +116,7 @@
                   {% with choice_val=checkbox|choice_value %}
                     {% with role_codes=role_map|dict_get:choice_val %}
                       {% if role_codes and "TECHNICIAN" in role_codes %}
-                        <div class="hidden rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm" data-subrole-user="{{ choice_val }}">
+                        <div class="hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm" data-subrole-user="{{ choice_val }}">
                           <label for="{% subrole_field_name form choice_val %}" class="text-sm font-medium text-slate-700 dark:text-slate-200">
                             {% blocktrans with name=checkbox.choice_label %}Sub-role for {{ name }}{% endblocktrans %}
                           </label>
