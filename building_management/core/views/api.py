@@ -21,12 +21,18 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_http_methods
 
 from ..authz import Capability
+from ..forms import BudgetExpenseForm, BudgetRequestApprovalForm, BudgetRequestForm
 from ..models import (
+    BudgetRequest,
+    BudgetRequestEvent,
     Building,
     BuildingMembership,
     MembershipRole,
     TodoActivity,
     TodoItem,
+    Expense,
+    ExpenseAttachment,
+    ExpenseCategory,
     Unit,
     WorkOrder,
     WorkOrderAttachment,
@@ -48,6 +54,10 @@ __all__ = [
     "core:api_todo_completed_clear",
     "core:todo_ics_feed",
     "core:api_todo_calendar",
+    "core:api_budget_requests",
+    "core:api_budget_request_detail",
+    "core:api_budget_expenses",
+    "core:api_budget_expense_attachments",
 ]
 
 
@@ -174,6 +184,102 @@ def _attachment_payload(
         "extension": extension,
         "delete_url": delete_url,
         "delete_confirm": format_attachment_delete_confirm(filename, work_order),
+    }
+
+
+def _budget_queryset(request):
+    if not request.user.is_authenticated:
+        raise Http404()
+    return (
+        BudgetRequest.objects.visible_to(request.user)
+        .select_related("building", "requester", "approved_by")
+        .with_totals()
+    )
+
+
+def _budget_payload(budget: BudgetRequest) -> dict[str, object]:
+    building = budget.building
+    requester = budget.requester
+    approver = budget.approved_by
+    return {
+        "id": budget.pk,
+        "building": {"id": getattr(building, "pk", None), "name": getattr(building, "name", "")},
+        "requester": {
+            "id": getattr(requester, "pk", None),
+            "name": requester.get_full_name() if requester else "",
+        },
+        "status": budget.status,
+        "requested_amount": str(budget.requested_amount),
+        "approved_amount": str(budget.approved_total),
+        "spent_amount": str(budget.spent_total),
+        "remaining_amount": str(budget.remaining_amount),
+        "currency": budget.currency,
+        "allow_overage": budget.allow_overage,
+        "allow_post_close_expense": budget.allow_post_close_expense,
+        "approved_by": {
+            "id": getattr(approver, "pk", None),
+            "name": approver.get_full_name() if approver else "",
+        },
+        "approved_at": budget.approved_at.isoformat() if budget.approved_at else None,
+        "created_at": budget.created_at.isoformat(),
+        "updated_at": budget.updated_at.isoformat(),
+        "feature_flag": budget.feature_flag,
+        "project_code": budget.project_code,
+        "notes": budget.notes,
+    }
+
+
+def _expense_payload(expense: Expense) -> dict[str, object]:
+    category = expense.expense_type
+    return {
+        "id": expense.pk,
+        "budget_id": expense.budget_request_id,
+        "label": expense.label,
+        "amount": str(expense.amount),
+        "status": expense.status,
+        "notes": expense.notes,
+        "incurred_on": expense.incurred_on.isoformat() if expense.incurred_on else None,
+        "category": {"id": getattr(category, "pk", None), "label": getattr(category, "label", "")},
+        "attachments": [
+            _expense_attachment_payload(attachment)
+            for attachment in expense.attachments.all()
+        ],
+    }
+
+
+def _user_can_log_budget_expense(user, budget: BudgetRequest) -> bool:
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if budget.requester_id == getattr(user, "pk", None):
+        return True
+    resolver = CapabilityResolver(user)
+    return resolver.has(Capability.MANAGE_BUDGETS, building_id=budget.building_id)
+
+
+def _get_budget_or_404(request, pk: int) -> BudgetRequest:
+    qs = _budget_queryset(request)
+    return get_object_or_404(qs, pk=pk)
+
+
+def _get_expense_or_404(request, budget_id: int, expense_id: int) -> Expense:
+    if not request.user.is_authenticated:
+        raise Http404()
+    qs = (
+        Expense.objects.filter(budget_request__in=_budget_queryset(request))
+        .select_related("budget_request", "expense_type")
+        .prefetch_related("attachments")
+    )
+    return get_object_or_404(qs, pk=expense_id, budget_request_id=budget_id)
+
+
+def _expense_attachment_payload(attachment: ExpenseAttachment) -> dict[str, object]:
+    return {
+        "id": attachment.pk,
+        "name": attachment.original_name,
+        "url": attachment.file.url if attachment.file else "",
+        "content_type": attachment.mime_type,
+        "size": attachment.size,
+        "uploaded_at": attachment.created_at.isoformat(),
     }
 
 
@@ -821,6 +927,128 @@ def api_buildings(request):
 
     data = list(qs.values("id", "name", "address", "owner_id"))
     return JsonResponse(data, safe=False)
+
+
+@require_http_methods(["GET", "POST"])
+def api_budget_requests(request):
+    qs = _budget_queryset(request)
+    if request.method == "GET":
+        status_filter = (request.GET.get("status") or "").strip()
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        building_param = request.GET.get("building")
+        if building_param:
+            try:
+                qs = qs.filter(building_id=int(building_param))
+            except (TypeError, ValueError):
+                return JsonResponse({"error": _("Invalid building filter.")}, status=400)
+        requester_param = request.GET.get("requester")
+        if requester_param:
+            if requester_param.lower() == "me":
+                qs = qs.filter(requester=request.user)
+            else:
+                try:
+                    qs = qs.filter(requester_id=int(requester_param))
+                except (TypeError, ValueError):
+                    return JsonResponse({"error": _("Invalid requester filter.")}, status=400)
+        results = [_budget_payload(budget) for budget in qs.order_by("-created_at")[:200]]
+        return JsonResponse({"results": results}, status=200)
+
+    data = request.POST or None
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            data = _load_json_body(request)
+        except ValueError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+    form = BudgetRequestForm(data=data, user=request.user)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+    budget = form.save()
+    budget.transition(
+        status=BudgetRequest.Status.PENDING_REVIEW,
+        actor=request.user,
+        comment=budget.notes or "",
+    )
+    return JsonResponse(_budget_payload(budget), status=201)
+
+
+@require_http_methods(["GET", "PATCH"])
+def api_budget_request_detail(request, pk: int):
+    budget = _get_budget_or_404(request, pk)
+    if request.method == "GET":
+        return JsonResponse(_budget_payload(budget), status=200)
+    resolver = CapabilityResolver(request.user)
+    if not resolver.has(Capability.APPROVE_BUDGETS, building_id=budget.building_id):
+        return JsonResponse({"error": _("You cannot approve this budget.")}, status=403)
+    try:
+        data = _load_json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    form = BudgetRequestApprovalForm(data=data, instance=budget, user=request.user)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+    form.save()
+    budget.refresh_from_db()
+    return JsonResponse(_budget_payload(budget), status=200)
+
+
+@require_http_methods(["GET", "POST"])
+def api_budget_expenses(request, budget_id: int):
+    budget = _get_budget_or_404(request, budget_id)
+    if request.method == "GET":
+        expenses = (
+            budget.expenses.select_related("expense_type")
+            .prefetch_related("attachments")
+            .order_by("-incurred_on", "-id")
+        )
+        return JsonResponse({"results": [_expense_payload(expense) for expense in expenses]}, status=200)
+    if not _user_can_log_budget_expense(request.user, budget):
+        return JsonResponse({"error": _("You cannot add expenses to this budget.")}, status=403)
+    data = request.POST or None
+    files = request.FILES or None
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            data = _load_json_body(request)
+        except ValueError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        files = None
+    form = BudgetExpenseForm(data=data, files=files, user=request.user, budget=budget)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+    expense = form.save()
+    expense.refresh_from_db()
+    return JsonResponse(_expense_payload(expense), status=201)
+
+
+@require_http_methods(["GET", "POST", "DELETE"])
+def api_budget_expense_attachments(request, budget_id: int, expense_id: int):
+    expense = _get_expense_or_404(request, budget_id, expense_id)
+    if request.method == "GET":
+        attachments = [_expense_attachment_payload(item) for item in expense.attachments.all()]
+        return JsonResponse({"results": attachments}, status=200)
+    if not _user_can_log_budget_expense(request.user, expense.budget_request):
+        return JsonResponse({"error": _("You cannot modify attachments for this expense.")}, status=403)
+    if request.method == "POST":
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return JsonResponse({"error": _("Upload a file via the `file` field.")}, status=400)
+        validate_work_order_attachment(uploaded)
+        attachment = ExpenseAttachment.objects.create(
+            expense=expense,
+            file=uploaded,
+            original_name=uploaded.name,
+            uploaded_by=request.user,
+        )
+        return JsonResponse({"attachment": _expense_attachment_payload(attachment)}, status=201)
+    attachment_id = request.GET.get("attachment")
+    if not attachment_id:
+        return JsonResponse({"error": _("Specify an `attachment` id to delete.")}, status=400)
+    try:
+        attachment = expense.attachments.get(pk=int(attachment_id))
+    except (ExpenseAttachment.DoesNotExist, ValueError, TypeError):
+        return JsonResponse({"error": _("Attachment not found.")}, status=404)
+    attachment.delete()
+    return HttpResponse(status=204)
 
 
 @require_http_methods(["GET", "POST"])

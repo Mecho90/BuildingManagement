@@ -27,8 +27,16 @@ from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, UpdateView
 
 from ..authz import Capability, CapabilityResolver, log_workorder_action
-from ..forms import MassAssignWorkOrdersForm, WorkOrderForm
-from ..models import Building, BuildingMembership, MembershipRole, WorkOrder, WorkOrderAttachment, WorkOrderAuditLog
+from ..forms import MassAssignWorkOrdersForm, WorkOrderBudgetChargeForm, WorkOrderForm
+from ..models import (
+    BudgetFeatureFlag,
+    Building,
+    BuildingMembership,
+    MembershipRole,
+    WorkOrder,
+    WorkOrderAttachment,
+    WorkOrderAuditLog,
+)
 from ..utils.metrics import log_duration
 from ..utils.roles import user_can_approve_work_orders, user_has_role, user_is_lawyer
 from ..services.notifications import (
@@ -64,6 +72,7 @@ __all__ = [
     "ArchivedWorkOrderDetailView",
     "WorkOrderAttachmentDeleteView",
     "WorkOrderApprovalDecisionView",
+    "WorkOrderBudgetChargeView",
 ]
 
 
@@ -786,6 +795,10 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             Capability.MANAGE_BUILDINGS,
             Capability.CREATE_WORK_ORDERS,
         )
+        ctx["can_add_budget"] = ctx["can_edit_order"] and BudgetFeatureFlag.is_enabled_for(
+            self.request.user,
+            building_id=self.object.building_id,
+        )
         ctx["can_delete_order"] = _user_has_building_capability(
             self.request.user,
             self.object.building,
@@ -875,6 +888,11 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         ctx["history_entries"] = history_entries
         ctx["history_participants"] = participant_labels
         ctx["history_approval_actor"] = approval_actor
+        if ctx.get("can_add_budget"):
+            charge_url = reverse("core:work_order_budget_charge", args=[self.object.pk])
+            if next_url:
+                charge_url = f"{charge_url}?{urlencode({'next': next_url})}"
+            ctx["add_budget_url"] = charge_url
 
         deadline_status = None
         if self.object.deadline and self.object.archived_at:
@@ -1010,6 +1028,7 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
         with transaction.atomic():
             response = super().form_valid(form)
             attachment_changes = form.save_attachments(self.object)
+            budget_expense = form.apply_budget_charge(work_order=self.object, actor=self.request.user)
         self._log_creation()
         _maybe_handle_forwarding_change(self.request, form, self.object)
         actor = self.request.user if self.request.user.is_authenticated else None
@@ -1018,6 +1037,17 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
             work_order=self.object,
             changes=attachment_changes,
         )
+        if budget_expense:
+            amount_label = formats.number_format(budget_expense.amount, 2)
+            messages.info(
+                self.request,
+                _("Charged %(amount)s %(currency)s to %(title)s.")
+                % {
+                    "amount": amount_label,
+                    "currency": budget_expense.budget_request.currency,
+                    "title": budget_expense.budget_request.title or _("Budget #%(id)s") % {"id": budget_expense.budget_request_id},
+                },
+            )
         messages.success(self.request, _("Work order created."))
         return response
 
@@ -1115,6 +1145,7 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         with transaction.atomic():
             obj.save()
             attachment_changes = form.save_attachments(obj)
+            budget_expense = form.apply_budget_charge(work_order=obj, actor=self.request.user)
         self.object = obj
         _maybe_handle_forwarding_change(self.request, form, obj)
         self._after_status_change(previous_status)
@@ -1122,6 +1153,17 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             self._log_general_updates(previous_obj, obj, form.changed_data or [])
         actor = self.request.user if self.request.user.is_authenticated else None
         _log_attachment_activity(actor=actor, work_order=obj, changes=attachment_changes)
+        if budget_expense:
+            amount_label = formats.number_format(budget_expense.amount, 2)
+            messages.info(
+                self.request,
+                _("Charged %(amount)s %(currency)s to %(title)s.")
+                % {
+                    "amount": amount_label,
+                    "currency": budget_expense.budget_request.currency,
+                    "title": budget_expense.budget_request.title or _("Budget #%(id)s") % {"id": budget_expense.budget_request_id},
+                },
+            )
         messages.warning(self.request, _("Work order updated."))
         return HttpResponseRedirect(self.get_success_url())
 
@@ -1730,6 +1772,19 @@ class ArchivedWorkOrderFilterMixin:
         ctx["building_summary_query"] = _querystring_without(self.request, "b_page")
         ctx["building_summary_per"] = summary_per
         ctx["building_summary_per_choices"] = self.SUMMARY_PER_CHOICES
+        ctx["archive_work_orders_url"] = reverse("core:work_orders_archive")
+        ctx["archive_budgets_url"] = ""
+        user = self.request.user
+        resolver = CapabilityResolver(user) if user.is_authenticated else None
+        if (
+            resolver
+            and resolver.has(Capability.APPROVE_BUDGETS)
+            and BudgetFeatureFlag.is_enabled_for(user)
+        ):
+            try:
+                ctx["archive_budgets_url"] = reverse("core:budget_archived_list")
+            except Exception:
+                ctx["archive_budgets_url"] = ""
         return ctx
 
 
@@ -1888,3 +1943,51 @@ class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Del
         if not name:
             name = _("Attachment %(id)s") % {"id": attachment.pk}
         return name
+
+
+class WorkOrderBudgetChargeView(LoginRequiredMixin, UserPassesTestMixin, FormView):
+    template_name = "core/work_order_budget_charge.html"
+    form_class = WorkOrderBudgetChargeForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.work_order = get_object_or_404(
+            WorkOrder.objects.visible_to(request.user).select_related("building"),
+            pk=kwargs["pk"],
+        )
+        if not BudgetFeatureFlag.is_enabled_for(request.user, building_id=self.work_order.building_id):
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
+
+    def test_func(self):
+        return _user_has_building_capability(
+            self.request.user,
+            self.work_order.building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        kwargs["work_order"] = self.work_order
+        return kwargs
+
+    def form_valid(self, form):
+        form.save(actor=self.request.user)
+        messages.success(self.request, _("Expense logged to the selected budget."))
+        return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        next_url = self.request.GET.get("next")
+        if next_url:
+            return next_url
+        return reverse("core:work_order_detail", args=[self.work_order.pk])
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["work_order"] = self.work_order
+        ctx["building"] = self.work_order.building
+        ctx["next_url"] = self.request.GET.get("next") or reverse(
+            "core:work_order_detail", args=[self.work_order.pk]
+        )
+        return ctx

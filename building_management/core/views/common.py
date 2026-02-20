@@ -178,3 +178,13 @@ class CapabilityRequiredMixin(UserPassesTestMixin):
         if not capabilities:
             return True
         return any(resolver.has(cap, building_id=building_id) for cap in capabilities)
+
+    def handle_no_permission(self):
+        user = getattr(self.request, "user", None)
+        if not user or not user.is_authenticated:
+            return redirect_to_login(
+                self.request.get_full_path(),
+                self.get_login_url(),
+                self.get_redirect_field_name(),
+            )
+        return super().handle_no_permission()

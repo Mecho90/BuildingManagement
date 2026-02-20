@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Budgets" %} · {{ block.super }}{% endblock %}
+{% block content %}
+  <div class="space-y-6">
+    <div class="space-y-4">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{% trans "Budgets" %}</h1>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {% if archived_budgets_url %}
+            <a href="{{ archived_budgets_url }}" class="btn btn-ghost">{% trans "Archived budgets" %}</a>
+          {% endif %}
+          <a href="{% url 'core:budget_create' %}" class="btn btn-primary">{% trans "New budget request" %}</a>
+        </div>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="ui-card">
+          <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total remaining" %}</p>
+          <p class="text-3xl font-semibold text-slate-900 dark:text-slate-100">
+            {{ summary_total_remaining|default:0|floatformat:2 }}
+          </p>
+        </div>
+        <div class="ui-card">
+          <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total spent" %}</p>
+          <p class="text-3xl font-semibold text-slate-900 dark:text-slate-100">
+            {{ summary_total_spent|default:0|floatformat:2 }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <form method="get" class="ui-panel space-y-4">
+      <div class="grid gap-4 md:grid-cols-3">
+        <div>
+          <label class="form-label" for="{{ filter_form.q.id_for_label }}">{% trans "Search" %}</label>
+          {{ filter_form.q }}
+        </div>
+        <div>
+          <label class="form-label" for="{{ filter_form.status.id_for_label }}">{% trans "Status" %}</label>
+          {{ filter_form.status }}
+        </div>
+        {% if filter_form.show_requester %}
+          <div>
+            <label class="form-label" for="{{ filter_form.technician.id_for_label }}">{% trans "Requester" %}</label>
+            {{ filter_form.technician }}
+          </div>
+        {% endif %}
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button type="submit" class="btn btn-primary">{% trans "Apply filters" %}</button>
+        <a href="{% url 'core:budget_list' %}" class="btn btn-ghost">{% trans "Reset" %}</a>
+      </div>
+    </form>
+
+    {% if budget_list %}
+      <div class="overflow-hidden rounded-2xl border border-emerald-100/60 shadow-sm dark:border-slate-800/60">
+        <table class="min-w-full divide-y divide-emerald-50 dark:divide-slate-800">
+          <thead class="bg-emerald-50/80 dark:bg-slate-800/70">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Budget" %}</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Status" %}</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Approved" %}</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Spent" %}</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Remaining" %}</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-emerald-50/60 bg-white dark:divide-slate-800 dark:bg-slate-900/70">
+            {% for budget in budget_list %}
+              <tr>
+                <td class="px-4 py-4 align-top">
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    <a href="{% url 'core:budget_detail' budget.pk %}" class="link">
+                      {{ budget.title|default:_("Untitled budget") }}
+                    </a>
+                  </div>
+                  {% if filter_form.show_requester %}
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ budget.requester.get_full_name|default:budget.requester.username }}
+                    </div>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-4 align-top">
+                  <span class="status-chip status-chip--{{ budget.status|slugify }}">{{ budget.get_status_display }}</span>
+                </td>
+                <td class="px-4 py-4 text-right align-top text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                  {{ budget.approved_total|floatformat:2 }} {{ budget.currency }}
+                </td>
+                <td class="px-4 py-4 text-right align-top text-sm text-slate-600 dark:text-slate-300">
+                  {{ budget.spent_total|floatformat:2 }} {{ budget.currency }}
+                </td>
+                <td class="px-4 py-4 text-right align-top text-sm {% if budget.has_overage %}text-red-600 dark:text-red-400{% else %}text-slate-600 dark:text-slate-300{% endif %}">
+                  {{ budget.remaining_amount|floatformat:2 }} {{ budget.currency }}
+                </td>
+                <td class="px-4 py-4 text-right">
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    <a href="{% url 'core:budget_detail' budget.pk %}" class="btn btn-xs btn-secondary">{% trans "View" %}</a>
+                    {% if request.user.is_authenticated and budget.requester_id == request.user.id and budget.status != 'approved' %}
+                      <a href="{% url 'core:budget_delete' budget.pk %}" class="btn btn-xs btn-danger">{% trans "Delete" %}</a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if budget_page.has_other_pages %}
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-slate-500 dark:text-slate-400">
+            {% blocktrans with number=budget_page.number total=budget_page.paginator.num_pages %}Page {{ number }} of {{ total }}{% endblocktrans %}
+          </div>
+          <div class="flex gap-2">
+            {% if budget_page.has_previous %}
+              <a class="btn btn-sm btn-outline" href="?{{ budget_query }}&page={{ budget_page.previous_page_number }}">{% trans "Previous" %}</a>
+            {% endif %}
+            {% if budget_page.has_next %}
+              <a class="btn btn-sm btn-outline" href="?{{ budget_query }}&page={{ budget_page.next_page_number }}">{% trans "Next" %}</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="ui-panel text-center text-slate-500 dark:text-slate-300">
+        {% trans "No budget requests yet. Create one to track project spending." %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

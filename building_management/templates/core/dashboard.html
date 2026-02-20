@@ -11,6 +11,19 @@
     </div>
   </div>
 
+  {% if budget_summary %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="ui-card bg-slate-900 text-white shadow-lg">
+        <p class="text-xs uppercase tracking-wide text-slate-200">{% trans "Total remaining" %}</p>
+        <p class="text-3xl font-semibold">{{ budget_summary.total_remaining|floatformat:2 }}</p>
+      </div>
+      <div class="ui-card bg-slate-900 text-white shadow-lg">
+        <p class="text-xs uppercase tracking-wide text-slate-200">{% trans "Total spent" %}</p>
+        <p class="text-3xl font-semibold">{{ budget_summary.total_spent|floatformat:2 }}</p>
+      </div>
+    </div>
+  {% endif %}
+
   {% with card_base="ui-card dashboard-card" section_shell="dashboard-panel space-y-4" %}
     <section class="space-y-4">
       <div class="flex items-center justify-between gap-3">

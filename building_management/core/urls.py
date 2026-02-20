@@ -7,6 +7,20 @@ app_name = "core"
 
 urlpatterns = [
     path("", views.DashboardView.as_view(), name="dashboard"),
+    # Budgets
+    path("budgets/", views.BudgetListView.as_view(), name="budget_list"),
+    path("budgets/new/", views.BudgetCreateView.as_view(), name="budget_create"),
+    path("budgets/<int:pk>/", views.BudgetDetailView.as_view(), name="budget_detail"),
+    path("budgets/<int:pk>/edit/", views.BudgetUpdateView.as_view(), name="budget_update"),
+    path("budgets/<int:pk>/expenses/new/", views.BudgetExpenseCreateView.as_view(), name="budget_expense_create"),
+    path("budgets/<int:pk>/archive/", views.BudgetArchiveView.as_view(), name="budget_archive"),
+    path("budgets/archived/", views.BudgetArchivedListView.as_view(), name="budget_archived_list"),
+    path("budgets/review/", views.BudgetReviewQueueView.as_view(), name="budget_review_queue"),
+    path("budgets/<int:pk>/review/", views.BudgetReviewDecisionView.as_view(), name="budget_review_decision"),
+    path("budgets/technicians/", views.BudgetTechnicianSummaryView.as_view(), name="budget_technicians"),
+    path("budgets/<int:pk>/delete/", views.BudgetDeleteView.as_view(), name="budget_delete"),
+    path("budgets/export/", views.BudgetExportView.as_view(), name="budget_export"),
+    path("budgets/<int:pk>/timeline.json", views.BudgetTimelineApiView.as_view(), name="budget_timeline"),
     # Buildings
     path("buildings/", views.BuildingListView.as_view(), name="buildings_list"),
     path("buildings/new/", views.BuildingCreateView.as_view(), name="building_create"),
@@ -56,6 +70,7 @@ urlpatterns = [
     path("work-orders/new/", views.WorkOrderCreateView.as_view(), name="work_order_create"),
     path("work-orders/<int:pk>/", views.WorkOrderDetailView.as_view(), name="work_order_detail"),
     path("work-orders/<int:pk>/edit/", views.WorkOrderUpdateView.as_view(), name="work_order_update"),
+    path("work-orders/<int:pk>/add-budget/", views.WorkOrderBudgetChargeView.as_view(), name="work_order_budget_charge"),
     path("work-orders/<int:pk>/delete/", views.WorkOrderDeleteView.as_view(), name="work_order_delete"),
     path("work-orders/<int:pk>/approval/", views.WorkOrderApprovalDecisionView.as_view(), name="work_order_approval_decide"),
     path("work-orders/<int:pk>/archive/", views.WorkOrderArchiveView.as_view(), name="work_order_archive"),
@@ -98,6 +113,18 @@ urlpatterns = [
         "api/work-orders/<int:pk>/attachments/<int:attachment_id>/",
         views.api_workorder_attachment_detail,
         name="api_workorder_attachment_detail",
+    ),
+    path("api/budgets/", views.api_budget_requests, name="api_budget_requests"),
+    path("api/budgets/<int:pk>/", views.api_budget_request_detail, name="api_budget_request_detail"),
+    path(
+        "api/budgets/<int:budget_id>/expenses/",
+        views.api_budget_expenses,
+        name="api_budget_expenses",
+    ),
+    path(
+        "api/budgets/<int:budget_id>/expenses/<int:expense_id>/attachments/",
+        views.api_budget_expense_attachments,
+        name="api_budget_expense_attachments",
     ),
     path("health/forwarding/", views.forwarding_health, name="forwarding_health"),
 ]

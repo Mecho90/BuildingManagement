@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}
+  {% if object %}
+    {% trans "Edit Budget" %} · {{ block.super }}
+  {% else %}
+    {% trans "New Budget" %} · {{ block.super }}
+  {% endif %}
+{% endblock %}
+{% block content %}
+  <div class="mx-auto max-w-3xl space-y-6">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+        {% if object %}{% trans "Edit budget request" %}{% else %}{% trans "New budget request" %}{% endif %}
+      </h1>
+    </div>
+    <form method="post" class="ui-panel space-y-4">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {% if form.title %}
+        <div>
+          <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Title" %}</label>
+          {{ form.title }}
+          {% for error in form.title.errors %}
+            <p class="form-error">{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if form.requested_amount %}
+        <div>
+          <label class="form-label" for="{{ form.requested_amount.id_for_label }}">{% trans "Requested amount" %}</label>
+          <div class="flex items-center gap-2">
+            <span class="text-lg font-semibold text-slate-600 dark:text-slate-300">€</span>
+            {{ form.requested_amount }}
+          </div>
+          {% for error in form.requested_amount.errors %}
+            <p class="form-error">{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% for field in form %}
+        {% if field.name != "requested_amount" and field.name != "title" %}
+          <div>
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}
+              <p class="form-help">{{ field.help_text }}</p>
+            {% endif %}
+            {% for error in field.errors %}
+              <p class="form-error">{{ error }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+      <div class="flex justify-end gap-3">
+        <a href="{% url 'core:budget_list' %}" class="btn btn-ghost">{% trans "Cancel" %}</a>
+        <button type="submit" class="btn btn-primary">
+          {% if object %}{% trans "Save changes" %}{% else %}{% trans "Submit for approval" %}{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

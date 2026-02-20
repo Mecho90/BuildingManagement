@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Delete budget request" %}{% endblock %}
+
+{% block content %}
+<section class="confirm-shell">
+  <div class="confirm-panel">
+    <span class="confirm-panel__icon" aria-hidden="true">
+      {% include "components/icons/warning.svg" %}
+    </span>
+    <h1 class="confirm-panel__title">{% trans "Delete budget request" %}</h1>
+    <p class="confirm-panel__message">
+      {% blocktrans with label=budget.title|default:_("this budget request") %}
+        Are you sure you want to delete <strong>{{ label }}</strong>?
+      {% endblocktrans %}
+      {% if budget.requested_amount %}
+        {% blocktrans with amount=budget.requested_amount|floatformat:2 currency=budget.currency %}
+          Requested amount: {{ amount }} {{ currency }}.
+        {% endblocktrans %}
+      {% endif %}
+      {% trans "This cannot be undone." %}
+    </p>
+    <form method="post" class="confirm-panel__actions">
+      {% csrf_token %}
+      <a class="btn btn-secondary" href="{{ cancel_url }}">{% trans "Cancel" %}</a>
+      <button class="btn btn-danger" type="submit">{% trans "Yes, delete" %}</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, SetPasswordForm
-from django.utils import timezone
+from django.utils import formats, timezone
 from django.utils.html import format_html
 from django.utils.text import capfirst
 from django.template.defaultfilters import filesizeformat
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Q
+from django.db.models import F, Q
 from django.db.models.functions import Lower
 
 from .authz import Capability, CapabilityResolver
 from .models import (
+    BudgetFeatureFlag,
+    BudgetRequest,
+    Expense,
+    ExpenseAttachment,
+    ExpenseCategory,
     Building,
     BuildingMembership,
     MembershipRole,
@@ -512,6 +518,9 @@ class WorkOrderForm(forms.ModelForm):
         self._forward_target_obj = None
         self._forwarding_owner_map: dict[str, str] = {}
         self._forwarding_changed = False
+        self._budget_fields_enabled = False
+        self._budget_charge_budget: BudgetRequest | None = None
+        self._budget_charge_amount_value: Decimal | None = None
         super().__init__(*args, **kwargs)
 
         # 1) Building choices / lock + hide if provided
@@ -566,8 +575,8 @@ class WorkOrderForm(forms.ModelForm):
         self.fields["deadline"].label = _("Deadline")
         self._current_status = self.instance.status if self.instance.pk else WorkOrder.Status.OPEN
         self._can_user_approve = user_can_approve_work_orders(self._user, b_id)
-        self._allowed_status_values = self._compute_allowed_statuses(
-            b_id, current_status=self._current_status, can_user_approve=self._can_user_approve
+        self._allowed_status_values = _workorder_allowed_statuses(
+            self, b_id, current_status=self._current_status, can_user_approve=self._can_user_approve
         )
         if self._current_status == WorkOrder.Status.AWAITING_APPROVAL and self._can_user_approve:
             self._allowed_status_values = {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
@@ -591,7 +600,7 @@ class WorkOrderForm(forms.ModelForm):
         self.fields["replacement_request_note"].widget = forms.HiddenInput()
         self.fields["replacement_request_note"].required = False
         self.fields["replacement_request_note"].initial = ""
-        self._approver_queryset = self._build_approver_queryset(self._effective_building)
+        self._approver_queryset = _workorder_build_approver_queryset(self._effective_building)
         self._approvers_available = self._approver_queryset.exists()
 
         self.forwarding_enabled = bool(
@@ -638,6 +647,8 @@ class WorkOrderForm(forms.ModelForm):
             self.initial["forward_note"] = ""
             self._forward_target_obj = None
             self._forwarding_owner_map = {}
+
+        self._init_budget_section()
 
         # Attachments (upload)
         self.fields["new_attachments"] = MultipleFileField(
@@ -717,7 +728,8 @@ class WorkOrderForm(forms.ModelForm):
             self.add_error("deadline", _("Deadline cannot be in the past."))
 
         status_value = cleaned.get("status")
-        allowed_statuses = self._compute_allowed_statuses(
+        allowed_statuses = _workorder_allowed_statuses(
+            self,
             building_id,
             current_status=self._current_status,
             can_user_approve=self._can_user_approve,
@@ -759,6 +771,7 @@ class WorkOrderForm(forms.ModelForm):
         else:
             cleaned["forwarded_to_building"] = None
             cleaned["forward_note"] = ""
+        self._clean_budget_section()
         return cleaned
 
     def clean_remove_attachments(self):
@@ -818,6 +831,89 @@ class WorkOrderForm(forms.ModelForm):
             obj.save()
         return obj
 
+    # ---------- budget helpers ----------
+    @property
+    def budget_section_enabled(self) -> bool:
+        return bool(self._budget_fields_enabled)
+
+    def _init_budget_section(self):
+        if not self._user or not getattr(self._user, "is_authenticated", False):
+            return
+        building_id = getattr(self._effective_building, "pk", None)
+        if not BudgetFeatureFlag.is_enabled_for(self._user, building_id=building_id):
+            return
+        qs = (
+            BudgetRequest.objects.visible_to(self._user)
+            .filter(status=BudgetRequest.Status.APPROVED)
+            .filter(
+                Q(allow_overage=True)
+                | Q(approved_amount__isnull=False, approved_amount__gt=F("spent_amount"))
+                | Q(approved_amount__isnull=True, requested_amount__gt=F("spent_amount"))
+            )
+            .select_related("requester")
+            .order_by("-updated_at", "-id")
+        )
+        if not qs.exists():
+            return
+        budget_field = forms.ModelChoiceField(
+            queryset=qs,
+            required=False,
+            label=_("Budget"),
+            widget=forms.Select(attrs={"class": "input"}),
+        )
+        budget_field.empty_label = _("Select a budget")
+        budget_field.label_from_instance = self._format_budget_label
+        self.fields["budget_charge_budget"] = budget_field
+        amount_field = forms.DecimalField(
+            required=False,
+            max_digits=12,
+            decimal_places=2,
+            min_value=Decimal("0.01"),
+            label=_("Charge amount"),
+            widget=forms.NumberInput(attrs={"class": "input", "step": "0.01", "min": "0.01"}),
+        )
+        self.fields["budget_charge_amount"] = amount_field
+        self._budget_fields_enabled = True
+
+    def _format_budget_label(self, budget: BudgetRequest) -> str:
+        title = (budget.title or "").strip()
+        if not title:
+            title = _("Budget #%(id)s") % {"id": budget.pk or "?"}
+        remaining_display = formats.number_format(budget.remaining_amount, 2)
+        return f"{title} · {remaining_display} {budget.currency}"
+
+    def _clean_budget_section(self):
+        if not self._budget_fields_enabled:
+            self._budget_charge_budget = None
+            self._budget_charge_amount_value = None
+            return
+        budget = self.cleaned_data.get("budget_charge_budget")
+        amount = self.cleaned_data.get("budget_charge_amount")
+        if amount and not budget:
+            self.add_error("budget_charge_budget", _("Select a budget to charge."))
+        if budget and not amount:
+            self.add_error("budget_charge_amount", _("Enter an amount to charge."))
+        if budget and amount:
+            if budget.status != BudgetRequest.Status.APPROVED:
+                self.add_error("budget_charge_budget", _("Only approved budgets can be charged."))
+            else:
+                remaining = budget.remaining_amount
+                if amount > remaining and not budget.allow_overage:
+                    remaining_display = formats.number_format(remaining, 2)
+                    self.add_error(
+                        "budget_charge_amount",
+                        _(
+                            "Amount exceeds remaining budget (%(amount)s %(currency)s)."
+                        )
+                        % {"amount": remaining_display, "currency": budget.currency},
+                    )
+        if self.errors:
+            self._budget_charge_budget = None
+            self._budget_charge_amount_value = None
+            return
+        self._budget_charge_budget = budget
+        self._budget_charge_amount_value = amount
+
     @property
     def forwarding_changed(self) -> bool:
         return bool(getattr(self, "_forwarding_changed", False))
@@ -848,6 +944,49 @@ class WorkOrderForm(forms.ModelForm):
         can_view_confidential = self._resolver.has(Capability.VIEW_CONFIDENTIAL_WORK_ORDERS)
         can_manage_buildings = self._resolver.has(Capability.MANAGE_BUILDINGS)
         return can_view_confidential and not can_manage_buildings
+
+    def apply_budget_charge(self, *, work_order: WorkOrder, actor):
+        budget = getattr(self, "_budget_charge_budget", None)
+        amount = getattr(self, "_budget_charge_amount_value", None)
+        if not budget or not amount:
+            return None
+        actor_user = actor if actor and getattr(actor, "is_authenticated", False) else None
+        label = _("Work order %(id)s · %(title)s") % {
+            "id": work_order.pk,
+            "title": work_order.title,
+        }
+        notes = _("Logged automatically from work order %(id)s.") % {"id": work_order.pk}
+        log_context = {
+            "work_order_id": work_order.pk,
+            "work_order_title": work_order.title,
+        }
+        building = getattr(work_order, "building", None)
+        if building:
+            log_context["building_id"] = building.pk
+            log_context["building_name"] = building.name
+        expense = Expense(
+            budget_request=budget,
+            label=label[:255],
+            amount=amount,
+            status=Expense.Status.LOGGED,
+            notes=notes,
+        )
+        if actor_user:
+            expense.created_by = actor_user
+        metadata = {}
+        if log_context:
+            expense._log_context = log_context  # hint for Expense.save event payload
+            metadata.update(
+                {
+                    key: value
+                    for key, value in log_context.items()
+                    if key in {"work_order_id", "work_order_title", "building_id", "building_name"}
+                }
+            )
+        if metadata:
+            expense.metadata = metadata
+        expense.save()
+        return expense
 
     # ---------- attachments helpers ----------
     def save_attachments(self, work_order: WorkOrder):
@@ -884,86 +1023,370 @@ class WorkOrderForm(forms.ModelForm):
                 change_log["added"].append(name)
         return change_log
 
-    def _compute_allowed_statuses(self, building_id, *, current_status=None, can_user_approve: bool = False):
-        current = current_status or (self.instance.status if self.instance.pk else WorkOrder.Status.OPEN)
-        if building_id is None:
-            return {WorkOrder.Status.OPEN}
-        can_manage = False
-        can_create = False
-        if self._resolver:
-            can_manage = self._resolver.has(Capability.MANAGE_BUILDINGS, building_id=building_id)
-            can_create = self._resolver.has(Capability.CREATE_WORK_ORDERS, building_id=building_id)
-        if not (can_manage or can_create or can_user_approve):
-            return {current}
 
-        transitions = {
-            WorkOrder.Status.OPEN: {WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS, WorkOrder.Status.DONE},
-            WorkOrder.Status.IN_PROGRESS: {
-                WorkOrder.Status.IN_PROGRESS,
-                WorkOrder.Status.AWAITING_APPROVAL,
-                WorkOrder.Status.DONE,
-            },
-            WorkOrder.Status.AWAITING_APPROVAL: {WorkOrder.Status.AWAITING_APPROVAL},
-            WorkOrder.Status.DONE: {WorkOrder.Status.DONE},
-            WorkOrder.Status.APPROVED: {
-                WorkOrder.Status.APPROVED,
-                WorkOrder.Status.OPEN,
-                WorkOrder.Status.IN_PROGRESS,
-                WorkOrder.Status.AWAITING_APPROVAL,
-                WorkOrder.Status.DONE,
-            },
-            WorkOrder.Status.REJECTED: {
-                WorkOrder.Status.REJECTED,
-                WorkOrder.Status.OPEN,
-                WorkOrder.Status.IN_PROGRESS,
-                WorkOrder.Status.AWAITING_APPROVAL,
-                WorkOrder.Status.DONE,
-            },
-        }
-        allowed = transitions.get(current, {current})
-        if current == WorkOrder.Status.AWAITING_APPROVAL:
-            if can_user_approve:
-                return {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
-            return allowed
+# -----------------------------
+# Helper functions
+# -----------------------------
+
+def _workorder_allowed_statuses(form, building_id, *, current_status=None, can_user_approve: bool = False):
+    current = current_status or (form.instance.status if form.instance.pk else WorkOrder.Status.OPEN)
+    if building_id is None:
+        return {WorkOrder.Status.OPEN}
+    can_manage = False
+    can_create = False
+    resolver = getattr(form, "_resolver", None)
+    if resolver:
+        can_manage = resolver.has(Capability.MANAGE_BUILDINGS, building_id=building_id)
+        can_create = resolver.has(Capability.CREATE_WORK_ORDERS, building_id=building_id)
+    if not (can_manage or can_create or can_user_approve):
+        return {current}
+
+    transitions = {
+        WorkOrder.Status.OPEN: {WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS, WorkOrder.Status.DONE},
+        WorkOrder.Status.IN_PROGRESS: {
+            WorkOrder.Status.IN_PROGRESS,
+            WorkOrder.Status.AWAITING_APPROVAL,
+            WorkOrder.Status.DONE,
+        },
+        WorkOrder.Status.AWAITING_APPROVAL: {WorkOrder.Status.AWAITING_APPROVAL},
+        WorkOrder.Status.DONE: {WorkOrder.Status.DONE},
+        WorkOrder.Status.APPROVED: {
+            WorkOrder.Status.APPROVED,
+            WorkOrder.Status.OPEN,
+            WorkOrder.Status.IN_PROGRESS,
+            WorkOrder.Status.AWAITING_APPROVAL,
+            WorkOrder.Status.DONE,
+        },
+        WorkOrder.Status.REJECTED: {
+            WorkOrder.Status.REJECTED,
+            WorkOrder.Status.OPEN,
+            WorkOrder.Status.IN_PROGRESS,
+            WorkOrder.Status.AWAITING_APPROVAL,
+            WorkOrder.Status.DONE,
+        },
+    }
+    allowed = transitions.get(current, {current})
+    if current == WorkOrder.Status.AWAITING_APPROVAL:
         if can_user_approve:
-            allowed |= {
-                WorkOrder.Status.OPEN,
-                WorkOrder.Status.IN_PROGRESS,
-                WorkOrder.Status.AWAITING_APPROVAL,
-                WorkOrder.Status.DONE,
-            }
+            return {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
         return allowed
+    if can_user_approve:
+        allowed |= {
+            WorkOrder.Status.OPEN,
+            WorkOrder.Status.IN_PROGRESS,
+            WorkOrder.Status.AWAITING_APPROVAL,
+            WorkOrder.Status.DONE,
+        }
+    return allowed
 
-    def _build_approver_queryset(self, building: Building | None):
-        if not building:
-            return User.objects.none()
-        user_ids: set[int] = set()
-        user_ids.update(
+
+def _workorder_build_approver_queryset(building: Building | None):
+    if not building:
+        return User.objects.none()
+    user_ids: set[int] = set()
+    user_ids.update(
+        BuildingMembership.objects.filter(
+            building=building,
+            role=MembershipRole.BACKOFFICE,
+        ).values_list("user_id", flat=True)
+    )
+    user_ids.update(
+        BuildingMembership.objects.filter(
+            building__isnull=True,
+            role=MembershipRole.ADMINISTRATOR,
+        ).values_list("user_id", flat=True)
+    )
+    if building.owner_id:
+        owner_roles = list(
             BuildingMembership.objects.filter(
                 building=building,
-                role=MembershipRole.BACKOFFICE,
-            ).values_list("user_id", flat=True)
+                user_id=building.owner_id,
+            ).values_list("role", flat=True)
         )
-        user_ids.update(
-            BuildingMembership.objects.filter(
-                building__isnull=True,
-                role=MembershipRole.ADMINISTRATOR,
-            ).values_list("user_id", flat=True)
-        )
-        # include owner only if they have an approver role (non-technician)
-        if building.owner_id:
-            owner_roles = list(
-                BuildingMembership.objects.filter(
-                    building=building,
-                    user_id=building.owner_id,
-                ).values_list("role", flat=True)
+        if owner_roles and MembershipRole.TECHNICIAN not in owner_roles:
+            user_ids.add(building.owner_id)
+    user_ids.discard(None)
+    if not user_ids:
+        return User.objects.none()
+    return User.objects.filter(pk__in=user_ids, is_active=True).order_by(Lower("username"))
+
+
+# -----------------------------
+# Budgets
+# -----------------------------
+
+class BudgetRequestForm(forms.ModelForm):
+    class Meta:
+        model = BudgetRequest
+        fields = [
+            "title",
+            "description",
+            "requested_amount",
+        ]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 5}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        self.fields["title"].widget.attrs.setdefault("placeholder", _("Add a short title so approvers can identify this budget."))
+        self.fields["requested_amount"].widget.attrs.setdefault("min", "0.01")
+        self.fields["requested_amount"].widget.attrs.setdefault("step", "0.01")
+        self.fields["description"].widget.attrs.setdefault("placeholder", _("Describe what this budget covers."))
+        self.fields["notes"].widget.attrs.setdefault("placeholder", _("Additional context for reviewers (optional)."))
+
+    def clean_requested_amount(self):
+        amount = self.cleaned_data.get("requested_amount")
+        if amount is None or amount <= 0:
+            raise forms.ValidationError(_("Requested amount must be greater than zero."))
+        return amount
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if not getattr(obj, "requester_id", None) and self.user and getattr(self.user, "is_authenticated", False):
+            obj.requester = self.user
+        obj.currency = BudgetRequest.Currency.EUR
+        if commit:
+            obj.save()
+        return obj
+
+
+class BudgetRequestApprovalForm(forms.ModelForm):
+    class Meta:
+        model = BudgetRequest
+        fields = [
+            "status",
+            "notes",
+        ]
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        allowed_statuses = [
+            BudgetRequest.Status.APPROVED,
+            BudgetRequest.Status.REJECTED,
+            BudgetRequest.Status.CLOSED,
+        ]
+        self.fields["status"].choices = [
+            (code, BudgetRequest.Status(code).label) for code in allowed_statuses
+        ]
+    def save(self, commit=True):
+        obj: BudgetRequest = super().save(commit=False)
+        if self.user and getattr(self.user, "is_authenticated", False):
+            obj.approved_by = self.user
+        if commit:
+            obj.save()
+            status = self.cleaned_data["status"]
+            comment = self.cleaned_data.get("notes") or ""
+            if status == BudgetRequest.Status.APPROVED and not obj.approved_amount:
+                obj.approved_amount = obj.requested_amount
+                obj.save(update_fields=["approved_amount"])
+            obj.transition(
+                status=status,
+                actor=self.user,
+                comment=comment,
             )
-            if owner_roles and MembershipRole.TECHNICIAN not in owner_roles:
-                user_ids.add(building.owner_id)
-        user_ids.discard(None)
-        if not user_ids:
-            return User.objects.none()
-        return User.objects.filter(pk__in=user_ids, is_active=True).order_by(Lower("username"))
+        return obj
+
+
+class BudgetExpenseForm(forms.ModelForm):
+    attachments = MultipleFileField(
+        required=False,
+        label=_("Attachments"),
+        help_text=_("Upload invoices or receipts required for this expense."),
+    )
+
+    class Meta:
+        model = Expense
+        fields = ["expense_type", "label", "amount", "notes", "status", "incurred_on"]
+        widgets = {
+            "notes": forms.Textarea(attrs={"rows": 4}),
+            "incurred_on": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, user=None, budget: BudgetRequest | None = None, **kwargs):
+        self.user = user
+        self.budget_request = budget or getattr(kwargs.get("instance"), "budget_request", None)
+        super().__init__(*args, **kwargs)
+        self.fields["expense_type"].queryset = ExpenseCategory.objects.order_by("label")
+        self.fields["expense_type"].required = False
+        self.fields["status"].choices = self._status_choices()
+        self.fields["status"].initial = Expense.Status.LOGGED
+        self.fields["status"].required = False
+        if self.budget_request:
+            self.instance.budget_request = self.budget_request
+
+    def _status_choices(self):
+        allowed = [Expense.Status.LOGGED]
+        if self.user and getattr(self.user, "is_authenticated", False):
+            memberships = BuildingMembership.objects.filter(user=self.user)
+            roles = set(memberships.values_list("role", flat=True))
+            if roles & {MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR} or getattr(self.user, "is_superuser", False):
+                allowed = [
+                    Expense.Status.LOGGED,
+                    Expense.Status.APPROVED,
+                    Expense.Status.REJECTED,
+                ]
+        return [(code, Expense.Status(code).label) for code in allowed]
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.budget_request:
+            raise forms.ValidationError(_("A parent budget request is required."))
+        return cleaned
+
+    def save(self, commit=True):
+        obj: Expense = super().save(commit=False)
+        if not obj.budget_request_id and self.budget_request:
+            obj.budget_request = self.budget_request
+        if not getattr(obj, "created_by_id", None) and self.user and getattr(self.user, "is_authenticated", False):
+            obj.created_by = self.user
+        obj.status = Expense.Status.LOGGED
+        if commit:
+            obj.save()
+            for uploaded in self.cleaned_data.get("attachments", []):
+                ExpenseAttachment.objects.create(
+                    expense=obj,
+                    file=uploaded,
+                    original_name=uploaded.name,
+                    uploaded_by=self.user,
+                )
+        return obj
+
+
+class BudgetFilterForm(forms.Form):
+    status = forms.ChoiceField(required=False)
+    technician = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label=_("Requester"))
+    q = forms.CharField(required=False, label=_("Search"))
+    show_requester = False
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+        status_choices = [("", _("All statuses"))] + list(BudgetRequest.Status.choices)
+        self.fields["status"].choices = status_choices
+        tech_qs = User.objects.filter(budget_requests__isnull=False).distinct().order_by(Lower("username"))
+        self.fields["technician"].queryset = tech_qs
+        self.show_requester = self._can_filter_by_requester(user)
+        if not self.show_requester:
+            self.fields.pop("technician")
+
+    def _can_filter_by_requester(self, user) -> bool:
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        return BuildingMembership.objects.filter(
+            user=user,
+            role__in=[MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR],
+        ).exists()
+
+
+class WorkOrderBudgetChargeForm(forms.Form):
+    budget = forms.ModelChoiceField(queryset=BudgetRequest.objects.none(), label=_("Budget"))
+    amount = forms.DecimalField(
+        label=_("Charge amount"),
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+    )
+    description = forms.CharField(
+        required=False,
+        label=_("Description"),
+        widget=forms.Textarea(attrs={"rows": 3, "class": "input"}),
+    )
+    attachments = MultipleFileField(
+        required=False,
+        label=_("Attachments"),
+        help_text=_("Upload receipts or invoices for this expense."),
+    )
+
+    def __init__(self, *args, user=None, work_order: WorkOrder | None = None, **kwargs):
+        self.user = user
+        self.work_order = work_order
+        super().__init__(*args, **kwargs)
+        self.fields["budget"].widget.attrs.setdefault("class", "input")
+        self.fields["amount"].widget.attrs.setdefault("class", "input")
+        self.fields["amount"].widget.attrs.setdefault("step", "0.01")
+        self.fields["amount"].widget.attrs.setdefault("min", "0.01")
+        qs = (
+            BudgetRequest.objects.visible_to(user)
+            .filter(status=BudgetRequest.Status.APPROVED)
+            .filter(
+                Q(allow_overage=True)
+                | Q(approved_amount__isnull=False, approved_amount__gt=F("spent_amount"))
+                | Q(approved_amount__isnull=True, requested_amount__gt=F("spent_amount"))
+            )
+            .order_by("-updated_at", "-id")
+        )
+        self.fields["budget"].queryset = qs
+        self.fields["budget"].empty_label = _("Select a budget")
+        self.fields["budget"].label_from_instance = self._format_budget_label
+
+    def _format_budget_label(self, budget: BudgetRequest) -> str:
+        title = (budget.title or "").strip()
+        if not title:
+            title = _("Budget #%(id)s") % {"id": budget.pk or "?"}
+        remaining_display = formats.number_format(budget.remaining_amount, 2)
+        return f"{title} · {remaining_display} {budget.currency}"
+
+    def clean(self):
+        cleaned = super().clean()
+        budget = cleaned.get("budget")
+        amount = cleaned.get("amount")
+        if not budget or amount is None:
+            return cleaned
+        remaining = budget.remaining_amount
+        if amount > remaining and not budget.allow_overage:
+            remaining_display = formats.number_format(remaining, 2)
+            self.add_error(
+                "amount",
+                _("Amount exceeds remaining budget (%(amount)s %(currency)s).")
+                % {"amount": remaining_display, "currency": budget.currency},
+            )
+        return cleaned
+
+    def save(self, *, actor=None):
+        budget = self.cleaned_data["budget"]
+        amount = self.cleaned_data["amount"]
+        description = (self.cleaned_data.get("description") or "").strip()
+        work_order = self.work_order
+        label = _("Work order %(id)s · %(title)s") % {
+            "id": work_order.pk,
+            "title": work_order.title,
+        }
+        fallback_notes = _("Logged automatically from work order %(id)s.") % {"id": work_order.pk}
+        expense = Expense(
+            budget_request=budget,
+            label=label[:255],
+            amount=amount,
+            status=Expense.Status.LOGGED,
+            notes=description or fallback_notes,
+        )
+        if actor and getattr(actor, "is_authenticated", False):
+            expense.created_by = actor
+        log_context = {
+            "work_order_id": work_order.pk,
+            "work_order_title": work_order.title,
+        }
+        building = getattr(work_order, "building", None)
+        if building:
+            log_context["building_id"] = building.pk
+            log_context["building_name"] = building.name
+        expense._log_context = log_context
+        expense.save()
+        for uploaded in self.cleaned_data.get("attachments", []):
+            ExpenseAttachment.objects.create(
+                expense=expense,
+                file=uploaded,
+                original_name=getattr(uploaded, "name", ""),
+                uploaded_by=actor if actor and getattr(actor, "is_authenticated", False) else None,
+            )
+        return expense
 
 
 class MassAssignWorkOrdersForm(forms.Form):
@@ -1243,34 +1666,41 @@ def _global_membership_for(user):
     return BuildingMembership.objects.filter(user=user, building__isnull=True).first()
 
 
-def _initial_roles_for(user):
-    memberships = (
+def _initial_role_for(user):
+    qs = (
         BuildingMembership.objects.filter(user=user, building__isnull=True)
         if getattr(user, "pk", None)
-        else []
+        else None
     )
-    roles = [membership.role for membership in memberships]
-    if roles:
-        return roles
+    membership = qs.first() if qs is not None else None
+    if membership:
+        return membership.role
     if getattr(user, "is_superuser", False):
-        return [MembershipRole.ADMINISTRATOR]
-    return [MembershipRole.BACKOFFICE]
+        return MembershipRole.ADMINISTRATOR
+    return MembershipRole.BACKOFFICE
 
 
-def _apply_user_roles(user, roles: list[str]):
-    roles = sorted(set(roles or []))
-    if not roles:
-        roles = [MembershipRole.BACKOFFICE]
-    user.is_superuser = MembershipRole.ADMINISTRATOR in roles
+def _apply_user_role(user, role: str | None):
+    role = role or MembershipRole.BACKOFFICE
+    user.is_superuser = role == MembershipRole.ADMINISTRATOR
     user.is_staff = user.is_superuser
     user.save(update_fields=["is_superuser", "is_staff"])
-    existing = BuildingMembership.objects.filter(user=user, building__isnull=True)
-    existing_roles = {membership.role: membership for membership in existing}
-    for role in roles:
-        if role in existing_roles:
-            continue
-        BuildingMembership.objects.create(user=user, building=None, role=role)
-    existing.exclude(role__in=roles).delete()
+    global_membership, created = BuildingMembership.objects.get_or_create(
+        user=user,
+        building=None,
+        defaults={"role": role},
+    )
+    if not created and global_membership.role != role:
+        global_membership.role = role
+        global_membership.save(update_fields=["role"])
+    other_memberships = BuildingMembership.objects.filter(user=user).exclude(pk=global_membership.pk)
+    for membership in other_memberships:
+        if membership.role != role:
+            membership.role = role
+            membership.save()
+        elif role != MembershipRole.TECHNICIAN and membership.technician_subrole:
+            membership.technician_subrole = ""
+            membership.save(update_fields=["technician_subrole"])
 
 
 class AdminUserCreateForm(RoleSelectionMixin, UserCreationForm):
@@ -1292,11 +1722,11 @@ class AdminUserCreateForm(RoleSelectionMixin, UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields.pop("is_superuser", None)
-        self.fields["roles"] = forms.MultipleChoiceField(
+        self.fields["role"] = forms.ChoiceField(
             choices=MembershipRole.choices,
-            label=_("Roles"),
-            initial=_initial_roles_for(self.instance),
-            widget=forms.CheckboxSelectMultiple(attrs={"class": "space-y-2"}),
+            label=_("Role"),
+            initial=_initial_role_for(self.instance),
+            widget=forms.RadioSelect(attrs={"class": "space-y-2"}),
         )
         for field in self.fields.values():
             widget = field.widget
@@ -1320,7 +1750,7 @@ class AdminUserCreateForm(RoleSelectionMixin, UserCreationForm):
             self.save_m2m()
             profile, created = UserSecurityProfile.objects.get_or_create(user=user)
             profile.reset()
-            _apply_user_roles(user, self.cleaned_data.get("roles", []))
+            _apply_user_role(user, self.cleaned_data.get("role"))
         return user
 
 
@@ -1340,11 +1770,11 @@ class AdminUserUpdateForm(RoleSelectionMixin, UserChangeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields.pop("is_superuser", None)
-        self.fields["roles"] = forms.MultipleChoiceField(
+        self.fields["role"] = forms.ChoiceField(
             choices=MembershipRole.choices,
-            label=_("Roles"),
-            initial=_initial_roles_for(self.instance),
-            widget=forms.CheckboxSelectMultiple(attrs={"class": "space-y-2"}),
+            label=_("Role"),
+            initial=_initial_role_for(self.instance),
+            widget=forms.RadioSelect(attrs={"class": "space-y-2"}),
         )
         for field in self.fields.values():
             widget = field.widget
@@ -1355,7 +1785,7 @@ class AdminUserUpdateForm(RoleSelectionMixin, UserChangeForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        roles = self.cleaned_data.get("roles", _initial_roles_for(user))
+        role = self.cleaned_data.get("role", _initial_role_for(user))
         user.is_staff = user.is_superuser
         if commit:
             user.save()
@@ -1363,7 +1793,7 @@ class AdminUserUpdateForm(RoleSelectionMixin, UserChangeForm):
             profile, created = UserSecurityProfile.objects.get_or_create(user=user)
             if user.is_active:
                 profile.reset()
-            _apply_user_roles(user, roles)
+            _apply_user_role(user, role)
         return user
 
 

@@ -4,7 +4,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from .authz import Capability, CapabilityResolver
-from .models import Building, MembershipRole, TodoItem, start_of_week
+from .models import Building, BudgetFeatureFlag, MembershipRole, TodoItem, start_of_week
 from .utils.roles import user_has_role, user_is_lawyer
 
 
@@ -29,6 +29,12 @@ def theme(request):
         "office_building_enabled": False,
         "office_building_url": "",
         "office_building_pattern": "",
+        "budgets_enabled": False,
+        "budgets_url": "",
+        "budgets_archived_enabled": False,
+        "budgets_archived_url": "",
+        "budget_review_enabled": False,
+        "budget_review_url": "",
     }
 
     user = getattr(request, "user", None)
@@ -62,6 +68,24 @@ def theme(request):
             try:
                 data["user_management_url"] = reverse("core:users_list")
                 data["can_view_user_management"] = True
+            except NoReverseMatch:
+                pass
+        if resolver.has(Capability.VIEW_BUDGETS) and BudgetFeatureFlag.is_enabled_for(user):
+            try:
+                data["budgets_url"] = reverse("core:budget_list")
+                data["budgets_enabled"] = True
+            except NoReverseMatch:
+                pass
+            if resolver.has(Capability.APPROVE_BUDGETS):
+                try:
+                    data["budgets_archived_url"] = reverse("core:budget_archived_list")
+                    data["budgets_archived_enabled"] = True
+                except NoReverseMatch:
+                    pass
+        if resolver.has(Capability.APPROVE_BUDGETS) and BudgetFeatureFlag.is_enabled_for(user):
+            try:
+                data["budget_review_url"] = reverse("core:budget_review_queue")
+                data["budget_review_enabled"] = True
             except NoReverseMatch:
                 pass
         if resolver.has(Capability.VIEW_AUDIT_LOG):

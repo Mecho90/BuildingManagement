@@ -29,7 +29,7 @@
 
     <div class="grid gap-5">
       {% for field in form.visible_fields %}
-        {% if field.name != 'new_attachments' and field.name != 'remove_attachments' and field.name != 'forwarded_to_building' and field.name != 'forward_note' %}
+        {% if field.name != 'new_attachments' and field.name != 'remove_attachments' and field.name != 'forwarded_to_building' and field.name != 'forward_note' and field.name != 'budget_charge_budget' and field.name != 'budget_charge_amount' %}
           {% include "components/form_field.html" with field=field %}
         {% endif %}
       {% endfor %}

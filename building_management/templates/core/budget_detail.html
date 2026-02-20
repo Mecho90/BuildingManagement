@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Budget request" %} · {{ block.super }}{% endblock %}
+{% block content %}
+  <div class="space-y-8">
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-100">
+          {% if budget.title %}
+            {{ budget.title }}
+          {% else %}
+            {% trans "Budget request" %}
+          {% endif %}
+        </h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400">
+          {% blocktrans with status=budget.get_status_display requester=budget.requester.get_full_name|default:budget.requester.username %}
+            Status: {{ status }} · Requested by {{ requester }}
+          {% endblocktrans %}
+        </p>
+        {% if budget.is_archived %}
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {% blocktrans with date=budget.archived_at|date:"Y-m-d H:i" %}Archived on {{ date }}{% endblocktrans %}
+          </p>
+        {% endif %}
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {% if can_review_budget %}
+          <a class="btn btn-outline" href="{% url 'core:budget_review_decision' budget.pk %}">{% trans "Review" %}</a>
+        {% endif %}
+        {% if can_archive_budget %}
+          <form method="post" action="{{ archive_budget_url }}" class="inline-flex">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline">{% trans "Archive budget" %}</button>
+          </form>
+        {% endif %}
+        {% if can_delete_budget %}
+          <a class="btn btn-outline btn-danger" href="{% url 'core:budget_delete' budget.pk %}">{% trans "Delete request" %}</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="ui-card">
+        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requested" %}</p>
+        <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.requested_amount|floatformat:2 }} {{ budget.currency }}</p>
+      </div>
+      <div class="ui-card">
+        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Approved" %}</p>
+        <p class="text-2xl font-semibold text-emerald-600 dark:text-emerald-300">{{ budget.approved_total|floatformat:2 }} {{ budget.currency }}</p>
+        {% if budget.approved_by %}
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {% blocktrans with name=budget.approved_by.get_full_name|default:budget.approved_by.username %}
+              Approved by {{ name }}
+            {% endblocktrans %}
+          </p>
+        {% endif %}
+      </div>
+      <div class="ui-card">
+        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Remaining" %}</p>
+        <p class="text-2xl font-semibold {% if budget.has_overage %}text-red-600 dark:text-red-400{% else %}text-slate-900 dark:text-slate-100{% endif %}">
+          {{ budget.remaining_amount|floatformat:2 }} {{ budget.currency }}
+        </p>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{% trans "Expenses" %}</h2>
+        <div class="flex flex-wrap items-center gap-3">
+          {% if expense_building_options %}
+            <form method="get" class="flex items-center gap-2 text-sm">
+              <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="expense-building-filter">{% trans "Building" %}</label>
+              <select id="expense-building-filter" name="building" class="input" onchange="this.form.submit()">
+                <option value="">{% trans "All buildings" %}</option>
+                {% for option in expense_building_options %}
+                  <option value="{{ option.id }}" {% if option.id == selected_expense_building %}selected{% endif %}>
+                    {{ option.name }}
+                  </option>
+                {% endfor %}
+              </select>
+              {% if selected_expense_building %}
+                <a href="{% url 'core:budget_detail' budget.pk %}" class="text-xs text-slate-500 dark:text-slate-400">{% trans "Clear" %}</a>
+              {% endif %}
+            </form>
+          {% endif %}
+          {% if can_log_expense %}
+            <button class="btn" type="button" data-budget-expense-toggle>
+              {% trans "Log expense" %}
+            </button>
+          {% endif %}
+        </div>
+      </div>
+      {% if expenses %}
+        <div class="space-y-3">
+          {% for expense in expenses %}
+            <div class="ui-panel space-y-2" data-expense-item>
+              <button class="flex w-full items-center justify-between text-left" type="button" data-expense-toggle>
+                <div>
+                  <p class="font-semibold text-slate-900 dark:text-slate-100">{{ expense.label }}</p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ expense.incurred_on }} · {{ expense.expense_type.label|default:_("Uncategorized") }}
+                  </p>
+                </div>
+                <div class="text-right">
+                  <p class="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    {{ expense.amount|floatformat:2 }} {{ budget.currency }}
+                  </p>
+                  <span class="text-xs text-slate-400" aria-hidden="true">{% trans "Tap for details" %}</span>
+                </div>
+              </button>
+              <div class="space-y-2 text-sm text-slate-600 dark:text-slate-300" data-expense-details hidden>
+                {% with meta=expense.metadata %}
+                  {% if meta.building_name or meta.work_order_id %}
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                      {% if meta.building_name %}
+                        {% trans "Building" %}: {{ meta.building_name }}
+                      {% endif %}
+                      {% if meta.work_order_id %}
+                        · {% trans "Work order" %} #{{ meta.work_order_id }}
+                      {% endif %}
+                    </p>
+                  {% endif %}
+                {% endwith %}
+                {% if expense.notes %}
+                  <p>{{ expense.notes }}</p>
+                {% endif %}
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {% trans "Logged on" %} {{ expense.created_at|date:"Y-m-d H:i" }}
+                  {% if expense.created_by %}
+                    · {% blocktrans with actor=expense.created_by.get_full_name|default:expense.created_by.username %}by {{ actor }}{% endblocktrans %}
+                  {% endif %}
+                </p>
+                {% with attachments=expense.attachments.all %}
+                  {% if attachments %}
+                    <div class="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      {% for attachment in attachments %}
+                        <a href="{{ attachment.file.url }}" target="_blank" class="link">{{ attachment.original_name|default:_("Attachment") }}</a>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                {% endwith %}
+                {% if expense.requires_attachment and not expense.attachments.all %}
+                  <p class="text-xs text-amber-600">{% trans "Receipt required for this category." %}</p>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="ui-panel text-sm text-slate-500 dark:text-slate-300">
+          {% trans "No expenses logged yet." %}
+        </div>
+      {% endif %}
+      {% if can_log_expense %}
+        <div class="ui-panel" id="expense-form-panel" hidden>
+          <form method="post" enctype="multipart/form-data" action="{% url 'core:budget_expense_create' budget.pk %}" class="space-y-4">
+            {% csrf_token %}
+            {{ expense_form.non_field_errors }}
+              {% for field in expense_form %}
+                {% if field.name != "expense_type" and field.name != "status" %}
+                  <div>
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {% if field.name == "amount" %}
+                      <div class="flex items-center gap-2">
+                        <span class="text-lg font-semibold text-slate-600 dark:text-slate-300">€</span>
+                        {{ field }}
+                      </div>
+                    {% else %}
+                      {{ field }}
+                    {% endif %}
+                    {% if field.help_text %}
+                      <p class="form-help">{{ field.help_text }}</p>
+                    {% endif %}
+                    {% for error in field.errors %}
+                      <p class="form-error">{{ error }}</p>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% endfor %}
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn btn-ghost" data-budget-expense-toggle>{% trans "Cancel" %}</button>
+              <button type="submit" class="btn btn-primary">{% trans "Save expense" %}</button>
+            </div>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+{% block extra_js %}
+  {{ block.super }}
+  <script>
+    document.querySelectorAll("[data-budget-expense-toggle]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const panel = document.getElementById("expense-form-panel");
+        if (!panel) return;
+        const isHidden = panel.hasAttribute("hidden");
+        if (isHidden) {
+          panel.removeAttribute("hidden");
+        } else {
+          panel.setAttribute("hidden", "hidden");
+        }
+      });
+    });
+    document.querySelectorAll("[data-expense-toggle]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const details = btn.closest("[data-expense-item]")?.querySelector("[data-expense-details]");
+        if (!details) return;
+        const isHidden = details.hasAttribute("hidden");
+        if (isHidden) {
+          details.removeAttribute("hidden");
+        } else {
+          details.setAttribute("hidden", "hidden");
+        }
+      });
+    });
+  </script>
+{% endblock %}

@@ -1,9 +1,11 @@
 # core/models.py
 from __future__ import annotations
 
+import hashlib
 import mimetypes
 import uuid
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 import time
 from pathlib import Path
 
@@ -11,9 +13,9 @@ from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import Lower
 from django.utils.functional import cached_property
 from django.utils import timezone
@@ -35,6 +37,10 @@ def start_of_week(value: date | datetime | None = None) -> date:
         base_date = value
     offset = base_date.weekday()  # Monday == 0
     return base_date - timedelta(days=offset)
+
+
+def default_currency() -> str:
+    return getattr(settings, "DEFAULT_CURRENCY", "USD")
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +179,13 @@ class WorkOrderQuerySet(models.QuerySet):
 ROLE_TECHNICIAN = "TECHNICIAN"
 ROLE_BACKOFFICE = "BACKOFFICE"
 ROLE_ADMINISTRATOR = "ADMINISTRATOR"
+
+
+class MembershipRole(models.TextChoices):
+    TECHNICIAN = "TECHNICIAN", _("Technician")
+    BACKOFFICE = "BACKOFFICE", _("Backoffice Employee")
+    LAWYER = "LAWYER", _("Lawyer")
+    ADMINISTRATOR = "ADMINISTRATOR", _("Administrator")
 
 
 class TodoListQuerySet(models.QuerySet):
@@ -804,6 +817,591 @@ class WorkOrderForwarding(TimeStampedModel):
         return f"{self.work_order} :: {from_name} → {to_name}"
 
 
+def _budget_attachment_upload_to(instance, filename: str) -> str:
+    expense_id = instance.expense_id or "pending"
+    extension = Path(filename).suffix.lower()
+    if len(extension) > 10:
+        extension = ""
+    return f"budgets/{expense_id}/{uuid.uuid4().hex}{extension}"
+
+
+class ExpenseCategory(TimeStampedModel):
+    code = models.CharField(max_length=40, unique=True)
+    label = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    requires_receipt = models.BooleanField(default=True)
+    max_amount_per_day = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    mileage_rate = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("label", "code")
+        verbose_name = _("Expense category")
+        verbose_name_plural = _("Expense categories")
+
+    def __str__(self):  # pragma: no cover
+        return self.label
+
+
+class BudgetFeatureFlag(TimeStampedModel):
+    key = models.CharField(max_length=64, default="budgets")
+    building = models.ForeignKey(
+        "core.Building",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="budget_feature_flags",
+    )
+    role = models.CharField(max_length=32, choices=MembershipRole.choices, blank=True)
+    is_enabled = models.BooleanField(default=True)
+    description = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        unique_together = ("key", "building", "role")
+        verbose_name = _("Budget feature flag")
+        verbose_name_plural = _("Budget feature flags")
+
+    def __str__(self):  # pragma: no cover
+        target = self.building or _("All buildings")
+        role = self.role or _("All roles")
+        return f"{self.key} → {target} ({role})"
+
+    @classmethod
+    def is_enabled_for(cls, user, *, key: str = "budgets", building_id: int | None = None) -> bool:
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        qs = cls.objects.filter(key=key, is_enabled=True)
+        if not qs.exists():
+            return True
+        if building_id:
+            qs = qs.filter(Q(building_id=building_id) | Q(building__isnull=True))
+        if qs.filter(role="").exists():
+            return True
+        user_roles = set(
+            BuildingMembership.objects.filter(user=user)
+            .values_list("role", flat=True)
+        )
+        return qs.filter(role__in=user_roles).exists()
+
+
+_EXPENSE_ACCUMULATION_STATUSES = {"logged", "approved"}
+
+
+class BudgetRequestQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        if not user or not getattr(user, "is_authenticated", False):
+            return self.none()
+        if getattr(user, "is_superuser", False):
+            return self
+        scope, resolver, building_ids = _resolve_visibility_scope(user)
+        own_q = Q(requester=user)
+        if scope == "none":
+            return self.filter(own_q)
+        if scope == "all":
+            return self
+        if not building_ids:
+            return self.filter(own_q)
+        return self.filter(own_q | Q(building_id__in=building_ids))
+
+    def pending_review(self):
+        return self.filter(status=BudgetRequest.Status.PENDING_REVIEW)
+
+    def active(self):
+        return self.filter(archived_at__isnull=True)
+
+    def archived(self):
+        return self.filter(archived_at__isnull=False)
+
+    def with_totals(self):
+        return self.annotate(
+            _spent_total=Sum(
+                "expenses__amount",
+                filter=Q(expenses__status__in=list(_EXPENSE_ACCUMULATION_STATUSES)),
+            ),
+            _attachment_count=Count("expenses__attachments", distinct=True),
+        )
+
+
+class BudgetRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", _("Draft")
+        PENDING_REVIEW = "pending_review", _("Pending review")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+        CLOSED = "closed", _("Closed")
+
+    class Currency(models.TextChoices):
+        USD = "USD", _("USD")
+        EUR = "EUR", _("EUR")
+        BGN = "BGN", _("BGN")
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="budget_requests",
+    )
+    title = models.CharField(max_length=255, blank=True)
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.CASCADE,
+        related_name="budget_requests",
+        null=True,
+        blank=True,
+    )
+    project_code = models.CharField(max_length=120, blank=True)
+    description = models.TextField(blank=True)
+    requested_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    approved_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    spent_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    currency = models.CharField(
+        max_length=8,
+        choices=Currency.choices,
+        default=Currency.EUR,
+    )
+    allow_overage = models.BooleanField(default=False)
+    allow_post_close_expense = models.BooleanField(default=False)
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        db_index=True,
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="budget_requests_approved",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    feature_flag = models.CharField(max_length=64, default="budgets", blank=True)
+    notes = models.TextField(blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    objects = BudgetRequestQuerySet.as_manager()
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=("building", "status")),
+            models.Index(fields=("requester", "status")),
+            models.Index(fields=("archived_at", "requester")),
+        ]
+        verbose_name = _("Budget request")
+        verbose_name_plural = _("Budget requests")
+
+    def __str__(self):  # pragma: no cover
+        label = (self.title or "").strip()
+        if not label:
+            label = _("Budget #%(id)s") % {"id": self.pk or "?"}
+        return f"{label} ({self.requested_amount} {self.currency})"
+
+    @property
+    def approved_total(self) -> Decimal:
+        if self.approved_amount is not None:
+            return self.approved_amount
+        return self.requested_amount
+
+    @property
+    def spent_total(self) -> Decimal:
+        annotated = getattr(self, "_spent_total", None)
+        if annotated is not None:
+            return Decimal(annotated or 0)
+        return self.spent_amount
+
+    @property
+    def remaining_amount(self) -> Decimal:
+        return max(self.approved_total - self.spent_total, Decimal("0.00"))
+
+    @property
+    def has_overage(self) -> bool:
+        return self.spent_total > self.approved_total
+
+    @property
+    def is_archived(self) -> bool:
+        return self.archived_at is not None
+
+    def clean(self):
+        super().clean()
+        if self.approved_amount is not None and self.approved_amount < Decimal("0.00"):
+            raise ValidationError({"approved_amount": _("Approved amount cannot be negative.")})
+        if self.requested_amount < Decimal("0.00"):
+            raise ValidationError({"requested_amount": _("Requested amount cannot be negative.")})
+
+    def update_spent_amount(self):
+        total = (
+            self.expenses.filter(status__in=list(_EXPENSE_ACCUMULATION_STATUSES))
+            .aggregate(total=Sum("amount"))
+            .get("total")
+            or Decimal("0.00")
+        )
+        self.spent_amount = total
+        self.save(update_fields=["spent_amount", "updated_at"])
+
+    def log_event(self, *, actor, event_type: str, notes: str = "", payload=None):
+        payload = payload or {}
+        return BudgetRequestEvent.objects.create(
+            budget_request=self,
+            actor=actor,
+            event_type=event_type,
+            notes=notes,
+            payload=payload,
+        )
+
+    def transition(self, *, status: str, actor=None, comment: str = "", payload=None):
+        if status not in dict(self.Status.choices):
+            raise ValidationError({"status": _("Unknown status.")})
+        previous = self.status
+        if previous == status and not comment:
+            return
+        self.status = status
+        updates = ["status", "updated_at"]
+        if status == self.Status.APPROVED:
+            self.approved_at = timezone.now()
+            if actor and not self.approved_by_id:
+                self.approved_by = actor
+            if not self.approved_amount:
+                self.approved_amount = self.requested_amount
+            updates.append("approved_at")
+            updates.append("approved_by")
+            updates.append("approved_amount")
+        self.save(update_fields=updates)
+        self.log_event(
+            actor=actor,
+            event_type=BudgetRequestEvent.EventType.STATUS,
+            notes=comment,
+            payload={"from": previous, "to": status, **(payload or {})},
+        )
+
+    def archive(self, *, actor=None, comment: str | None = None):
+        if self.archived_at:
+            return
+        comment = comment or _("Budget archived.")
+        if self.status != self.Status.CLOSED:
+            self.transition(status=self.Status.CLOSED, actor=actor, comment=comment)
+        else:
+            self.log_event(
+                actor=actor,
+                event_type=BudgetRequestEvent.EventType.STATUS,
+                notes=comment,
+                payload={"from": self.Status.CLOSED, "to": self.Status.CLOSED, "archived": True},
+            )
+        self.archived_at = timezone.now()
+        self.save(update_fields=["archived_at", "updated_at"])
+
+
+class ExpenseQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        if not user or not getattr(user, "is_authenticated", False):
+            return self.none()
+        return self.filter(budget_request__in=BudgetRequest.objects.visible_to(user))
+
+
+class Expense(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", _("Draft")
+        LOGGED = "logged", _("Logged")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+
+    budget_request = models.ForeignKey(
+        BudgetRequest,
+        on_delete=models.CASCADE,
+        related_name="expenses",
+    )
+    expense_type = models.ForeignKey(
+        ExpenseCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="expenses",
+    )
+    label = models.CharField(max_length=255)
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    notes = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        db_index=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="expenses_created",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="expenses_approved",
+    )
+    incurred_on = models.DateField(default=timezone.localdate)
+
+    objects = ExpenseQuerySet.as_manager()
+
+    class Meta:
+        ordering = ("-incurred_on", "-id")
+        indexes = [
+            models.Index(fields=("budget_request", "status")),
+        ]
+        verbose_name = _("Expense")
+        verbose_name_plural = _("Expenses")
+
+    def __str__(self):  # pragma: no cover
+        return f"{self.label} ({self.amount})"
+
+    @property
+    def requires_attachment(self) -> bool:
+        if self.expense_type:
+            return self.expense_type.requires_receipt
+        return False
+
+    def clean(self):
+        super().clean()
+        if self.amount <= Decimal("0.00"):
+            raise ValidationError({"amount": _("Expense amount must be positive.")})
+        if self.status in _EXPENSE_ACCUMULATION_STATUSES:
+            remaining = self.budget_request.remaining_amount
+            previous_amount, previous_status = self._previous_amount_snapshot()
+            if previous_amount is not None and previous_status in _EXPENSE_ACCUMULATION_STATUSES:
+                remaining += Decimal(previous_amount)
+            if self.amount > remaining:
+                raise ValidationError(
+                    {"amount": _("Expense exceeds remaining budget.")},
+                )
+        elif self.status == self.Status.REJECTED:
+            return
+        if self.expense_type and self.expense_type.max_amount_per_day:
+            if self.amount > self.expense_type.max_amount_per_day:
+                raise ValidationError(
+                    {"amount": _("Expense amount exceeds the configured daily maximum for this category.")},
+                )
+
+    def _countable_amount(self, *, amount: Decimal | None = None, status: str | None = None) -> Decimal:
+        amount = amount if amount is not None else self.amount
+        status = status if status is not None else self.status
+        if status in _EXPENSE_ACCUMULATION_STATUSES:
+            return Decimal(amount or 0)
+        return Decimal("0.00")
+
+    def _previous_amount_snapshot(self) -> tuple[Decimal, str] | tuple[None, None]:
+        if not self.pk:
+            return None, None
+        previous = (
+            Expense.objects.filter(pk=self.pk)
+            .values_list("amount", "status", named=False)
+            .first()
+        )
+        if not previous:
+            return None, None
+        return Decimal(previous[0]), str(previous[1])
+
+    def save(self, *args, **kwargs):
+        validate = kwargs.pop("validate", True)
+        previous_amount, previous_status = (None, None)
+        if self.pk:
+            try:
+                previous_amount, previous_status = self._previous_amount_snapshot()
+            except ValidationError:
+                previous_amount, previous_status = (None, None)
+        previous_remaining = max(
+            Decimal(self.budget_request.approved_total) - Decimal(self.budget_request.spent_amount or 0),
+            Decimal("0.00"),
+        )
+        if validate:
+            self.full_clean()
+        is_create = self.pk is None
+        super().save(*args, **kwargs)
+        previous_contribution = (
+            self._countable_amount(amount=previous_amount, status=previous_status)
+            if previous_amount is not None
+            else Decimal("0.00")
+        )
+        new_contribution = self._countable_amount()
+        delta = new_contribution - previous_contribution
+        if delta:
+            self.budget_request.spent_amount = max(
+                Decimal("0.00"), self.budget_request.spent_amount + delta
+            )
+            self.budget_request.save(update_fields=["spent_amount", "updated_at"])
+            try:
+                from .services.budgets import BudgetNotificationService
+
+                BudgetNotificationService(self.budget_request).check_thresholds(actor=self.created_by)
+                new_remaining = max(
+                    Decimal(self.budget_request.approved_total) - Decimal(self.budget_request.spent_amount or 0),
+                    Decimal("0.00"),
+                )
+                if previous_remaining > Decimal("0.00") and new_remaining == Decimal("0.00"):
+                    BudgetNotificationService(self.budget_request).notify_depleted()
+            except Exception:
+                pass
+        payload = {
+            "expense_id": self.pk,
+            "label": self.label,
+            "amount": str(self.amount),
+            "status": self.status,
+            "update": not is_create,
+        }
+        log_context = getattr(self, "_log_context", None)
+        if isinstance(log_context, dict):
+            payload.update({k: v for k, v in log_context.items() if v not in (None, "")})
+        self.budget_request.log_event(
+            actor=self.created_by,
+            event_type=BudgetRequestEvent.EventType.EXPENSE_LOGGED,
+            notes=self.notes or "",
+            payload=payload,
+        )
+
+    def delete(self, *args, **kwargs):
+        amount = self._countable_amount()
+        result = super().delete(*args, **kwargs)
+        if amount:
+            self.budget_request.spent_amount = max(
+                Decimal("0.00"), self.budget_request.spent_amount - amount
+            )
+            self.budget_request.save(update_fields=["spent_amount", "updated_at"])
+        return result
+
+
+class ExpenseAttachment(TimeStampedModel):
+    expense = models.ForeignKey(
+        Expense,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    file = models.FileField(upload_to=_budget_attachment_upload_to)
+    original_name = models.CharField(max_length=255, blank=True)
+    mime_type = models.CharField(max_length=255, blank=True)
+    size = models.PositiveBigIntegerField(default=0)
+    checksum = models.CharField(max_length=64, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="expense_attachments",
+    )
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = _("Expense attachment")
+        verbose_name_plural = _("Expense attachments")
+
+    def __str__(self):  # pragma: no cover
+        return self.original_name or Path(self.file.name).name
+
+    def save(self, *args, **kwargs):
+        if self.file:
+            path = Path(self.file.name)
+            if not self.original_name:
+                self.original_name = path.name
+            detected = getattr(getattr(self.file, "file", None), "content_type", "")
+            if not detected:
+                detected, _ = mimetypes.guess_type(path.name)
+            if detected:
+                self.mime_type = detected
+            try:
+                self.size = int(self.file.size)
+            except (TypeError, AttributeError, ValueError):
+                self.size = 0
+            self.checksum = self._compute_checksum()
+        super().save(*args, **kwargs)
+        self.expense.budget_request.log_event(
+            actor=self.uploaded_by,
+            event_type=BudgetRequestEvent.EventType.ATTACHMENT,
+            notes=self.original_name or "",
+            payload={"attachment_id": self.pk, "expense_id": self.expense_id},
+        )
+
+    def delete(self, *args, **kwargs):
+        result = super().delete(*args, **kwargs)
+        self.expense.budget_request.log_event(
+            actor=self.uploaded_by,
+            event_type=BudgetRequestEvent.EventType.ATTACHMENT,
+            notes=_("Attachment removed"),
+            payload={"attachment_id": self.pk, "expense_id": self.expense_id, "removed": True},
+        )
+        return result
+
+    def _compute_checksum(self) -> str:
+        hasher = hashlib.sha256()
+        for chunk in self.file.chunks():
+            hasher.update(chunk)
+        return hasher.hexdigest()
+
+
+class BudgetRequestEvent(TimeStampedModel):
+    class EventType(models.TextChoices):
+        STATUS = "status", _("Status changed")
+        APPROVAL = "approval", _("Approval decision")
+        EXPENSE_LOGGED = "expense", _("Expense recorded")
+        ATTACHMENT = "attachment", _("Attachment activity")
+        COMMENT = "comment", _("Comment")
+
+    budget_request = models.ForeignKey(
+        BudgetRequest,
+        on_delete=models.CASCADE,
+        related_name="events",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="budget_events",
+    )
+    event_type = models.CharField(max_length=32, choices=EventType.choices)
+    notes = models.TextField(blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name = _("Budget event")
+        verbose_name_plural = _("Budget events")
+
+    def __str__(self):  # pragma: no cover
+        return f"{self.get_event_type_display()} – {self.budget_request_id}"
+
+
 class TodoList(TimeStampedModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -1094,13 +1692,6 @@ class Notification(TimeStampedModel):
         return result
 
 
-class MembershipRole(models.TextChoices):
-    TECHNICIAN = "TECHNICIAN", _("Technician")
-    BACKOFFICE = "BACKOFFICE", _("Backoffice Employee")
-    LAWYER = "LAWYER", _("Lawyer")
-    ADMINISTRATOR = "ADMINISTRATOR", _("Administrator")
-
-
 class Capability:
     VIEW_ALL_BUILDINGS = "view_all_buildings"
     MANAGE_BUILDINGS = "manage_buildings"
@@ -1112,6 +1703,10 @@ class Capability:
     MANAGE_MEMBERSHIPS = "manage_memberships"
     VIEW_USERS = "view_users"
     VIEW_CONFIDENTIAL_WORK_ORDERS = "view_confidential_work_orders"
+    VIEW_BUDGETS = "view_budgets"
+    MANAGE_BUDGETS = "manage_budgets"
+    APPROVE_BUDGETS = "approve_budgets"
+    EXPORT_BUDGETS = "export_budgets"
 
     @classmethod
     def all(cls) -> set[str]:
@@ -1126,6 +1721,10 @@ class Capability:
             cls.MANAGE_MEMBERSHIPS,
             cls.VIEW_USERS,
             cls.VIEW_CONFIDENTIAL_WORK_ORDERS,
+            cls.VIEW_BUDGETS,
+            cls.MANAGE_BUDGETS,
+            cls.APPROVE_BUDGETS,
+            cls.EXPORT_BUDGETS,
         }
 
 
@@ -1134,8 +1733,11 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         Capability.MANAGE_BUILDINGS,
         Capability.CREATE_UNITS,
         Capability.CREATE_WORK_ORDERS,
+        Capability.VIEW_BUDGETS,
+        Capability.MANAGE_BUDGETS,
     },
     MembershipRole.BACKOFFICE: {
+        Capability.VIEW_ALL_BUILDINGS,
         Capability.MANAGE_BUILDINGS,
         Capability.CREATE_UNITS,
         Capability.CREATE_WORK_ORDERS,
@@ -1143,6 +1745,10 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         Capability.APPROVE_WORK_ORDERS,
         Capability.MANAGE_MEMBERSHIPS,
         Capability.VIEW_CONFIDENTIAL_WORK_ORDERS,
+        Capability.VIEW_BUDGETS,
+        Capability.MANAGE_BUDGETS,
+        Capability.APPROVE_BUDGETS,
+        Capability.EXPORT_BUDGETS,
     },
     MembershipRole.LAWYER: {
         Capability.VIEW_ALL_BUILDINGS,
@@ -1161,6 +1767,10 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         Capability.MANAGE_MEMBERSHIPS,
         Capability.VIEW_USERS,
         Capability.VIEW_CONFIDENTIAL_WORK_ORDERS,
+        Capability.VIEW_BUDGETS,
+        Capability.MANAGE_BUDGETS,
+        Capability.APPROVE_BUDGETS,
+        Capability.EXPORT_BUDGETS,
     },
 }
 
@@ -1232,7 +1842,30 @@ class BuildingMembership(TimeStampedModel):
         remove = set(overrides.get("remove", []))
         return (set(defaults) | add) - remove
 
+    def clean(self):
+        super().clean()
+        if not self.user_id or not self.role:
+            return
+        conflict = (
+            BuildingMembership.objects.filter(user=self.user)
+            .exclude(pk=self.pk)
+            .exclude(role=self.role)
+        )
+        if conflict.exists():
+            raise ValidationError(
+                {
+                    "role": _(
+                        "%(user)s already has the %(role)s role. Users can only have one role."
+                    )
+                    % {
+                        "user": self.user.get_full_name() or self.user.username,
+                        "role": MembershipRole(conflict.values_list("role", flat=True).first()).label,
+                    }
+                }
+            )
+
     def save(self, *args, **kwargs):
+        self.full_clean()
         overrides = self.capabilities_override or {}
         _validate_capability_entries(overrides.get("add"))
         _validate_capability_entries(overrides.get("remove"))

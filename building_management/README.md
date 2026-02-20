@@ -4,6 +4,7 @@ Responsive Django/Tailwind UI for managing buildings, units, and work orders.
 
 Role-based access control (RBAC) is described in [docs/rbac.md](docs/rbac.md).
 Logging and timing instrumentation guidelines live in [docs/logging.md](docs/logging.md), and the release QA checklist is tracked in [docs/qa_checklist.md](docs/qa_checklist.md).
+Budget workflow product notes, API surfaces, and rollout guidance live in [docs/budgets.md](docs/budgets.md).
 
 ## System Office Building
 

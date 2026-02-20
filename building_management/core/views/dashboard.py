@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Case, When, F, Sum, DecimalField, ExpressionWrapper
 from django.urls import reverse
 from django.utils import formats, timezone, translation
 from django.utils.translation import gettext as _, ngettext
@@ -14,6 +15,8 @@ from django.views.generic import TemplateView
 from ..authz import Capability, CapabilityResolver
 from ..models import (
     Building,
+    BudgetFeatureFlag,
+    BudgetRequest,
     MembershipRole,
     Notification,
     TodoItem,
@@ -43,6 +46,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         self._lawyer_scope_only = self._is_lawyer and not staff_role
 
         ctx.setdefault("dashboard_label", self._label_for(resolver))
+        ctx["budget_summary"] = self._budget_summary(user, resolver)
         tech_page, tech_query = self._technician_cards(user, resolver)
         ctx["technician_cards_page"] = tech_page
         ctx["technician_cards"] = tech_page.object_list if tech_page else []
@@ -206,6 +210,36 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         except (TypeError, ValueError):
             page_number = 1
         return paginator.get_page(page_number)
+
+    def _budget_summary(self, user, resolver):
+        if not user or not user.is_authenticated:
+            return None
+        if not BudgetFeatureFlag.is_enabled_for(user):
+            return None
+        if not resolver.has(Capability.VIEW_BUDGETS):
+            return None
+        qs = BudgetRequest.objects.visible_to(user).active()
+        if not qs.exists():
+            return None
+        amount_field = DecimalField(max_digits=12, decimal_places=2)
+        approved_expr = Case(
+            When(approved_amount__isnull=False, then=F("approved_amount")),
+            default=F("requested_amount"),
+            output_field=amount_field,
+        )
+        totals = qs.aggregate(
+            spent_total=Sum("spent_amount"),
+            remaining_total=Sum(
+                ExpressionWrapper(
+                    approved_expr - F("spent_amount"),
+                    output_field=amount_field,
+                )
+            ),
+        )
+        return {
+            "total_remaining": totals.get("remaining_total") or Decimal("0.00"),
+            "total_spent": totals.get("spent_total") or Decimal("0.00"),
+        }
 
     def _deadline_alert_cards(self, user):
         query = _querystring_without(self.request, "deadline_page")

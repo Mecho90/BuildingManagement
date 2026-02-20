@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Technician Budgets" %} · {{ block.super }}{% endblock %}
+{% block content %}
+  <div class="space-y-6">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{% trans "Technician budgets" %}</h1>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="{% url 'core:budget_list' %}" class="btn btn-secondary">{% trans "Back to budgets" %}</a>
+      </div>
+    </div>
+
+    {% if not technician_rows %}
+      <div class="ui-panel text-sm text-slate-500 dark:text-slate-300">
+        {% trans "No budgets found yet." %}
+      </div>
+    {% endif %}
+
+    {% if my_budgets %}
+      <div class="space-y-4">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{% trans "My budget requests" %}</h2>
+        <div class="space-y-3">
+          {% for budget in my_budgets %}
+            <div class="ui-panel space-y-2">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    {{ budget.title|default:_("Budget") }} #{{ budget.pk }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ budget.created_at|date:"Y-m-d H:i" }} · {% trans "Status" %}: {{ budget.get_status_display }}
+                  </p>
+                </div>
+                <span class="status-chip status-chip--{{ budget.status|slugify }}">{{ budget.get_status_display }}</span>
+              </div>
+              <div class="text-sm text-slate-600 dark:text-slate-300">
+                {% trans "Requested" %}: {{ budget.requested_amount|floatformat:2 }} {{ budget.currency }}
+              </div>
+              <div class="space-y-1">
+                <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">{% trans "Expenses" %}</p>
+                {% if budget.expenses.all %}
+                  <ul class="space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                    {% for expense in budget.expenses.all %}
+                      <li class="rounded-2xl border border-slate-100 bg-slate-50/60 p-3 text-sm dark:border-slate-800 dark:bg-slate-900/40">
+                        <div class="flex items-center justify-between">
+                          <span class="font-semibold">{{ expense.label }}</span>
+                          <span class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                            {{ expense.amount|floatformat:2 }} {{ budget.currency }}
+                          </span>
+                        </div>
+                        <div class="mt-2 grid gap-2 text-xs text-slate-500 dark:text-slate-400 md:grid-cols-2">
+                          <div>
+                            {% if expense.expense_type %}
+                              <span class="block">{% trans "Type" %}: {{ expense.expense_type.label }}</span>
+                            {% endif %}
+                            <span class="block">{% trans "Date" %}: {{ expense.incurred_on|date:"Y-m-d" }}</span>
+                            <span class="block">{% trans "Remaining" %}: {{ budget.remaining_amount|floatformat:2 }} {{ budget.currency }}</span>
+                          </div>
+                          <div>
+                            {% if expense.budget_request.building %}
+                              <span class="block">{% trans "Building" %}: {{ expense.budget_request.building.name }}</span>
+                            {% endif %}
+                            {% if expense.work_order %}
+                              <span class="block">
+                                {% trans "Work order" %}:
+                                <a class="link" href="{% url 'core:work_order_detail' expense.work_order_id %}">
+                                  #{{ expense.work_order_id }}
+                                </a>
+                              </span>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% else %}
+                  <p class="text-xs text-slate-500 dark:text-slate-400">{% trans "No expenses logged for this budget yet." %}</p>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if my_expenses %}
+      <div class="space-y-4">
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{% trans "Recent expenses by budget" %}</h2>
+        <div class="overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-700">
+          <table class="min-w-full divide-y divide-slate-100 dark:divide-slate-800">
+            <thead class="bg-slate-50/80 dark:bg-slate-800/70">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Budget" %}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Expense" %}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Type" %}</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Amount" %}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{% trans "Date" %}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900/80">
+              {% for expense in my_expenses %}
+                <tr>
+                  <td class="px-4 py-3 align-top text-sm text-slate-700 dark:text-slate-200">
+                    <a href="{% url 'core:budget_detail' expense.budget_request_id %}" class="link">
+                      {{ expense.budget_request.title|default:_("Budget") }} #{{ expense.budget_request_id }}
+                    </a>
+                  </td>
+                  <td class="px-4 py-3 align-top text-sm text-slate-700 dark:text-slate-200">
+                    {{ expense.label }}
+                  </td>
+                  <td class="px-4 py-3 align-top text-sm text-slate-600 dark:text-slate-300">
+                    {{ expense.expense_type.label|default:"—" }}
+                  </td>
+                  <td class="px-4 py-3 text-right align-top text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    {{ expense.amount|floatformat:2 }} {{ expense.budget_request.currency }}
+                  </td>
+                  <td class="px-4 py-3 align-top text-sm text-slate-500 dark:text-slate-400">
+                    {{ expense.incurred_on|date:"Y-m-d" }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

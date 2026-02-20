@@ -12,6 +12,12 @@
         {% blocktrans with count=building_summary_total %}Total archived buildings: {{ count }}{% endblocktrans %}
       </p>
     </div>
+    <div class="flex flex-wrap gap-3">
+      <a href="{{ archive_work_orders_url }}" class="btn btn-primary">{% trans "Archived Working Orders" %}</a>
+      {% if archive_budgets_url %}
+        <a href="{{ archive_budgets_url }}" class="btn btn-primary">{% trans "Archived Budgets" %}</a>
+      {% endif %}
+    </div>
   </div>
 
   <form method="get" class="filter-panel">

@@ -58,14 +58,14 @@
                 <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/$' css_class='nav-link--active' %}">
                   {% trans "Buildings" %}
                 </a>
-                {% if office_building_enabled and office_building_url %}
-                  <a href="{{ office_building_url }}" class="nav-link {% active_nav office_building_pattern css_class='nav-link--active' %}">
-                  {% trans "Офис" %}
-                  </a>
-                {% endif %}
                 {% if work_orders_enabled and work_orders_url %}
                   <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url|add:'$' css_class='nav-link--active' %}">
                     {% trans "Work Orders" %}
+                  </a>
+                {% endif %}
+                {% if budgets_enabled and budgets_url %}
+                  <a href="{{ budgets_url }}" class="nav-link {% active_nav budgets_url|add:'$' css_class='nav-link--active' %}">
+                    {% trans "Budgets" %}
                   </a>
                 {% endif %}
                 {% if lawyer_orders_enabled and lawyer_orders_url %}

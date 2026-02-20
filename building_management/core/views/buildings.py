@@ -83,6 +83,13 @@ class BuildingListView(LoginRequiredMixin, ListView):
             .with_lawyer_alerts()
             .select_related("owner")
         )
+        office_id = Building.system_default_id()
+        office_priority = Case(
+            When(pk=office_id, then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        )
+        qs = qs.annotate(_office_priority=office_priority)
 
         # Search
         q = (self.request.GET.get("q") or "").strip()
@@ -153,7 +160,7 @@ class BuildingListView(LoginRequiredMixin, ListView):
             sort_field = "-" + base if sort.startswith("-") else base
 
         self._effective_sort = sort
-        return qs.order_by("-is_system_default", sort_field, "id")
+        return qs.order_by("-_office_priority", "-is_system_default", sort_field, "id")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)

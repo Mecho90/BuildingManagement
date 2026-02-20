@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Budget Review" %} · {{ block.super }}{% endblock %}
+{% block content %}
+  <div class="space-y-6">
+    <div class="flex flex-col gap-2">
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{% trans "Budget review queue" %}</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        {% trans "Approve, reject, or request changes without leaving the admin console." %}
+      </p>
+    </div>
+
+    {% if pending_budgets %}
+      <div class="grid gap-4 md:grid-cols-2">
+        {% for budget in pending_budgets %}
+          <div class="ui-panel space-y-2">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "Budget" %} #{{ budget.pk }}</p>
+                <p class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ budget.building.name }}</p>
+              </div>
+              <span class="status-chip status-chip--{{ budget.status|slugify }}">{{ budget.get_status_display }}</span>
+            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              {% blocktrans with amount=budget.requested_amount|floatformat:2 currency=budget.currency %}
+                Requested {{ amount }} {{ currency }}
+              {% endblocktrans %}
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <a class="btn btn-xs btn-primary" href="{% url 'core:budget_review_decision' budget.pk %}">{% trans "Review" %}</a>
+              <a class="btn btn-xs btn-ghost" href="{% url 'core:budget_detail' budget.pk %}">{% trans "Details" %}</a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ui-panel text-sm text-slate-500 dark:text-slate-300">
+        {% trans "Nothing to review right now." %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

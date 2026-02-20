@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Archived budgets" %} · {{ block.super }}{% endblock %}
+{% block content %}
+  <div class="space-y-6">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{% trans "Archived budgets" %}</h1>
+      </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="{{ back_url }}" class="btn btn-primary">{% trans "Back to archive" %}</a>
+    </div>
+  </div>
+
+    {% if owner_groups %}
+      <div class="space-y-6">
+        {% for group in owner_groups %}
+          <section class="space-y-3 rounded-3xl border border-emerald-50/80 bg-white/70 p-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requester" %}</p>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ group.owner_name }}</h2>
+              </div>
+              <div class="rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:bg-slate-800/70 dark:text-slate-100">
+                {% blocktrans with requested=group.total_requested|floatformat:2 spent=group.total_spent|floatformat:2 %}
+                  Requested {{ requested }} · Spent {{ spent }}
+                {% endblocktrans %}
+              </div>
+            </div>
+            <div class="space-y-3">
+              {% for budget in group.budgets %}
+                <div class="ui-panel flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p class="font-semibold text-slate-900 dark:text-slate-100">
+                      {{ budget.title|default:_("Untitled budget") }}
+                    </p>
+                    <p class="text-xs text-white/80 dark:text-white">
+                      {% blocktrans with approved=budget.approved_total|floatformat:2 spent=budget.spent_total|floatformat:2 currency=budget.currency archived=budget.archived_at|date:"Y-m-d" %}
+                        Approved {{ approved }} {{ currency }} · Spent {{ spent }} {{ currency }} · Archived {{ archived }}
+                      {% endblocktrans %}
+                    </p>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <a href="{% url 'core:budget_detail' budget.pk %}" class="btn btn-xs btn-secondary">{% trans "View" %}</a>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ui-panel text-center text-slate-500 dark:text-slate-300">
+        {% trans "No archived budgets yet." %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

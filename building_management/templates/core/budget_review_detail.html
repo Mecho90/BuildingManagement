@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}{% trans "Review Budget" %} · {{ block.super }}{% endblock %}
+{% block content %}
+  <div class="mx-auto max-w-3xl space-y-6">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.building.name }}</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        {% blocktrans with requester=budget.requester.get_full_name|default:budget.requester.username %}
+          Requested by {{ requester }}
+        {% endblocktrans %}
+      </p>
+    </div>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="ui-card">
+        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requested" %}</p>
+        <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.requested_amount|floatformat:2 }} {{ budget.currency }}</p>
+      </div>
+      <div class="ui-card">
+        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Spent" %}</p>
+        <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.spent_amount|floatformat:2 }} {{ budget.currency }}</p>
+      </div>
+      <div class="ui-card">
+        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Current status" %}</p>
+        <span class="status-chip status-chip--{{ budget.status|slugify }}">{{ budget.get_status_display }}</span>
+      </div>
+    </div>
+    <form method="post" class="ui-panel space-y-4">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {% for field in form %}
+        <div>
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}
+            <p class="form-help">{{ field.help_text }}</p>
+          {% endif %}
+          {% for error in field.errors %}
+            <p class="form-error">{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endfor %}
+      <div class="flex justify-end gap-2">
+        <a href="{% url 'core:budget_detail' budget.pk %}" class="btn btn-ghost">{% trans "Back" %}</a>
+        <button type="submit" class="btn btn-primary">{% trans "Submit decision" %}</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

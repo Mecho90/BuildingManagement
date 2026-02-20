@@ -19,6 +19,9 @@
         <a class="btn" href="{% url 'core:work_order_update' order.id %}">{% trans "Edit" %}</a>
       {% endif %}
     {% endif %}
+    {% if can_add_budget and add_budget_url %}
+      <a class="btn" href="{{ add_budget_url }}">{% trans "Add expense" %}</a>
+    {% endif %}
     {% if can_delete_order %}
       {% if next_url %}
         <a class="btn btn-danger" href="{% url 'core:work_order_delete' order.id %}?next={{ next_url|urlencode }}">{% trans "Delete" %}</a>

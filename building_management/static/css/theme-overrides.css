@@ -1401,7 +1401,7 @@ html.dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
   position: relative;
   display: flex;
   gap: var(--ui-space-3);
-  align-items: flex-start;
+  align-items: center;
   padding: 1rem 1.25rem;
   border-radius: 1.1rem;
   border: 1px solid rgba(15, 23, 42, 0.12);
@@ -1442,6 +1442,10 @@ html.dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .alert__body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
 }
 
 .alert__title {

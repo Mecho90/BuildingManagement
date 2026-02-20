@@ -1,6 +1,12 @@
 from django.contrib import admin
 
 from .models import (
+    BudgetFeatureFlag,
+    BudgetRequest,
+    BudgetRequestEvent,
+    Expense,
+    ExpenseAttachment,
+    ExpenseCategory,
     Building,
     BuildingMembership,
     Notification,
@@ -146,3 +152,59 @@ class RoleAuditLogAdmin(admin.ModelAdmin):
     search_fields = ("actor__username", "target_user__username", "payload")
     autocomplete_fields = ("actor", "target_user", "building")
     readonly_fields = ("created_at", "updated_at")
+
+
+class ExpenseAttachmentInline(admin.TabularInline):
+    model = ExpenseAttachment
+    extra = 0
+    fields = ("original_name", "uploaded_by", "created_at", "file")
+    readonly_fields = ("original_name", "uploaded_by", "created_at", "file")
+    can_delete = False
+
+
+@admin.register(Expense)
+class ExpenseAdmin(admin.ModelAdmin):
+    list_display = ("label", "budget_request", "expense_type", "amount", "status", "incurred_on")
+    list_filter = ("status", "expense_type")
+    search_fields = ("label", "notes", "budget_request__building__name")
+    list_select_related = ("budget_request", "expense_type", "created_by")
+    inlines = (ExpenseAttachmentInline,)
+
+
+@admin.register(BudgetRequest)
+class BudgetRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "building",
+        "requester",
+        "status",
+        "requested_amount",
+        "approved_amount",
+        "spent_amount",
+        "currency",
+        "created_at",
+        "archived_at",
+    )
+    list_filter = ("status", "currency", "building", "archived_at")
+    search_fields = ("project_code", "description", "notes", "building__name", "requester__username")
+    list_select_related = ("building", "requester", "approved_by")
+
+
+@admin.register(ExpenseCategory)
+class ExpenseCategoryAdmin(admin.ModelAdmin):
+    list_display = ("code", "label", "requires_receipt", "max_amount_per_day")
+    search_fields = ("code", "label")
+
+
+@admin.register(BudgetFeatureFlag)
+class BudgetFeatureFlagAdmin(admin.ModelAdmin):
+    list_display = ("key", "building", "role", "is_enabled", "updated_at")
+    list_filter = ("key", "role", "is_enabled")
+    search_fields = ("key", "building__name")
+
+
+@admin.register(BudgetRequestEvent)
+class BudgetRequestEventAdmin(admin.ModelAdmin):
+    list_display = ("budget_request", "event_type", "actor", "created_at")
+    list_filter = ("event_type",)
+    search_fields = ("notes", "payload")
