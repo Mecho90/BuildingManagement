@@ -70,6 +70,12 @@ def theme(request):
                 data["can_view_user_management"] = True
             except NoReverseMatch:
                 pass
+        elif getattr(user, "is_superuser", False):
+            try:
+                data["user_management_url"] = reverse("core:users_list")
+                data["can_view_user_management"] = True
+            except NoReverseMatch:
+                pass
         if resolver.has(Capability.VIEW_BUDGETS) and BudgetFeatureFlag.is_enabled_for(user):
             try:
                 data["budgets_url"] = reverse("core:budget_list")

@@ -50,10 +50,37 @@ def ensure_backoffice_memberships_for_building(building):
         _assign_backoffice_membership(membership.user, building)
 
 
+def _ensure_superuser_admin_membership(user):
+    if not user or not getattr(user, "pk", None):
+        return
+    if not getattr(user, "is_superuser", False):
+        BuildingMembership.objects.filter(
+            user=user,
+            building__isnull=True,
+            role=MembershipRole.ADMINISTRATOR,
+        ).delete()
+        return
+    membership, created = BuildingMembership.objects.get_or_create(
+        user=user,
+        building=None,
+        role=MembershipRole.ADMINISTRATOR,
+    )
+    if created:
+        log_role_action(
+            actor=None,
+            target_user=user,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+            action=RoleAuditLog.Action.ROLE_ADDED,
+            payload={"reason": "superuser_auto_assign"},
+        )
+
+
 @receiver(post_save, sender=get_user_model())
 def ensure_security_profile(sender, instance, created, **kwargs):
     if created:
         UserSecurityProfile.objects.get_or_create(user=instance)
+    _ensure_superuser_admin_membership(instance)
 
 
 @receiver(post_save, sender=Building)

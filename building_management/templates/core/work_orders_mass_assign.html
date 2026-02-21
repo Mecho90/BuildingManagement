@@ -11,7 +11,7 @@
       {% blocktrans with total=technical_support_count %}Total orders for mass assignment: {{ total }}{% endblocktrans %}
     </p>
     {% if not technical_support_count %}
-      <p class="mt-4 text-sm text-slate-500 dark:text-slate-300">{% trans "No Technical Support buildings found. Create a building with this role first." %}</p>
+      <p class="mt-4 text-sm text-slate-500 dark:text-slate-300"></p>
     {% endif %}
   </header>
 
@@ -78,9 +78,6 @@
         <div class="space-y-2">
           <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="{{ form.description.id_for_label }}">{% trans "Description" %}</label>
           {{ form.description }}
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            {% blocktrans with markup=_("Markdown formatting") %}Optional context for the recipients. {{ markup }} not supported.{% endblocktrans %}
-          </p>
           {% if form.description.errors %}
             <p class="text-sm text-rose-600">{{ form.description.errors|join:", " }}</p>
           {% endif %}

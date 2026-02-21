@@ -9,11 +9,6 @@
     <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">
       {% if form.instance.pk %}{% trans "Edit user" %}{% else %}{% trans "Add user" %}{% endif %}
     </h1>
-    {% if not form.instance.pk %}
-      <p class="text-sm text-slate-500 dark:text-slate-400">
-        {% trans "Create a new account and assign the right access level." %}
-      </p>
-    {% endif %}
   </header>
 
   <form method="post" class="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900" novalidate>
@@ -51,11 +46,12 @@
             {% include "components/form_field.html" with field=field %}
           </div>
         {% elif field.name == "email" %}
-          {% trans "Optional, used for contact and password resets." as email_hint %}
+          {# email field temporarily hidden #}
+        {% elif field.name == "username" %}
           <div>
-            {% include "components/form_field.html" with field=field help_text=field.help_text|default:email_hint icon="mail" %}
+            {% include "components/form_field.html" with field=field icon="user" help_text="" %}
           </div>
-        {% elif field.name == "first_name" or field.name == "last_name" or field.name == "username" %}
+        {% elif field.name == "first_name" or field.name == "last_name" %}
           <div>
             {% include "components/form_field.html" with field=field icon="user" %}
           </div>

@@ -471,6 +471,7 @@ class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Tem
             entry["total_spent"] += budget.spent_total
         ctx["owner_groups"] = groups
         ctx["back_url"] = reverse("core:work_orders_archive")
+        ctx["requester_total"] = len(groups)
         return ctx
 
 

@@ -27,7 +27,7 @@
             </a>
           <div class="header-meta">
             {% block header_meta %}
-              <div class="header-meta__pill">
+              <div class="header-meta__pill header-meta__pill--accent" style="border:2px solid #fde68a; padding:0.35rem 1.25rem;">
                 <time datetime="{% now 'c' %}" class="body-sm text-muted font-semibold">{% now 'D, M j, Y' %}</time>
                 {% if user.is_authenticated %}
                   <span class="body-sm text-muted hidden sm:inline-flex font-semibold">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>

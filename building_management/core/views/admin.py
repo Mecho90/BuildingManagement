@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Q
+from django.db.models import Case, Count, DecimalField, ExpressionWrapper, F, Q, Sum, When
 from django.db.models.functions import Lower
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -14,7 +15,7 @@ from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
 from ..forms import AdminUserCreateForm, AdminUserPasswordForm, AdminUserUpdateForm
-from ..models import Building, BuildingMembership, MembershipRole, WorkOrder
+from ..models import Building, BuildingMembership, BudgetRequest, MembershipRole, WorkOrder
 from .common import AdminRequiredMixin, _querystring_without
 
 User = get_user_model()
@@ -144,6 +145,7 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
                 "priority_medium": 0,
                 "priority_low": 0,
                 "archived": 0,
+                "budget_remaining": Decimal("0.00"),
             }
 
         aggregated_stats = (
@@ -168,6 +170,7 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
             for row in aggregated_stats
         }
         self._apply_work_order_stats(stats, user_ids)
+        self._apply_budget_stats(stats, user_ids)
 
         totals = defaultdict(int)
         overview_rows: list[dict[str, object]] = []
@@ -176,7 +179,11 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
             if not user_stats:
                 user_stats = _empty_stats()
             for key, value in user_stats.items():
-                totals[key] += value
+                if key == "budget_remaining":
+                    current = totals.get(key, Decimal("0.00"))
+                    totals[key] = Decimal(current) + Decimal(value or 0)
+                else:
+                    totals[key] += value
             overview_rows.append(
                 {
                     "user": user,
@@ -220,6 +227,32 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
                 stats[responsible_id]["priority_medium"] += 1
             elif priority == WorkOrder.Priority.LOW:
                 stats[responsible_id]["priority_low"] += 1
+
+    def _apply_budget_stats(self, stats: dict[int, dict[str, object]], user_ids: list[int]) -> None:
+        if not stats:
+            return
+        if not user_ids:
+            return
+        amount_field = DecimalField(max_digits=12, decimal_places=2)
+        approved_expr = Case(
+            When(approved_amount__isnull=False, then=F("approved_amount")),
+            default=F("requested_amount"),
+            output_field=amount_field,
+        )
+        remaining_expr = ExpressionWrapper(
+            approved_expr - F("spent_amount"),
+            output_field=amount_field,
+        )
+        budgets = (
+            BudgetRequest.objects.filter(requester_id__in=user_ids)
+            .values("requester_id")
+            .annotate(remaining_total=Sum(remaining_expr))
+        )
+        for row in budgets:
+            user_id = row.get("requester_id")
+            if user_id not in stats:
+                continue
+            stats[user_id]["budget_remaining"] = row.get("remaining_total") or Decimal("0.00")
 
 
 class AdminUserCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
