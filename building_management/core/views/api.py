@@ -332,7 +332,7 @@ def _resolve_todo_owner(request, raw_owner, *, required: bool = False, allow_sel
     try:
         owner = User.objects.get(pk=owner_id, is_active=True)
     except User.DoesNotExist as exc:  # pragma: no cover - defensive
-        raise ValidationError(_("Owner not found.")) from exc
+        raise ValidationError(_("Отговорник not found.")) from exc
     return owner
 
 
@@ -776,7 +776,7 @@ def api_todo_completed_clear(request):
         try:
             owner = User.objects.get(pk=owner_id)
         except User.DoesNotExist:
-            return JsonResponse({"error": _("Owner not found.")}, status=404)
+            return JsonResponse({"error": _("Отговорник not found.")}, status=404)
     qs = qs.filter(user=owner)
 
     week_start_param = params.get("week_start")

@@ -14,7 +14,7 @@ from django.core.exceptions import FieldDoesNotExist
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Value, When
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.conf import settings
@@ -27,7 +27,7 @@ from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, UpdateView
 
 from ..authz import Capability, CapabilityResolver, log_workorder_action
-from ..forms import MassAssignWorkOrdersForm, WorkOrderBudgetChargeForm, WorkOrderForm
+from ..forms import ArchivePurgeForm, MassAssignWorkOrdersForm, WorkOrderBudgetChargeForm, WorkOrderForm
 from ..models import (
     BudgetFeatureFlag,
     Building,
@@ -38,7 +38,12 @@ from ..models import (
     WorkOrderAuditLog,
 )
 from ..utils.metrics import log_duration
-from ..utils.roles import user_can_approve_work_orders, user_has_role, user_is_lawyer
+from ..utils.roles import (
+    user_can_approve_work_orders,
+    user_has_role,
+    user_is_admin_or_backoffice,
+    user_is_lawyer,
+)
 from ..services.notifications import (
     notify_approvers_of_pending_order,
     notify_building_technicians_of_mass_assignment,
@@ -73,6 +78,7 @@ __all__ = [
     "WorkOrderAttachmentDeleteView",
     "WorkOrderApprovalDecisionView",
     "WorkOrderBudgetChargeView",
+    "ArchivedWorkOrderPurgeView",
 ]
 
 
@@ -265,6 +271,8 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
                 "status": getattr(self, "_status", ""),
                 "priority": getattr(self, "_priority", ""),
                 "deadline_range": getattr(self, "_deadline_range", ""),
+                "deadline_from": getattr(self, "_deadline_from", ""),
+                "deadline_to": getattr(self, "_deadline_to", ""),
                 "status_choices": WorkOrder.Status.choices,
                 "priority_choices": WorkOrder.Priority.choices,
                 "per": self.get_paginate_by(self.object_list),
@@ -281,8 +289,8 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
                     ("created_asc", _("Created (Oldest first)")),
                     ("building", _("Building (A → Z)")),
                     ("building_desc", _("Building (Z → A)")),
-                    ("owner", _("Owner (A → Z)")),
-                    ("owner_desc", _("Owner (Z → A)")),
+                    ("owner", _("Отговорник (A → Z)")),
+                    ("owner_desc", _("Отговорник (Z → A)")),
                 ],
                 "pagination_query": _querystring_without(self.request, "page"),
                 "show_owner_info": True,
@@ -603,16 +611,24 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
             search = (request.GET.get("q") or "").strip()
             status = (request.GET.get("status") or "").strip().upper()
             priority = (request.GET.get("priority") or "").strip().upper()
+            deadline_from_raw = (request.GET.get("deadline_from") or "").strip()
+            deadline_to_raw = (request.GET.get("deadline_to") or "").strip()
             deadline_range_raw = (request.GET.get("deadline_range") or "").strip()
-            deadline_from = None
-            deadline_to = None
-            if deadline_range_raw:
+            deadline_from = parse_date(deadline_from_raw) if deadline_from_raw else None
+            deadline_to = parse_date(deadline_to_raw) if deadline_to_raw else None
+
+            if not (deadline_from or deadline_to) and deadline_range_raw:
                 normalized = deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
                 parts = [part.strip() for part in normalized.split("/") if part.strip()]
                 if parts:
                     deadline_from = parse_date(parts[0])
                     if len(parts) > 1:
                         deadline_to = parse_date(parts[1])
+                if deadline_from and not deadline_from_raw:
+                    deadline_from_raw = deadline_from.isoformat()
+                if deadline_to and not deadline_to_raw:
+                    deadline_to_raw = deadline_to.isoformat()
+
             valid_status = {choice[0] for choice in WorkOrder.Status.choices}
             valid_priority = {choice[0] for choice in WorkOrder.Priority.choices}
             if status and status not in valid_status:
@@ -716,6 +732,8 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
             self._owner = owner_param
             self._sort = sort_param
             self._deadline_range = deadline_range_raw
+            self._deadline_from = deadline_from_raw
+            self._deadline_to = deadline_to_raw
 
             return qs
 
@@ -755,8 +773,8 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                     ("created_asc", _("Created (Oldest first)")),
                     ("building", _("Building (A → Z)")),
                     ("building_desc", _("Building (Z → A)")),
-                    ("owner", _("Owner (A → Z)")),
-                    ("owner_desc", _("Owner (Z → A)")),
+                    ("owner", _("Отговорник (A → Z)")),
+                    ("owner_desc", _("Отговорник (Z → A)")),
                 ],
                 "show_owner_info": getattr(self, "_can_filter_owner", False),
                 "pagination_query": _querystring_without(self.request, "page"),
@@ -1631,10 +1649,12 @@ class ArchivedWorkOrderFilterMixin:
             )
         self._search = search
 
+        archived_from_raw = (request.GET.get("archived_from") or "").strip()
+        archived_to_raw = (request.GET.get("archived_to") or "").strip()
+        archived_from = parse_date(archived_from_raw) if archived_from_raw else None
+        archived_to = parse_date(archived_to_raw) if archived_to_raw else None
         archived_range_raw = (request.GET.get("archived_range") or "").strip()
-        archived_from = None
-        archived_to = None
-        if archived_range_raw:
+        if not (archived_from or archived_to) and archived_range_raw:
             normalized = archived_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
             parts = [part.strip() for part in normalized.split("/") if part.strip()]
             if parts:
@@ -1647,9 +1667,11 @@ class ArchivedWorkOrderFilterMixin:
             qs = qs.filter(archived_at__date__gte=archived_from)
         if archived_to:
             qs = qs.filter(archived_at__date__lte=archived_to)
-        if not (archived_from or archived_to):
-            archived_range_raw = ""
-        self._archived_range = archived_range_raw
+        use_range_text = archived_range_raw if archived_range_raw and not (archived_from_raw or archived_to_raw) else ""
+        self._archived_range = use_range_text
+        self._archived_from_raw = archived_from_raw
+        self._archived_to_raw = archived_to_raw
+        self._has_archived_filter = bool(archived_from or archived_to or archived_range_raw)
 
         owner_ids = list(qs.values_list("building__owner_id", flat=True).distinct())
         owner_ids = [oid for oid in owner_ids if oid]
@@ -1733,6 +1755,9 @@ class ArchivedWorkOrderFilterMixin:
         ctx = super().get_context_data(**kwargs)
         ctx["q"] = getattr(self, "_search", "")
         ctx["archived_range"] = getattr(self, "_archived_range", "")
+        ctx["archived_from"] = getattr(self, "_archived_from_raw", "")
+        ctx["archived_to"] = getattr(self, "_archived_to_raw", "")
+        ctx["has_archived_filter"] = getattr(self, "_has_archived_filter", False)
         ctx["owner"] = getattr(self, "_owner", "")
         ctx["owner_choices"] = getattr(self, "_owner_choices", [])
         ctx["sort"] = getattr(self, "_sort", "archived_desc")
@@ -1785,6 +1810,12 @@ class ArchivedWorkOrderFilterMixin:
                 ctx["archive_budgets_url"] = reverse("core:budget_archived_list")
             except Exception:
                 ctx["archive_budgets_url"] = ""
+        can_purge = user_is_admin_or_backoffice(user)
+        ctx["can_purge_archives"] = can_purge
+        if can_purge:
+            ctx["archive_purge_form"] = ArchivePurgeForm()
+            ctx["archive_purge_action"] = reverse("core:work_orders_archive_purge")
+            ctx["archive_purge_preview_url"] = reverse("core:work_orders_archive_purge_preview")
         return ctx
 
 
@@ -1866,6 +1897,70 @@ class ArchivedWorkOrderDetailView(
         ctx["detail_per"] = getattr(self, "_detail_per", self.DETAIL_PER_DEFAULT)
         ctx["detail_per_choices"] = self.DETAIL_PER_CHOICES
         return ctx
+
+
+class ArchivedWorkOrderPurgeView(LoginRequiredMixin, View):
+    """
+    Permanently delete archived work orders within a date range.
+    """
+
+    form_class = ArchivePurgeForm
+
+    def post(self, request, *args, **kwargs):
+        if not user_is_admin_or_backoffice(request.user):
+            raise Http404()
+        form = self.form_class(request.POST)
+        if not form.is_valid():
+            for errors in form.errors.values():
+                for error in errors:
+                    messages.error(request, error)
+            return redirect("core:work_orders_archive")
+        if not form.cleaned_data.get("confirm"):
+            messages.error(request, _("Please confirm the permanent deletion."))
+            return redirect("core:work_orders_archive")
+
+        start = form.cleaned_data["from_date"]
+        end = form.cleaned_data["to_date"]
+        qs = WorkOrder.objects.filter(archived_at__isnull=False)
+        if start:
+            qs = qs.filter(archived_at__date__gte=start)
+        if end:
+            qs = qs.filter(archived_at__date__lte=end)
+        deleted = qs.count()
+        if not deleted:
+            messages.info(request, _("No archived work orders matched the selected range."))
+            return redirect("core:work_orders_archive")
+        qs.delete()
+        if deleted:
+            messages.success(
+                request,
+                ngettext(
+                    "Deleted %(count)s archived work order permanently.",
+                    "Deleted %(count)s archived work orders permanently.",
+                    deleted,
+                )
+                % {"count": deleted},
+            )
+        else:
+            messages.info(request, _("No archived work orders matched the selected range."))
+        return redirect("core:work_orders_archive")
+
+
+class ArchivedWorkOrderPurgePreviewView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        if not user_is_admin_or_backoffice(request.user):
+            raise Http404()
+        form = ArchivePurgeForm(request.GET)
+        if not form.is_valid():
+            return JsonResponse({"count": 0}, status=400)
+        start = form.cleaned_data["from_date"]
+        end = form.cleaned_data["to_date"]
+        qs = WorkOrder.objects.filter(archived_at__isnull=False)
+        if start:
+            qs = qs.filter(archived_at__date__gte=start)
+        if end:
+            qs = qs.filter(archived_at__date__lte=end)
+        return JsonResponse({"count": qs.count()})
 
 
 class WorkOrderAttachmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):

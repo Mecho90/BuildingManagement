@@ -59,3 +59,31 @@ class WorkOrderVisibilityTests(TestCase):
         order = self._create_forwarded_order(lawyer_only=True, title="Confidential")
         qs = WorkOrder.objects.visible_to(technician)
         self.assertNotIn(order.pk, qs.values_list("pk", flat=True))
+
+
+class OfficeBootstrapTests(TestCase):
+    def setUp(self):
+        Building.objects.all().delete()
+        Building.clear_system_default_cache()
+        User = get_user_model()
+        self.admin = User.objects.create_user(
+            username="bootstrap-admin",
+            password="pass",
+            is_superuser=True,
+        )
+        BuildingMembership.objects.create(
+            user=self.admin,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+        )
+
+    def tearDown(self):
+        Building.clear_system_default_cache()
+
+    def test_office_is_created_on_demand_for_admins(self):
+        resolver = CapabilityResolver(self.admin)
+        office_id = resolver._office_building_id  # pylint: disable=protected-access
+        self.assertIsNotNone(office_id)
+        self.assertTrue(
+            Building.objects.filter(pk=office_id, is_system_default=True).exists()
+        )

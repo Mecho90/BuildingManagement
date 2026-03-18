@@ -119,8 +119,8 @@ class RoleAwareCheckboxSelect(forms.CheckboxSelectMultiple):
 # -----------------------------
 class BuildingForm(forms.ModelForm):
     """
-    - Staff users can choose an Owner from a dropdown.
-    - Non-staff users do not see the Owner field; the form will force
+    - Staff users can choose an Отговорник from a dropdown.
+    - Non-staff users do not see the Отговорник field; the form will force
       owner = request.user on save.
     - Pass the current user via: BuildingForm(..., user=request.user)
     """
@@ -286,7 +286,7 @@ class TodoItemForm(forms.ModelForm):
         if self._can_assign_owner:
             owner_field = forms.ModelChoiceField(
                 queryset=self._owner_queryset(),
-                label=_("Owner"),
+                label=_("Отговорник"),
                 required=False,
                 widget=forms.Select(attrs={"class": "input"}),
             )
@@ -317,7 +317,7 @@ class TodoItemForm(forms.ModelForm):
             if target_owner is None and self.user and getattr(self.user, "is_authenticated", False):
                 target_owner = self.user
         if target_owner is None:
-            raise forms.ValidationError(_("A task owner is required."))
+            raise forms.ValidationError(_("A task Отговорник is required."))
         obj.user = target_owner
         if commit:
             obj.save()
@@ -1134,7 +1134,6 @@ class BudgetRequestForm(forms.ModelForm):
         self.fields["requested_amount"].widget.attrs.setdefault("min", "0.01")
         self.fields["requested_amount"].widget.attrs.setdefault("step", "0.01")
         self.fields["description"].widget.attrs.setdefault("placeholder", _("Describe what this budget covers."))
-        self.fields["notes"].widget.attrs.setdefault("placeholder", _("Additional context for reviewers (optional)."))
 
     def clean_requested_amount(self):
         amount = self.cleaned_data.get("requested_amount")
@@ -1284,6 +1283,34 @@ class BudgetFilterForm(forms.Form):
             user=user,
             role__in=[MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR],
         ).exists()
+
+
+class ArchivePurgeForm(forms.Form):
+    from_date = forms.DateField(
+        label=_("From date"),
+        widget=forms.DateInput(attrs={"type": "date", "class": "input rounded-2xl"}),
+    )
+    to_date = forms.DateField(
+        label=_("To date"),
+        widget=forms.DateInput(attrs={"type": "date", "class": "input rounded-2xl"}),
+    )
+    confirm = forms.BooleanField(
+        label=_("I understand these records will be permanently deleted."),
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 mt-1",
+            }
+        ),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        start = cleaned.get("from_date")
+        end = cleaned.get("to_date")
+        if start and end and end < start:
+            raise forms.ValidationError(_("End date must be on or after the start date."))
+        return cleaned
 
 
 class WorkOrderBudgetChargeForm(forms.Form):

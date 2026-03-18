@@ -188,6 +188,47 @@
       </section>
     {% endif %}
 
+    {% if pending_budget_cards %}
+      <section class="space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Budgets Awaiting Review" %}</h2>
+          <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            {% blocktrans count total=pending_budget_cards|length %}{{ total }} budget{% plural %}{{ total }} budgets{% endblocktrans %}
+          </span>
+        </div>
+        <div class="{{ section_shell }}">
+          <div class="grid gap-4 md:grid-cols-2">
+            {% for card in pending_budget_cards %}
+              <article class="{{ card_base }}">
+                <header class="dashboard-card__header">
+                  <div class="space-y-2">
+                    <p class="dashboard-card__eyebrow">{{ card.building|default:_("Unassigned building") }}</p>
+                    <h3 class="dashboard-card__title">{{ card.title }}</h3>
+                    <p class="dashboard-card__description">
+                      {% blocktrans with requester=card.requester %}Requested by {{ requester }}{% endblocktrans %}
+                    </p>
+                  </div>
+                  <div class="dashboard-card__badges">
+                    <span class="badge badge--muted badge--sm">{{ card.updated|date:"Y-m-d H:i" }}</span>
+                  </div>
+                </header>
+                <div class="dashboard-card__meta">
+                  <span class="dashboard-card__meta-item">
+                    <span class="dashboard-card__meta-label">{% trans "Requested" %}</span>
+                    <span>{{ card.requested|floatformat:2 }} {{ card.currency }}</span>
+                  </span>
+                </div>
+                <div class="dashboard-card__actions">
+                  <a class="btn btn-xs" href="{% url 'core:budget_review_decision' card.id %}">{% trans "Review" %}</a>
+                  <a class="btn btn-secondary btn-xs" href="{% url 'core:budget_detail' card.id %}">{% trans "View details" %}</a>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
     {% if todo_cards %}
       <section class="space-y-4">
         <div class="flex items-center justify-between gap-3">

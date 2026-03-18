@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, TestCase
@@ -192,3 +193,59 @@ class BudgetArchiveViewTests(TestCase):
         owner_groups = response.context["owner_groups"]
         self.assertEqual(len(owner_groups), 1)
         self.assertEqual(owner_groups[0]["owner_name"], self.technician.get_username())
+
+
+class BudgetArchivePurgeViewTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.requester = User.objects.create_user(username="req", password="pass")
+        self.backoffice = User.objects.create_user(username="approver-purge", password="pass")
+        self.building = Building.objects.create(owner=self.requester, name="Delta")
+        BudgetFeatureFlag.objects.create(key="budgets", is_enabled=True)
+        BuildingMembership.objects.create(
+            user=self.backoffice,
+            building=None,
+            role=MembershipRole.BACKOFFICE,
+        )
+
+    def _create_archived_budget(self, days_ago: int):
+        budget = BudgetRequest.objects.create(
+            requester=self.requester,
+            building=self.building,
+            requested_amount=Decimal("100.00"),
+            approved_amount=Decimal("100.00"),
+            status=BudgetRequest.Status.CLOSED,
+        )
+        budget.archived_at = timezone.now() - timedelta(days=days_ago)
+        budget.save(update_fields=["archived_at", "status"])
+        return budget
+
+    def test_requires_backoffice_role(self):
+        technician = User.objects.create_user(username="tech-purge", password="pass")
+        self.client.force_login(technician)
+        response = self.client.post(
+            reverse("core:budget_archived_purge"),
+            {
+                "from_date": timezone.localdate().isoformat(),
+                "to_date": timezone.localdate().isoformat(),
+                "confirm": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_backoffice_deletes_budgets_in_range(self):
+        old_budget = self._create_archived_budget(days_ago=90)
+        recent_budget = self._create_archived_budget(days_ago=5)
+        self.client.force_login(self.backoffice)
+        today = timezone.localdate()
+        response = self.client.post(
+            reverse("core:budget_archived_purge"),
+            {
+                "from_date": (today - timedelta(days=10)).isoformat(),
+                "to_date": today.isoformat(),
+                "confirm": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(BudgetRequest.objects.filter(pk=old_budget.pk).exists())
+        self.assertFalse(BudgetRequest.objects.filter(pk=recent_budget.pk).exists())

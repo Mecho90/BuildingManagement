@@ -18,6 +18,8 @@ from django.utils import timezone
 
 _lock = threading.Lock()
 _bootstrapped = False  # process-level guard
+_office_lock = threading.Lock()
+_office_bootstrapped = False
 logger = logging.getLogger(__name__)
 
 
@@ -98,6 +100,34 @@ class EnsureCoreSchemaMiddleware:
                     )
         except Exception as exc:
             logger.warning("[core] Auto-migrate skipped due to error: %s", exc)
+
+class EnsureOfficeBuildingMiddleware:
+    """
+    Guarantees the singleton Office building exists for every process. Runs once per
+    worker (first request) so administrators/backoffice staff always see the default
+    building even on a brand new database.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.enabled = getattr(settings, "AUTO_ENSURE_OFFICE_BUILDING", True)
+
+    def __call__(self, request):
+        global _office_bootstrapped
+        if self.enabled and not _office_bootstrapped:
+            with _office_lock:
+                if not _office_bootstrapped:
+                    self._ensure_office_building()
+                    _office_bootstrapped = True
+        return self.get_response(request)
+
+    def _ensure_office_building(self) -> None:
+        try:
+            from core.services.office import ensure_office_building
+
+            ensure_office_building(strict_owner=False)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("[core] Office bootstrap skipped due to error: %s", exc)
 
 
 class SessionIdleTimeoutMiddleware:

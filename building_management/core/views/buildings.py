@@ -73,6 +73,9 @@ class BuildingListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         user = self.request.user
         resolver = CapabilityResolver(user) if user.is_authenticated else None
+
+        self._ensure_office_building_for_user(user)
+
         self._can_manage_buildings = resolver.has(Capability.MANAGE_BUILDINGS) if resolver else False
         self._can_filter_owner = _user_can_filter_building_owner(user)
 
@@ -161,6 +164,26 @@ class BuildingListView(LoginRequiredMixin, ListView):
 
         self._effective_sort = sort
         return qs.order_by("-_office_priority", "-is_system_default", sort_field, "id")
+
+    def _ensure_office_building_for_user(self, user) -> None:
+        if not user or not user.is_authenticated:
+            return
+        if Building.system_default_id():
+            return
+        has_global_role = BuildingMembership.objects.filter(
+            user=user,
+            building__isnull=True,
+            role__in=(MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE),
+        ).exists()
+        if not has_global_role:
+            return
+        try:
+            from ..services.office import ensure_office_building
+
+            ensure_office_building(strict_owner=False)
+            Building.system_default_id(force_refresh=True)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("[core] Unable to bootstrap Office building for user %s: %s", user.pk, exc)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -338,16 +361,22 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             w_q = (self.request.GET.get("w_q") or "").strip()
             w_per = self._get_int("w_per", 25)
             w_status = (self.request.GET.get("w_status") or "").strip().upper()
+            w_deadline_from_raw = (self.request.GET.get("w_deadline_from") or "").strip()
+            w_deadline_to_raw = (self.request.GET.get("w_deadline_to") or "").strip()
             w_deadline_range_raw = (self.request.GET.get("w_deadline_range") or "").strip()
-            w_deadline_from = None
-            w_deadline_to = None
-            if w_deadline_range_raw:
+            w_deadline_from = parse_date(w_deadline_from_raw) if w_deadline_from_raw else None
+            w_deadline_to = parse_date(w_deadline_to_raw) if w_deadline_to_raw else None
+            if not (w_deadline_from or w_deadline_to) and w_deadline_range_raw:
                 normalized = w_deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
                 parts = [part.strip() for part in normalized.split("/") if part.strip()]
                 if parts:
                     w_deadline_from = parse_date(parts[0])
                     if len(parts) > 1:
                         w_deadline_to = parse_date(parts[1])
+                if w_deadline_from and not w_deadline_from_raw:
+                    w_deadline_from_raw = w_deadline_from.isoformat()
+                if w_deadline_to and not w_deadline_to_raw:
+                    w_deadline_to_raw = w_deadline_to.isoformat()
 
             filter_expr = Q(building=bld)
             awaiting_filter = Q(
@@ -434,6 +463,8 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                     "w_status": w_status,
                     "w_status_choices": WorkOrder.Status.choices,
                     "w_deadline_range": w_deadline_range_raw,
+                    "w_deadline_from": w_deadline_from_raw,
+                    "w_deadline_to": w_deadline_to_raw,
                     "w_active": active_tab == "work_orders",
                     "awaiting_queue_badges": awaiting_queue_badges,
                 }

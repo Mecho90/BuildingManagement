@@ -257,7 +257,7 @@ class Building(TimeStampedModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="buildings",
-        verbose_name=_("Owner"),
+        verbose_name=_("Отговорник"),
     )
     name = models.CharField(max_length=255, db_index=True, verbose_name=_("Name"))
     address = models.CharField(max_length=512, blank=True, verbose_name=_("Address"))

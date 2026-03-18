@@ -23,7 +23,7 @@
         {% endif %}
       </div>
       <div class="text-sm text-slate-500 dark:text-slate-300 md:text-right">
-        <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Owner" %}:</span>
+        <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Отговорник" %}:</span>
         {% with owner=building.owner %}
           {% if owner %}
             {{ owner.get_full_name|default:owner.username }}
@@ -75,7 +75,7 @@
               <th class="px-4 py-3">{% trans "Status" %}</th>
               <th class="px-4 py-3">{% trans "Created" %}</th>
               <th class="px-4 py-3">{% trans "Archived" %}</th>
-              <th class="px-4 py-3">{% trans "Owner" %}</th>
+              <th class="px-4 py-3">{% trans "Отговорник" %}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">

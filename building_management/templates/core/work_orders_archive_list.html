@@ -32,7 +32,7 @@
 
       {% if owner_choices %}
         <div class="space-y-2">
-          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Отговорник" %}</label>
           <select id="id_owner" name="owner" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
             {% for opt in owner_choices %}
@@ -61,18 +61,50 @@
       </div>
 
       <div class="space-y-2">
-        <label for="id_archived_range" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Archived range" %}</label>
-        <input id="id_archived_range" name="archived_range" type="text" value="{{ archived_range }}" placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" />
+        <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Archived range" %}</span>
+        <div class="grid gap-3 md:grid-cols-2">
+          <input id="id_archived_from" name="archived_from" type="date" value="{{ archived_from }}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" />
+          <input id="id_archived_to" name="archived_to" type="date" value="{{ archived_to }}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" />
+        </div>
       </div>
     </div>
 
     <div class="filter-panel__actions">
-      {% if q or owner or sort != 'archived_desc' or archived_range %}
+      {% if q or owner or sort != 'archived_desc' or has_archived_filter %}
         <a class="btn btn-secondary" href="{{ archive_reset_url }}">{% trans "Reset" %}</a>
       {% endif %}
       <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
     </div>
   </form>
+
+  {% if can_purge_archives %}
+    <section class="rounded-2xl border border-red-200 bg-red-50/80 p-4 shadow-card space-y-4 dark:border-red-500/40 dark:bg-slate-900">
+      <div>
+        <h2 class="text-lg font-semibold text-red-700 dark:text-red-300">{% trans "Permanent deletion" %}</h2>
+        <p class="text-sm text-slate-700 dark:text-slate-200" data-archive-preview
+           data-preview-url="{{ archive_purge_preview_url }}"
+           data-label-singular="{% trans 'work order' %}"
+           data-label-plural="{% trans 'work orders' %}"
+           data-empty-text="{% trans 'Select both dates to preview the total.' %}"
+           data-error-text="{% trans 'Unable to load count.' %}"
+           data-loading-text="{% trans 'Calculating…' %}"
+           data-result-suffix="{% trans 'will be permanently deleted.' %}">
+        </p>
+      </div>
+      <form method="post" action="{{ archive_purge_action }}" class="space-y-4">
+        {% csrf_token %}
+        <div class="grid gap-3 md:grid-cols-2">
+          {{ archive_purge_form.from_date }}
+          {{ archive_purge_form.to_date }}
+        </div>
+        <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+          {{ archive_purge_form.confirm }}
+          <span>{% trans "I understand the selected work orders will be permanently removed and cannot be restored." %}</span>
+        </label>
+        <button class="btn btn-danger" type="submit">{% trans "Delete archived work orders" %}</button>
+      </form>
+    </section>
+  {% endif %}
 
   {% if building_summary_page %}
     <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">

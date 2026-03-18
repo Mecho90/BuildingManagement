@@ -58,12 +58,11 @@
               {% endif %}
             </nav>
             <form class="filter-panel">
-              <div class="flex items-center justify-between gap-3">
-                <span class="sr-only">{% trans "Filter controls" %}</span>
-                {% if show_completed_tab %}
+              {% if show_completed_tab %}
+                <div class="flex items-center justify-end gap-3">
                   <button class="btn btn-danger btn-sm hidden" id="todo-completed-delete-all" data-confirm="{% trans "Delete all completed tasks? This cannot be undone." %}">{% trans "Delete all" %}</button>
-                {% endif %}
-              </div>
+                </div>
+              {% endif %}
               <div class="filter-panel__grid md:grid-cols-{% if owner_filter_options %}3{% else %}2{% endif %}">
                 <div class="space-y-2">
                   <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-search">{% trans "Search tasks" %}</label>
@@ -77,7 +76,7 @@
                 </div>
                 {% if owner_filter_options %}
                   <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-owner-filter">{% trans "Owner" %}</label>
+                    <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-owner-filter">{% trans "Отговорник" %}</label>
                     <select id="todo-owner-filter" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
                       <option value="all"{% if owner_filter_default == "all" %} selected{% endif %}>{% trans "All owners" %}</option>
                       {% for owner in owner_filter_options %}

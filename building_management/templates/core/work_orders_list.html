@@ -61,7 +61,7 @@
 
       {% if owner_choices %}
         <div class="space-y-2">
-          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Отговорник" %}</label>
           <select id="id_owner" name="owner" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
             {% for opt in owner_choices %}
@@ -72,16 +72,23 @@
       {% endif %}
 
       <div class="space-y-2">
-        <label for="id_deadline_range" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Deadline range" %}</label>
-        <input
-          id="id_deadline_range"
-          name="deadline_range"
-          type="text"
-          placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}"
-          value="{{ deadline_range }}"
-          class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-          onchange="this.form.submit()"
-        />
+        <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search range" %}</span>
+        <div class="grid gap-3 md:grid-cols-2">
+          <input
+            id="id_deadline_from"
+            name="deadline_from"
+            type="date"
+            value="{{ deadline_from }}"
+            class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+          />
+          <input
+            id="id_deadline_to"
+            name="deadline_to"
+            type="date"
+            value="{{ deadline_to }}"
+            class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+          />
+        </div>
       </div>
 
       <div class="space-y-2">
@@ -95,7 +102,7 @@
     </div>
 
     <div class="filter-panel__actions">
-      {% if q or status or owner or sort != 'priority' or per != 25 or priority or deadline_range %}
+      {% if q or status or owner or sort != 'priority' or per != 25 or priority or deadline_from or deadline_to %}
         <a class="btn btn-secondary" href="{% url 'core:work_orders_list' %}">{% trans "Reset" %}</a>
       {% endif %}
       <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
@@ -125,7 +132,7 @@
             </p>
             {% if show_owner_info %}
               <p class="text-sm text-slate-500 dark:text-slate-400">
-                <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Owner" %}:</span>
+                <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Отговорник" %}:</span>
                 {% with owner=w.building.owner %}
                   {% if owner %}
                     {{ owner.get_full_name|default:owner.username }}
@@ -196,7 +203,7 @@
           <th class="px-4 py-3">{% trans "Title" %}</th>
           <th class="px-4 py-3">{% trans "Building" %}</th>
           {% if show_owner_info %}
-            <th class="px-4 py-3">{% trans "Owner" %}</th>
+            <th class="px-4 py-3">{% trans "Отговорник" %}</th>
             <th class="px-4 py-3">{% trans "Role" %}</th>
           {% endif %}
           <th class="px-4 py-3">{% trans "Unit" %}</th>

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -48,6 +50,69 @@ class WorkOrderArchiveViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         order.refresh_from_db()
         self.assertIsNotNone(order.archived_at)
+
+
+class ArchivedWorkOrderPurgeViewTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.owner = self.User.objects.create_user(username="owner2", password="pass1234")
+        self.building = Building.objects.create(
+            owner=self.owner,
+            name="Purge Tower",
+            address="2 Main",
+        )
+        self.admin = self.User.objects.create_user(username="admin", password="pass1234")
+        BuildingMembership.objects.create(
+            user=self.admin,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+        )
+
+    def _create_archived_order(self, days_ago: int):
+        order = WorkOrder.objects.create(
+            building=self.building,
+            title=f"Order-{days_ago}",
+            deadline=timezone.localdate(),
+            status=WorkOrder.Status.DONE,
+        )
+        order.archived_at = timezone.now() - timedelta(days=days_ago)
+        order.save(update_fields=["archived_at"])
+        return order
+
+    def test_requires_admin_or_backoffice_role(self):
+        lawyer = self.User.objects.create_user(username="lawyer-purge", password="pass1234")
+        BuildingMembership.objects.create(
+            user=lawyer,
+            building=None,
+            role=MembershipRole.LAWYER,
+        )
+        self.client.force_login(lawyer)
+        response = self.client.post(
+            reverse("core:work_orders_archive_purge"),
+            {
+                "from_date": timezone.localdate().isoformat(),
+                "to_date": timezone.localdate().isoformat(),
+                "confirm": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_admin_can_purge_orders_in_range(self):
+        old_order = self._create_archived_order(days_ago=30)
+        recent_order = self._create_archived_order(days_ago=3)
+        self.client.force_login(self.admin)
+        today = timezone.localdate()
+        response = self.client.post(
+            reverse("core:work_orders_archive_purge"),
+            {
+                "from_date": (today - timedelta(days=7)).isoformat(),
+                "to_date": today.isoformat(),
+                "confirm": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(WorkOrder.objects.filter(pk=old_order.pk).exists())
+        self.assertFalse(WorkOrder.objects.filter(pk=recent_order.pk).exists())
 
     def test_lawyer_denied_for_non_lawyer_only_order(self):
         user = self.User.objects.create_user(username="lawyer", password="pass1234")

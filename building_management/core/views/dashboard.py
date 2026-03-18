@@ -53,6 +53,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["technician_page_query"] = tech_query
         ctx["technician_section_title"] = self._technician_section_title(user)
         ctx["backoffice_cards"] = self._backoffice_cards(user, resolver)
+        ctx["pending_budget_cards"] = self._pending_budget_cards(user, resolver)
         deadline_page, deadline_query = self._deadline_alert_cards(user)
         ctx["deadline_alert_page"] = deadline_page
         ctx["deadline_alert_cards"] = deadline_page.object_list if deadline_page else []
@@ -172,6 +173,37 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 }
             )
 
+        return cards
+
+    def _pending_budget_cards(self, user, resolver):
+        if not user or not user.is_authenticated:
+            return []
+        if not BudgetFeatureFlag.is_enabled_for(user):
+            return []
+        if not resolver.has(Capability.APPROVE_BUDGETS):
+            return []
+
+        qs = (
+            BudgetRequest.objects.pending_review()
+            .visible_to(user)
+            .select_related("building", "requester")
+            .order_by("-updated_at")[:6]
+        )
+        cards = []
+        for budget in qs:
+            requester = budget.requester.get_full_name() or budget.requester.username
+            building = getattr(budget.building, "name", "")
+            cards.append(
+                {
+                    "id": budget.pk,
+                    "title": budget.title or _("Budget #%(id)s") % {"id": budget.pk},
+                    "building": building,
+                    "requester": requester,
+                    "requested": budget.requested_amount,
+                    "currency": budget.currency,
+                    "updated": budget.updated_at,
+                }
+            )
         return cards
 
     def _todo_cards(self, user):

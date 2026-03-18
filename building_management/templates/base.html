@@ -28,9 +28,9 @@
           <div class="header-meta">
             {% block header_meta %}
               <div class="header-meta__pill header-meta__pill--accent" style="border:2px solid #fde68a; padding:0.35rem 1.25rem;">
-                <time datetime="{% now 'c' %}" class="body-sm text-muted font-semibold">{% now 'D, M j, Y' %}</time>
+                <time datetime="{% now 'c' %}" class="body-sm text-black font-semibold">{% now 'D, M j, Y' %}</time>
                 {% if user.is_authenticated %}
-                  <span class="body-sm text-muted hidden sm:inline-flex font-semibold">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>
+                  <span class="body-sm text-black hidden sm:inline-flex font-semibold">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>
                 {% endif %}
               </div>
             {% endblock %}
@@ -203,6 +203,88 @@
           const removeAlert = () => alert.remove();
           alert.addEventListener("transitionend", removeAlert, { once: true });
           window.setTimeout(removeAlert, 250);
+        });
+      })();
+      (() => {
+        const previewNodes = document.querySelectorAll("[data-archive-preview]");
+        if (!previewNodes.length) {
+          return;
+        }
+        previewNodes.forEach((node) => {
+          const form = node.closest("form");
+          if (!form) {
+            return;
+          }
+          const fromInput = form.querySelector('input[name="from_date"]');
+          const toInput = form.querySelector('input[name="to_date"]');
+          if (!fromInput || !toInput) {
+            return;
+          }
+          let controller = null;
+          const emptyText = node.dataset.emptyText || "";
+          const errorText = node.dataset.errorText || "";
+          const loadingText = node.dataset.loadingText || "";
+          const labelSingular = node.dataset.labelSingular || "";
+          const labelPlural = node.dataset.labelPlural || labelSingular;
+          const suffix = node.dataset.resultSuffix || "";
+          const previewUrl = node.dataset.previewUrl || "";
+          const setText = (text) => {
+            node.textContent = text;
+          };
+          const formatResult = (count) => {
+            const label = count === 1 ? labelSingular : labelPlural;
+            return `${count} ${label} ${suffix}`.trim();
+          };
+          const update = () => {
+            const fromValue = fromInput.value;
+            const toValue = toInput.value;
+            if (!fromValue || !toValue || !previewUrl) {
+              setText(emptyText);
+              if (controller) {
+                controller.abort();
+                controller = null;
+              }
+              return;
+            }
+            if (controller) {
+              controller.abort();
+            }
+            controller = new AbortController();
+            setText(loadingText || emptyText);
+            const params = new URLSearchParams({
+              from_date: fromValue,
+              to_date: toValue,
+              confirm: "on",
+            });
+            fetch(`${previewUrl}?${params.toString()}`, { signal: controller.signal })
+              .then((response) => {
+                if (!response.ok) {
+                  throw new Error("preview_failed");
+                }
+                return response.json();
+              })
+              .then((data) => {
+                if (typeof data.count === "number") {
+                  setText(formatResult(data.count));
+                } else {
+                  setText(errorText || emptyText);
+                }
+              })
+              .catch((error) => {
+                if (error.name === "AbortError") {
+                  return;
+                }
+                setText(errorText || emptyText);
+              })
+              .finally(() => {
+                controller = null;
+              });
+          };
+          ["change", "input"].forEach((eventName) => {
+            fromInput.addEventListener(eventName, update);
+            toInput.addEventListener(eventName, update);
+          });
+          update();
         });
       })();
     </script>

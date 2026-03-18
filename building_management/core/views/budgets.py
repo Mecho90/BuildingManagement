@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 from decimal import Decimal
+import re
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Prefetch
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, ngettext
+from django.utils.dateparse import parse_date
 from django.views.generic import DetailView, FormView, ListView, TemplateView, CreateView, UpdateView, View
 from django.core.paginator import Paginator
 
 from ..authz import Capability, CapabilityResolver
 from ..forms import (
+    ArchivePurgeForm,
     BudgetExpenseForm,
     BudgetFilterForm,
     BudgetRequestApprovalForm,
@@ -30,9 +34,50 @@ from ..models import (
     MembershipRole,
 )
 from ..services import BudgetExporter, NotificationPayload, NotificationService
+from ..utils.roles import user_is_admin_or_backoffice
 from .common import CapabilityRequiredMixin, _querystring_without
 
 User = get_user_model()
+
+
+def _primary_membership_role(user) -> str | None:
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
+    cached = getattr(user, "_primary_membership_role", None)
+    if cached is not None:
+        return cached
+    ordering = models.Case(
+        models.When(building__isnull=True, then=0),
+        default=1,
+    )
+    role = (
+        BuildingMembership.objects.filter(user=user)
+        .order_by(ordering, "id")
+        .values_list("role", flat=True)
+        .first()
+    )
+    setattr(user, "_primary_membership_role", role)
+    return role
+
+
+def _user_can_request_budget(user) -> bool:
+    role = _primary_membership_role(user)
+    return role in {MembershipRole.TECHNICIAN, MembershipRole.BACKOFFICE}
+
+
+def _budget_can_be_reviewed_by(budget: BudgetRequest, reviewer) -> bool:
+    if not reviewer or not getattr(reviewer, "is_authenticated", False):
+        return False
+    reviewer_role = _primary_membership_role(reviewer)
+    requester_role = _primary_membership_role(budget.requester)
+    if reviewer_role is None:
+        return False
+    if requester_role == MembershipRole.BACKOFFICE:
+        return reviewer_role == MembershipRole.ADMINISTRATOR
+    if requester_role == MembershipRole.TECHNICIAN:
+        return reviewer_role in {MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE}
+    # Default to administrator-only approvals.
+    return reviewer_role == MembershipRole.ADMINISTRATOR
 
 
 def _user_can_delete_budget(budget: BudgetRequest, user) -> bool:
@@ -63,6 +108,38 @@ def _user_can_archive_budget(budget: BudgetRequest, user) -> bool:
         return True
     resolver = CapabilityResolver(user)
     return resolver.has(Capability.APPROVE_BUDGETS, building_id=budget.building_id)
+
+def _user_can_log_budget_expense(budget: BudgetRequest, user) -> bool:
+    if not budget or not user or not getattr(user, "is_authenticated", False):
+        return False
+    if budget.status != BudgetRequest.Status.APPROVED:
+        return False
+    if budget.requester_id == getattr(user, "pk", None):
+        return True
+    resolver = CapabilityResolver(user)
+    return resolver.has(Capability.MANAGE_BUDGETS, building_id=budget.building_id)
+
+def _coerce_int(value):
+    if value is None:
+        return None
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+_WORK_ORDER_PATTERN = re.compile(r"work\s*order\s+#?(\d+)", re.IGNORECASE)
+
+def _extract_work_order_id_from_text(*texts):
+    for text in texts:
+        if not text:
+            continue
+        match = _WORK_ORDER_PATTERN.search(str(text))
+        if match:
+            try:
+                return int(match.group(1))
+            except (TypeError, ValueError):
+                continue
+    return None
 
 
 class BudgetFeatureRequiredMixin(CapabilityRequiredMixin):
@@ -106,7 +183,6 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                 query = data["q"].strip()
                 budget_qs = budget_qs.filter(
                     models.Q(description__icontains=query)
-                    | models.Q(notes__icontains=query)
                     | models.Q(project_code__icontains=query)
                     | models.Q(title__icontains=query)
                 )
@@ -129,6 +205,12 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
         paginator = Paginator(budget_qs, 20)
         page_number = self.request.GET.get("page") or 1
         page_obj = paginator.get_page(page_number)
+        archiveable_ids = [
+            budget.pk
+            for budget in page_obj.object_list
+            if getattr(budget, "spent_total", Decimal("0.00")) > Decimal("0.00")
+            and _user_can_archive_budget(budget, self.request.user)
+        ]
         ctx.update(
             {
                 "budget_list": page_obj.object_list,
@@ -142,6 +224,9 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                 "archived_budgets_url": reverse_lazy("core:budget_archived_list")
                 if resolver.has(Capability.APPROVE_BUDGETS)
                 else "",
+                "can_create_budget": _user_can_request_budget(self.request.user),
+                "can_review_budgets": resolver.has(Capability.APPROVE_BUDGETS),
+                "budget_archive_ids": archiveable_ids,
             }
         )
         return ctx
@@ -176,6 +261,60 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
         )
         if building_filter_id:
             expenses = expenses.filter(metadata__building_id=building_filter_id)
+        expenses = list(expenses)
+        current_user_id = getattr(self.request.user, "pk", None)
+        can_manage_expenses = _user_can_log_budget_expense(budget, self.request.user)
+        for expense in expenses:
+            meta = expense.metadata or {}
+            work_order_id = _coerce_int(meta.get("work_order_id"))
+            if work_order_id is None:
+                work_order_id = _coerce_int(meta.get("work_order"))
+            if work_order_id is None:
+                work_order_id = _extract_work_order_id_from_text(
+                    meta.get("work_order_title"),
+                    meta.get("work_order_label"),
+                    expense.label,
+                    expense.notes,
+                )
+            building_id = _coerce_int(meta.get("building_id"))
+            if building_id is None:
+                building_id = _coerce_int(meta.get("building"))
+            work_order_url = ""
+            building_url = ""
+            work_order_label = ""
+            building_label = ""
+            primary_url = ""
+            primary_label = ""
+            primary_kind = ""
+            if work_order_id:
+                work_order_url = reverse("core:work_order_detail", args=[work_order_id])
+                work_order_label = _("Work order #%(id)s") % {"id": work_order_id}
+                primary_url = work_order_url
+                primary_label = work_order_label
+                primary_kind = "work_order"
+            if building_id:
+                building_url = reverse("core:building_detail", args=[building_id])
+                building_label = meta.get("building_name") or _("Building %(id)s") % {"id": building_id}
+                if not primary_url:
+                    primary_url = building_url
+                    primary_label = building_label
+                    primary_kind = "building"
+            expense.primary_link_url = primary_url
+            expense.primary_link_label = primary_label
+            expense.primary_link_kind = primary_kind
+            expense.work_order_url = work_order_url
+            expense.building_url = building_url
+            expense.work_order_label = work_order_label
+            expense.building_label = building_label
+            can_delete = can_manage_expenses or (
+                current_user_id and expense.created_by_id == current_user_id
+            )
+            expense.can_delete = can_delete
+            if can_delete:
+                expense.delete_url = reverse(
+                    "core:budget_expense_delete",
+                    args=[budget.pk, expense.pk],
+                )
         ctx["expenses"] = expenses
         building_options_qs = (
             budget.expenses.filter(metadata__building_id__isnull=False)
@@ -195,9 +334,9 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
         building_options.sort(key=lambda item: item["name"])
         ctx["expense_building_options"] = building_options
         ctx["selected_expense_building"] = building_filter_id
-        can_log_expense = self._can_log_expense(budget)
-        ctx["can_log_expense"] = can_log_expense
-        if can_log_expense:
+        can_manage_expenses = _user_can_log_budget_expense(budget, self.request.user)
+        ctx["can_log_expense"] = can_manage_expenses
+        if can_manage_expenses:
             ctx["expense_form"] = BudgetExpenseForm(user=self.request.user, budget=budget)
         ctx["events"] = budget.events.select_related("actor")
         resolver = CapabilityResolver(self.request.user)
@@ -210,15 +349,6 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
         ctx["archive_budget_url"] = reverse("core:budget_archive", args=[budget.pk])
         return ctx
 
-    def _can_log_expense(self, budget: BudgetRequest) -> bool:
-        if budget.status != BudgetRequest.Status.APPROVED:
-            return False
-        if budget.requester_id == getattr(self.request.user, "pk", None):
-            return True
-        resolver = CapabilityResolver(self.request.user)
-        building_id = getattr(budget.building, "pk", None)
-        return resolver.has(Capability.MANAGE_BUDGETS, building_id=building_id)
-
 
 class BudgetCreateView(LoginRequiredMixin, BudgetFeatureRequiredMixin, CreateView):
     template_name = "core/budget_form.html"
@@ -230,12 +360,17 @@ class BudgetCreateView(LoginRequiredMixin, BudgetFeatureRequiredMixin, CreateVie
         kwargs["user"] = self.request.user
         return kwargs
 
+    def dispatch(self, request, *args, **kwargs):
+        if not _user_can_request_budget(request.user):
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
+
     def form_valid(self, form):
         response = super().form_valid(form)
         self.object.transition(
             status=BudgetRequest.Status.PENDING_REVIEW,
             actor=self.request.user,
-            comment=self.object.notes or "",
+            comment="",
         )
         messages.success(self.request, _("Budget request submitted for review."))
         return response
@@ -271,7 +406,7 @@ class BudgetExpenseCreateView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Fo
             BudgetRequest.objects.visible_to(request.user),
             pk=kwargs["pk"],
         )
-        if not self._can_log_expense(self.budget, request.user):
+        if not _user_can_log_budget_expense(self.budget, request.user):
             raise Http404()
         return super().dispatch(request, *args, **kwargs)
 
@@ -282,12 +417,16 @@ class BudgetExpenseCreateView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Fo
         return kwargs
 
     def form_valid(self, form):
-        form.save()
+        try:
+            form.save()
+        except ValidationError as exc:
+            self._handle_validation_errors(exc)
+            return redirect(self.get_success_url())
         messages.success(self.request, _("Expense logged."))
         return redirect(self.get_success_url())
 
     def form_invalid(self, form):
-        for field, errors in form.errors.items():
+        for errors in form.errors.values():
             for error in errors:
                 messages.error(self.request, error)
         return redirect(self.get_success_url())
@@ -295,13 +434,38 @@ class BudgetExpenseCreateView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Fo
     def get_success_url(self):
         return reverse("core:budget_detail", args=[self.budget.pk])
 
-    def _can_log_expense(self, budget, user) -> bool:
-        if budget.status != BudgetRequest.Status.APPROVED:
-            return False
-        if budget.requester_id == getattr(user, "pk", None):
+    def _handle_validation_errors(self, error: ValidationError):
+        if hasattr(error, "error_dict"):
+            for field_errors in error.error_dict.values():
+                for message in field_errors:
+                    messages.error(self.request, message)
+        else:
+            for message in error.messages:
+                messages.error(self.request, message)
+
+
+class BudgetExpenseDeleteView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
+    def post(self, request, pk, expense_id):
+        budget = get_object_or_404(
+            BudgetRequest.objects.visible_to(request.user),
+            pk=pk,
+        )
+        expense = get_object_or_404(
+            Expense.objects.filter(budget_request=budget),
+            pk=expense_id,
+        )
+        if not self._can_delete_expense(request.user, budget, expense):
+            raise Http404()
+        expense.delete()
+        messages.success(request, _("Expense removed."))
+        return redirect("core:budget_detail", pk=budget.pk)
+
+    def _can_delete_expense(self, user, budget, expense):
+        if _user_can_log_budget_expense(budget, user):
             return True
-        resolver = CapabilityResolver(user)
-        return resolver.has(Capability.MANAGE_BUDGETS, building_id=budget.building_id)
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        return expense.created_by_id == getattr(user, "pk", None)
 
 
 class BudgetReviewQueueView(LoginRequiredMixin, BudgetFeatureRequiredMixin, ListView):
@@ -329,8 +493,7 @@ class BudgetReviewDecisionView(LoginRequiredMixin, BudgetFeatureRequiredMixin, F
             BudgetRequest.objects.visible_to(request.user),
             pk=kwargs["pk"],
         )
-        resolver = CapabilityResolver(request.user)
-        if not resolver.has(Capability.APPROVE_BUDGETS, building_id=self.budget.building_id):
+        if not _budget_can_be_reviewed_by(self.budget, request.user):
             raise Http404()
         return super().dispatch(request, *args, **kwargs)
 
@@ -430,6 +593,14 @@ class BudgetArchiveView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
 
 class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateView):
     template_name = "core/budgets_archived.html"
+    PER_CHOICES = (25, 50, 100, 200)
+    PER_DEFAULT = 25
+    SORT_CHOICES = [
+        ("archived_desc", _("Archived (Newest first)")),
+        ("archived_asc", _("Archived (Oldest first)")),
+        ("requester", _("Requester (A → Z)")),
+        ("requester_desc", _("Requester (Z → A)")),
+    ]
 
     def dispatch(self, request, *args, **kwargs):
         resolver = CapabilityResolver(request.user)
@@ -439,13 +610,75 @@ class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Tem
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        budgets = (
-            BudgetRequest.objects.visible_to(self.request.user)
+        request = self.request
+        base_qs = (
+            BudgetRequest.objects.visible_to(request.user)
             .archived()
             .select_related("requester")
             .with_totals()
-            .order_by("requester__username", "-archived_at")
         )
+        budgets = base_qs
+        search = (request.GET.get("q") or "").strip()
+        if search:
+            budgets = budgets.filter(
+                models.Q(title__icontains=search)
+                | models.Q(description__icontains=search)
+                | models.Q(project_code__icontains=search)
+                | models.Q(requester__first_name__icontains=search)
+                | models.Q(requester__last_name__icontains=search)
+                | models.Q(requester__username__icontains=search)
+            )
+        owner_ids = [oid for oid in base_qs.values_list("requester_id", flat=True).distinct() if oid]
+        owner_users = User.objects.filter(pk__in=owner_ids).only("id", "first_name", "last_name", "username")
+        owner_label_map = {user.pk: user.get_full_name() or user.get_username() for user in owner_users}
+        owner_choices = [
+            {"id": str(pk), "label": owner_label_map[pk]}
+            for pk in sorted(owner_label_map.keys(), key=lambda key: owner_label_map[key].lower())
+        ]
+        owner_param = (request.GET.get("owner") or "").strip()
+        owner_filter = None
+        if owner_param:
+            try:
+                owner_filter = int(owner_param)
+            except (TypeError, ValueError):
+                owner_param = ""
+                owner_filter = None
+        if owner_filter and owner_filter in owner_label_map:
+            budgets = budgets.filter(requester_id=owner_filter)
+        else:
+            owner_param = ""
+
+        archived_from_raw = (request.GET.get("archived_from") or "").strip()
+        archived_to_raw = (request.GET.get("archived_to") or "").strip()
+        archived_from = parse_date(archived_from_raw) if archived_from_raw else None
+        archived_to = parse_date(archived_to_raw) if archived_to_raw else None
+        if archived_from and archived_to and archived_to < archived_from:
+            archived_from, archived_to = archived_to, archived_from
+        if archived_from:
+            budgets = budgets.filter(archived_at__date__gte=archived_from)
+        if archived_to:
+            budgets = budgets.filter(archived_at__date__lte=archived_to)
+        has_archived_filter = bool(archived_from or archived_to)
+
+        sort_param = (request.GET.get("sort") or "archived_desc").strip()
+        sort_map = {
+            "archived_desc": ("-archived_at", "-id"),
+            "archived_asc": ("archived_at", "-id"),
+            "requester": ("requester__username", "-archived_at"),
+            "requester_desc": ("-requester__username", "-archived_at"),
+        }
+        if sort_param not in sort_map:
+            sort_param = "archived_desc"
+        budgets = budgets.order_by(*sort_map[sort_param])
+
+        per_param = request.GET.get("per")
+        try:
+            per_value = int(per_param)
+        except (TypeError, ValueError):
+            per_value = self.PER_DEFAULT
+        if per_value not in self.PER_CHOICES:
+            per_value = self.PER_DEFAULT
+
         groups = []
         group_map = {}
         for budget in budgets:
@@ -469,10 +702,106 @@ class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Tem
             entry["budgets"].append(budget)
             entry["total_requested"] += Decimal(budget.requested_amount or 0)
             entry["total_spent"] += budget.spent_total
-        ctx["owner_groups"] = groups
+        paginator = Paginator(groups, per_value)
+        page_number = request.GET.get("page")
+        groups_page = paginator.get_page(page_number)
+        ctx["owner_groups_page"] = groups_page
+        ctx["owner_groups_total"] = paginator.count
+        ctx["pagination_query"] = _querystring_without(request, "page")
         ctx["back_url"] = reverse("core:work_orders_archive")
-        ctx["requester_total"] = len(groups)
+        ctx["requester_total"] = paginator.count
+        ctx["q"] = search
+        ctx["archived_from"] = archived_from_raw
+        ctx["archived_to"] = archived_to_raw
+        ctx["has_archived_filter"] = has_archived_filter
+        ctx["owner_choices"] = owner_choices
+        ctx["owner_filter"] = owner_param
+        ctx["sort"] = sort_param
+        ctx["sort_choices"] = self.SORT_CHOICES
+        ctx["per"] = per_value
+        ctx["per_choices"] = self.PER_CHOICES
+        ctx["per_default"] = self.PER_DEFAULT
+        can_purge = user_is_admin_or_backoffice(self.request.user)
+        ctx["can_purge_archives"] = can_purge
+        if can_purge:
+            ctx["archive_purge_form"] = ArchivePurgeForm()
+            ctx["archive_purge_action"] = reverse("core:budget_archived_purge")
+            ctx["archive_purge_preview_url"] = reverse("core:budget_archived_purge_preview")
         return ctx
+
+
+class BudgetArchivePurgeView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
+    form_class = ArchivePurgeForm
+
+    def dispatch(self, request, *args, **kwargs):
+        resolver = CapabilityResolver(request.user)
+        if not resolver.has(Capability.APPROVE_BUDGETS) or not user_is_admin_or_backoffice(request.user):
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        form = self.form_class(request.POST)
+        if not form.is_valid():
+            for errors in form.errors.values():
+                for error in errors:
+                    messages.error(request, error)
+            return redirect("core:budget_archived_list")
+        if not form.cleaned_data.get("confirm"):
+            messages.error(request, _("Please confirm the permanent deletion."))
+            return redirect("core:budget_archived_list")
+
+        start = form.cleaned_data["from_date"]
+        end = form.cleaned_data["to_date"]
+        qs = (
+            BudgetRequest.objects.visible_to(request.user)
+            .filter(archived_at__isnull=False)
+        )
+        if start:
+            qs = qs.filter(archived_at__date__gte=start)
+        if end:
+            qs = qs.filter(archived_at__date__lte=end)
+        deleted = qs.count()
+        if not deleted:
+            messages.info(request, _("No archived budgets matched the selected date range."))
+            return redirect("core:budget_archived_list")
+        qs.delete()
+        if deleted:
+            messages.success(
+                request,
+                ngettext(
+                    "Deleted %(count)s archived budget permanently.",
+                    "Deleted %(count)s archived budgets permanently.",
+                    deleted,
+                )
+                % {"count": deleted},
+            )
+        else:
+            messages.info(request, _("No archived budgets matched the selected date range."))
+        return redirect("core:budget_archived_list")
+
+
+class BudgetArchivePurgePreviewView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
+    def dispatch(self, request, *args, **kwargs):
+        resolver = CapabilityResolver(request.user)
+        if not resolver.has(Capability.APPROVE_BUDGETS) or not user_is_admin_or_backoffice(request.user):
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        form = ArchivePurgeForm(request.GET)
+        if not form.is_valid():
+            return JsonResponse({"count": 0}, status=400)
+        start = form.cleaned_data["from_date"]
+        end = form.cleaned_data["to_date"]
+        qs = (
+            BudgetRequest.objects.visible_to(request.user)
+            .filter(archived_at__isnull=False)
+        )
+        if start:
+            qs = qs.filter(archived_at__date__gte=start)
+        if end:
+            qs = qs.filter(archived_at__date__lte=end)
+        return JsonResponse({"count": qs.count()})
 
 
 class BudgetTechnicianSummaryView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateView):

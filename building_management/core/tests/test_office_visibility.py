@@ -184,3 +184,18 @@ class OfficeVisibilityTests(TestCase):
         self.assertContains(response, order.title)
         self.assertContains(response, "Origin · Office")
         self.assertContains(response, f"Destination · {destination_building.name}")
+
+    def test_building_list_bootstraps_office_for_global_staff(self):
+        Building.objects.all().delete()
+        User = get_user_model()
+        admin_user = User.objects.create_user(username="global-admin", password="pass")
+        BuildingMembership.objects.create(
+            user=admin_user,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get(reverse("core:buildings_list"))
+        self.assertTrue(Building.objects.filter(is_system_default=True).exists())
+        self.assertContains(response, "Office")

@@ -14,17 +14,92 @@
         <a href="{{ back_url }}" class="btn btn-primary">{% trans "Back to archive" %}</a>
       </div>
     </div>
+    <form method="get" class="filter-panel">
+      <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-4">
+        <div class="space-y-2 md:col-span-2 lg:col-span-4">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q_budgets">{% trans "Search archived budgets" %}</label>
+          <input id="id_q_budgets" name="q" type="text" value="{{ q }}" placeholder="{% trans 'Requester, title, or notes' %}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" autocomplete="off" />
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_owner_filter">{% trans "Отговорник" %}</label>
+          <select id="id_owner_filter" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            <option value="">{% trans "All owners" %}</option>
+            {% for choice in owner_choices %}
+              <option value="{{ choice.id }}" {% if owner_filter == choice.id %}selected{% endif %}>{{ choice.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_sort_filter">{% trans "Sort" %}</label>
+          <select id="id_sort_filter" name="sort" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            {% for value,label in sort_choices %}
+              <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_per_filter">{% trans "Page size" %}</label>
+          <select id="id_per_filter" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            {% for option in per_choices %}
+              <option value="{{ option }}" {% if per == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="space-y-2">
+          <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Archived range" %}</span>
+          <div class="grid gap-3 md:grid-cols-2">
+            <input id="id_archived_from_budgets" name="archived_from" type="date" value="{{ archived_from }}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" />
+            <input id="id_archived_to_budgets" name="archived_to" type="date" value="{{ archived_to }}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" />
+          </div>
+        </div>
+      </div>
+      <div class="filter-panel__actions">
+        {% if q or has_archived_filter or owner_filter or sort != 'archived_desc' or per != per_default %}
+          <a class="btn btn-secondary" href="{% url 'core:budget_archived_list' %}">{% trans "Reset" %}</a>
+        {% endif %}
+        <button class="btn" type="submit">{% trans "Apply filters" %}</button>
+      </div>
+    </form>
 
-    {% if owner_groups %}
+    {% if can_purge_archives %}
+      <section class="rounded-2xl border border-red-200 bg-red-50/80 p-4 shadow-card space-y-4 dark:border-red-500/40 dark:bg-slate-900">
+        <div>
+          <h2 class="text-lg font-semibold text-red-700 dark:text-red-300">{% trans "Permanent budget deletion" %}</h2>
+          <p class="text-sm text-slate-700 dark:text-slate-200" data-archive-preview
+             data-preview-url="{{ archive_purge_preview_url }}"
+             data-label-singular="{% trans 'budget' %}"
+             data-label-plural="{% trans 'budgets' %}"
+             data-empty-text="{% trans 'Select both dates to preview the total.' %}"
+             data-error-text="{% trans 'Unable to load count.' %}"
+             data-loading-text="{% trans 'Calculating…' %}"
+             data-result-suffix="{% trans 'will be permanently deleted (including expenses and files).' %}">
+          </p>
+        </div>
+        <form method="post" action="{{ archive_purge_action }}" class="space-y-4">
+          {% csrf_token %}
+          <div class="grid gap-3 md:grid-cols-2">
+            {{ archive_purge_form.from_date }}
+            {{ archive_purge_form.to_date }}
+          </div>
+          <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+            {{ archive_purge_form.confirm }}
+            <span>{% trans "I understand these archived budgets, expenses, and files cannot be restored." %}</span>
+          </label>
+          <button class="btn btn-danger" type="submit">{% trans "Delete archived budgets" %}</button>
+        </form>
+      </section>
+    {% endif %}
+
+    {% if owner_groups_page %}
       <div class="space-y-6">
-        {% for group in owner_groups %}
+        {% for group in owner_groups_page.object_list %}
           <section class="space-y-3 rounded-3xl border border-emerald-50/80 bg-white/70 p-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/60">
             <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div>
                 <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requester" %}</p>
                 <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ group.owner_name }}</h2>
               </div>
-              <div class="rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:bg-slate-800/70 dark:text-slate-100">
+              <div class="rounded-2xl px-4 py-2 text-sm font-semibold text-brand-foreground dark:text-white">
                 {% blocktrans with requested=group.total_requested|floatformat:2 spent=group.total_spent|floatformat:2 %}
                   Requested {{ requested }} · Spent {{ spent }}
                 {% endblocktrans %}
@@ -37,7 +112,7 @@
                     <p class="font-semibold text-slate-900 dark:text-slate-100">
                       {{ budget.title|default:_("Untitled budget") }}
                     </p>
-                    <p class="text-xs text-white/80 dark:text-white">
+                    <p class="text-xs text-brand-foreground dark:text-white">
                       {% blocktrans with approved=budget.approved_total|floatformat:2 spent=budget.spent_total|floatformat:2 currency=budget.currency archived=budget.archived_at|date:"Y-m-d" %}
                         Approved {{ approved }} {{ currency }} · Spent {{ spent }} {{ currency }} · Archived {{ archived }}
                       {% endblocktrans %}
@@ -51,6 +126,19 @@
             </div>
           </section>
         {% endfor %}
+      </div>
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-slate-500 dark:text-slate-400">
+          {% blocktrans with number=owner_groups_page.number total=owner_groups_page.paginator.num_pages %}Page {{ number }} of {{ total }}{% endblocktrans %}
+        </div>
+        <div class="flex gap-2">
+          {% if owner_groups_page.has_previous %}
+            <a class="btn btn-sm btn-outline" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ owner_groups_page.previous_page_number }}">{% trans "Previous" %}</a>
+          {% endif %}
+          {% if owner_groups_page.has_next %}
+            <a class="btn btn-sm btn-outline" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ owner_groups_page.next_page_number }}">{% trans "Next" %}</a>
+          {% endif %}
+        </div>
       </div>
     {% else %}
       <div class="ui-panel text-center text-slate-500 dark:text-slate-300">

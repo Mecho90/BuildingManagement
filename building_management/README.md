@@ -16,6 +16,7 @@ The application now ships with a singleton **Office** building that acts as the 
 - Owner rotation runbook: set the desired username/email (env or flag) and run `python manage.py ensure_office_building`. The command updates the FK owner, regenerates owner memberships for every administrator, and keeps backoffice memberships in sync.
 - Office work orders are always created inside the Office building and must be forwarded to a destination. The work-order form pins the Office entry at the top, disables units when Office is selected, and exposes a dedicated forwarding panel with owner previews. Forwarded tickets stay visible to the Office owner/backoffice plus the destination owner/backoffice/technicians; confidentiality (`lawyer_only`) still applies as usual.
 - See [docs/office_forwarding.md](docs/office_forwarding.md) for the full forwarding runbook (how to forward, re-route, deal with deleted destinations, and recover from mis-forwarding).
+- Django automatically re-syncs the Office building after migrations and whenever administrator/backoffice users load building data, so the singleton is recreated even if it’s deleted. You can still run `python manage.py ensure_office_building` manually whenever you need to rotate the owner.
 
 ## Dependencies
 
