@@ -1841,9 +1841,10 @@ class ArchivedWorkOrderDetailView(
         qs = self.get_filtered_queryset()
         building_id = self.kwargs.get("building_id")
         qs = qs.filter(building_id=building_id)
-        if not qs.exists():
+        first_order = qs.first()
+        if first_order is None:
             raise Http404()
-        self._current_building = qs[0].building
+        self._current_building = first_order.building
         return qs
 
     def get_context_data(self, **kwargs):
