@@ -600,6 +600,14 @@ class WorkOrder(TimeStampedModel):
                 fields=("forwarded_to_building", "archived_at"),
                 name="core_wo_forwarded_archived_idx",
             ),
+            models.Index(
+                fields=("building", "archived_at", "status", "deadline"),
+                name="core_wo_building_active_idx",
+            ),
+            models.Index(
+                fields=("archived_at", "status", "deadline"),
+                name="core_wo_active_deadline_idx",
+            ),
         ]
 
     def __str__(self) -> str:  # pragma: no cover
