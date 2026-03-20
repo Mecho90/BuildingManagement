@@ -785,13 +785,18 @@
     }
 
     function handleFiles (files) {
-      files.forEach(function (file) {
-        uploadFile(file)
-      })
+      uploadFiles(files)
     }
 
-    function uploadFile (file) {
-      const queueItem = createQueueItem(file.name, uploadLabels.uploading)
+    function uploadFiles (files) {
+      if (!files || !files.length) {
+        return
+      }
+      const queueLabel =
+        files.length === 1
+          ? files[0].name
+          : files.length + " files"
+      const queueItem = createQueueItem(queueLabel, uploadLabels.uploading)
       if (queue) {
         queue.hidden = false
         queue.appendChild(queueItem.root)
@@ -843,7 +848,9 @@
       })
 
       const formData = new FormData()
-      formData.append("files", file)
+      files.forEach(function (file) {
+        formData.append("files", file)
+      })
       xhr.send(formData)
     }
 
