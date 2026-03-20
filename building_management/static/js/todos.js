@@ -109,6 +109,8 @@
   const TAB_QUERIES = {
     "this-week": () => ({ week_start: config.currentWeek }),
     upcoming: () => ({ include_history: 1, upcoming: 1, status: "pending,in_progress" }),
+    all: () => ({ include_history: 1, created_only: 1, status: "pending,in_progress" }),
+    created: () => ({ include_history: 1, created_only: 1, status: "pending,in_progress" }),
     completed: () => ({ week_start: config.currentWeek, status: "done", history: 1 }),
     history: () => ({ status: "done", history: 1 }),
   };
@@ -131,6 +133,15 @@
 
   function detailUrl(id) {
     return config.detailUrl.replace("{id}", id);
+  }
+
+  function listUrlWithCurrentTab() {
+    const base = config.listUrl || window.location.pathname;
+    const url = new URL(base, window.location.origin);
+    if (state.currentTab) {
+      url.searchParams.set("tab", state.currentTab);
+    }
+    return `${url.pathname}${url.search}`;
   }
 
   function csrftoken() {
@@ -313,7 +324,7 @@
     const deleteUrl = config.deleteUrl ? config.deleteUrl.replace("{id}", item.id) : null;
     const deleteTarget =
       deleteUrl && (config.listUrl || window.location.pathname)
-        ? `${deleteUrl}?next=${encodeURIComponent(config.listUrl || window.location.pathname)}`
+        ? `${deleteUrl}?next=${encodeURIComponent(listUrlWithCurrentTab())}`
         : deleteUrl;
     const ownerName = item.owner && item.owner.name ? escapeHtml(item.owner.name) : "";
     const showOwner = ownerName && item.owner.id !== config.currentUserId;
@@ -579,7 +590,7 @@
     if (state.search) {
       params.set("q", state.search);
     }
-    if (state.owner !== undefined) {
+    if (state.owner !== undefined && !params.has("owner")) {
       params.set("owner", state.owner || "");
     }
     return fetch(`${config.apiUrl}?${params.toString()}`, {
@@ -862,7 +873,13 @@
     els.list.addEventListener("click", handleListClick);
   }
 
+  function initialTab() {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (!tab) return "this-week";
+    return TAB_QUERIES[tab] ? tab : "this-week";
+  }
+
   initForms();
-  fetchTasks("this-week");
+  fetchTasks(initialTab());
   fetchCalendar();
 })();

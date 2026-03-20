@@ -8,9 +8,11 @@ from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from core.forms import BudgetFilterForm
 from core.models import (
     BudgetFeatureFlag,
     BudgetRequest,
+    BudgetRequestEvent,
     Building,
     BuildingMembership,
     Expense,
@@ -249,3 +251,275 @@ class BudgetArchivePurgeViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(BudgetRequest.objects.filter(pk=old_budget.pk).exists())
         self.assertFalse(BudgetRequest.objects.filter(pk=recent_budget.pk).exists())
+
+
+class BudgetMassAssignViewTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        BudgetFeatureFlag.objects.create(key="budgets", is_enabled=True)
+        self.admin = User.objects.create_user(username="admin-budget", password="pass")
+        self.tech_one = User.objects.create_user(username="tech-one", password="pass")
+        self.tech_two = User.objects.create_user(username="tech-two", password="pass")
+        self.backoffice = User.objects.create_user(username="backoffice-budget", password="pass")
+        self.lawyer = User.objects.create_user(username="lawyer-budget", password="pass")
+        self.building = Building.objects.create(owner=self.admin, name="Mass Budget")
+        BuildingMembership.objects.create(
+            user=self.admin,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+        )
+        BuildingMembership.objects.create(
+            user=self.tech_one,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+        )
+        BuildingMembership.objects.create(
+            user=self.tech_two,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+        )
+        BuildingMembership.objects.create(
+            user=self.backoffice,
+            building=None,
+            role=MembershipRole.BACKOFFICE,
+        )
+        BuildingMembership.objects.create(
+            user=self.lawyer,
+            building=None,
+            role=MembershipRole.LAWYER,
+        )
+        self.budget = BudgetRequest.objects.create(
+            requester=self.tech_one,
+            building=self.building,
+            title="Initial budget",
+            requested_amount=Decimal("150.00"),
+            status=BudgetRequest.Status.PENDING_REVIEW,
+        )
+
+    def test_non_admin_cannot_open_mass_assign(self):
+        self.client.force_login(self.tech_one)
+        response = self.client.get(reverse("core:budget_mass_assign"))
+        self.assertEqual(response.status_code, 404)
+
+    def test_admin_can_create_budgets_for_selected_users(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("core:budget_mass_assign"),
+            {
+                "users": [str(self.tech_one.pk), str(self.tech_two.pk)],
+                "title": "Mass Assigned Budget",
+                "requested_amount": "333.00",
+                "description": "Bulk created budget",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("core:budget_list"))
+        created_qs = BudgetRequest.objects.filter(
+            title="Mass Assigned Budget",
+            requested_amount=Decimal("333.00"),
+            description="Bulk created budget",
+        )
+        self.assertEqual(created_qs.count(), 2)
+        self.assertSetEqual(
+            set(created_qs.values_list("requester_id", flat=True)),
+            {self.tech_one.pk, self.tech_two.pk},
+        )
+        self.assertEqual(
+            created_qs.filter(status=BudgetRequest.Status.APPROVED).count(),
+            2,
+        )
+        self.assertEqual(
+            created_qs.filter(approved_by=self.admin).count(),
+            2,
+        )
+        event = BudgetRequestEvent.objects.filter(
+            budget_request__in=created_qs,
+            event_type=BudgetRequestEvent.EventType.COMMENT,
+            payload__action="mass_assigned",
+        ).count()
+        self.assertEqual(event, 2)
+
+    def test_admin_users_are_excluded_from_assignee_list(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("core:budget_mass_assign"))
+        self.assertEqual(response.status_code, 200)
+        assignee_qs = response.context["form"].fields["users"].queryset
+        self.assertFalse(assignee_qs.filter(pk=self.admin.pk).exists())
+        self.assertFalse(assignee_qs.filter(pk=self.lawyer.pk).exists())
+
+    def test_only_admin_can_delete_mass_assigned_budgets(self):
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("core:budget_mass_assign"),
+            {
+                "users": [str(self.tech_one.pk)],
+                "title": "Mass Assigned Budget Deletable",
+                "requested_amount": "120.00",
+                "description": "Bulk created budget",
+            },
+        )
+        mass_assigned_budget = BudgetRequest.objects.get(
+            requester=self.tech_one,
+            title="Mass Assigned Budget Deletable",
+        )
+
+        self.client.force_login(self.tech_one)
+        response = self.client.get(reverse("core:budget_delete", args=[mass_assigned_budget.pk]))
+        self.assertEqual(response.status_code, 404)
+
+        self.client.force_login(self.backoffice)
+        response = self.client.get(reverse("core:budget_delete", args=[mass_assigned_budget.pk]))
+        self.assertEqual(response.status_code, 404)
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("core:budget_delete", args=[mass_assigned_budget.pk]))
+        self.assertEqual(response.status_code, 200)
+
+    def test_admin_budget_list_exposes_delete_for_mass_assigned_budgets(self):
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("core:budget_mass_assign"),
+            {
+                "users": [str(self.tech_one.pk)],
+                "title": "Mass Assigned Budget List Delete",
+                "requested_amount": "90.00",
+                "description": "Bulk created budget",
+            },
+        )
+        mass_assigned_budget = BudgetRequest.objects.get(
+            requester=self.tech_one,
+            title="Mass Assigned Budget List Delete",
+        )
+        response = self.client.get(reverse("core:budget_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(mass_assigned_budget.pk, set(response.context["budget_delete_ids"]))
+
+
+class BudgetSummaryVisibilityTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        BudgetFeatureFlag.objects.create(key="budgets", is_enabled=True)
+        self.admin = User.objects.create_user(username="budget-admin", password="pass")
+        self.backoffice = User.objects.create_user(username="budget-backoffice", password="pass")
+        self.tech = User.objects.create_user(username="budget-tech", password="pass")
+        self.building = Building.objects.create(owner=self.admin, name="Budget Summary")
+        BuildingMembership.objects.create(user=self.admin, building=None, role=MembershipRole.ADMINISTRATOR)
+        BuildingMembership.objects.create(user=self.backoffice, building=None, role=MembershipRole.BACKOFFICE)
+        BuildingMembership.objects.create(user=self.tech, building=self.building, role=MembershipRole.TECHNICIAN)
+
+        BudgetRequest.objects.create(
+            requester=self.backoffice,
+            building=self.building,
+            title="Backoffice budget",
+            requested_amount=Decimal("200.00"),
+            approved_amount=Decimal("200.00"),
+            spent_amount=Decimal("50.00"),
+            status=BudgetRequest.Status.APPROVED,
+        )
+        BudgetRequest.objects.create(
+            requester=self.tech,
+            building=self.building,
+            title="Technician budget",
+            requested_amount=Decimal("300.00"),
+            approved_amount=Decimal("300.00"),
+            spent_amount=Decimal("100.00"),
+            status=BudgetRequest.Status.APPROVED,
+        )
+
+    def test_backoffice_summary_shows_only_own_remaining(self):
+        self.client.force_login(self.backoffice)
+        response = self.client.get(reverse("core:budget_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["summary_total_remaining"], Decimal("150.00"))
+        self.assertEqual(response.context["summary_by_requester"], [])
+
+    def test_admin_summary_shows_all_and_per_requester(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("core:budget_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["summary_total_remaining"], Decimal("350.00"))
+        labels = {entry["requester_label"] for entry in response.context["summary_by_requester"]}
+        self.assertIn(self.backoffice.username, labels)
+        self.assertIn(self.tech.username, labels)
+
+
+class BudgetReviewPermissionTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        BudgetFeatureFlag.objects.create(key="budgets", is_enabled=True)
+        self.backoffice = User.objects.create_user(username="backoffice-review", password="pass")
+        self.admin = User.objects.create_user(username="admin-review", password="pass")
+        self.tech = User.objects.create_user(username="tech-review", password="pass")
+        self.building = Building.objects.create(owner=self.admin, name="Review Building")
+        BuildingMembership.objects.create(user=self.backoffice, building=None, role=MembershipRole.BACKOFFICE)
+        BuildingMembership.objects.create(user=self.admin, building=None, role=MembershipRole.ADMINISTRATOR)
+        BuildingMembership.objects.create(user=self.tech, building=self.building, role=MembershipRole.TECHNICIAN)
+
+        self.backoffice_budget = BudgetRequest.objects.create(
+            requester=self.backoffice,
+            building=self.building,
+            title="Backoffice request",
+            requested_amount=Decimal("100.00"),
+            status=BudgetRequest.Status.PENDING_REVIEW,
+        )
+        self.tech_budget = BudgetRequest.objects.create(
+            requester=self.tech,
+            building=self.building,
+            title="Technician request",
+            requested_amount=Decimal("120.00"),
+            status=BudgetRequest.Status.PENDING_REVIEW,
+        )
+
+    def test_backoffice_list_hides_review_for_own_budget(self):
+        self.client.force_login(self.backoffice)
+        response = self.client.get(reverse("core:budget_list"))
+        self.assertEqual(response.status_code, 200)
+        reviewable_ids = set(response.context["reviewable_budget_ids"])
+        self.assertNotIn(self.backoffice_budget.pk, reviewable_ids)
+        self.assertIn(self.tech_budget.pk, reviewable_ids)
+
+    def test_backoffice_review_queue_excludes_own_budget(self):
+        self.client.force_login(self.backoffice)
+        response = self.client.get(reverse("core:budget_review_queue"))
+        self.assertEqual(response.status_code, 200)
+        pending_ids = {budget.pk for budget in response.context["pending_budgets"]}
+        self.assertNotIn(self.backoffice_budget.pk, pending_ids)
+        self.assertIn(self.tech_budget.pk, pending_ids)
+
+    def test_backoffice_cannot_open_own_budget_review_page(self):
+        self.client.force_login(self.backoffice)
+        response = self.client.get(reverse("core:budget_review_decision", args=[self.backoffice_budget.pk]))
+        self.assertEqual(response.status_code, 404)
+
+
+class BudgetFilterFormTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="form-backoffice", password="pass")
+        BuildingMembership.objects.create(user=self.user, building=None, role=MembershipRole.BACKOFFICE)
+
+    def test_requester_defaults_to_current_user_without_empty_option(self):
+        form = BudgetFilterForm(user=self.user)
+        self.assertTrue(form.show_requester)
+        technician_field = form.fields["technician"]
+        self.assertIsNone(technician_field.empty_label)
+        self.assertEqual(form.initial.get("technician"), self.user.pk)
+        self.assertTrue(technician_field.queryset.filter(pk=self.user.pk).exists())
+
+    def test_admin_without_budgets_still_visible_in_requester_filter(self):
+        admin = User.objects.create_user(username="form-admin", password="pass")
+        BuildingMembership.objects.create(user=admin, building=None, role=MembershipRole.ADMINISTRATOR)
+        form = BudgetFilterForm(user=admin)
+        technician_field = form.fields["technician"]
+        self.assertTrue(technician_field.queryset.filter(pk=admin.pk).exists())
+        self.assertEqual(form.initial.get("technician"), admin.pk)
+
+    def test_requester_label_prefers_full_name(self):
+        self.user.first_name = "Господин"
+        self.user.last_name = "Лимон"
+        self.user.save(update_fields=["first_name", "last_name"])
+        form = BudgetFilterForm(user=self.user)
+        technician_field = form.fields["technician"]
+        self.assertEqual(
+            technician_field.label_from_instance(self.user),
+            "Господин Лимон",
+        )

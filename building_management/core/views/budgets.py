@@ -24,6 +24,7 @@ from ..forms import (
     BudgetFilterForm,
     BudgetRequestApprovalForm,
     BudgetRequestForm,
+    MassAssignBudgetsForm,
 )
 from ..models import (
     BudgetFeatureFlag,
@@ -65,6 +66,28 @@ def _user_can_request_budget(user) -> bool:
     return role in {MembershipRole.TECHNICIAN, MembershipRole.BACKOFFICE}
 
 
+def _user_can_mass_assign_budgets(user) -> bool:
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return BuildingMembership.objects.filter(
+        user=user,
+        role=MembershipRole.ADMINISTRATOR,
+    ).exists()
+
+
+def _user_is_budget_admin(user) -> bool:
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return BuildingMembership.objects.filter(
+        user=user,
+        role=MembershipRole.ADMINISTRATOR,
+    ).exists()
+
+
 def _budget_can_be_reviewed_by(budget: BudgetRequest, reviewer) -> bool:
     if not reviewer or not getattr(reviewer, "is_authenticated", False):
         return False
@@ -83,6 +106,12 @@ def _budget_can_be_reviewed_by(budget: BudgetRequest, reviewer) -> bool:
 def _user_can_delete_budget(budget: BudgetRequest, user) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
+    is_mass_assigned = budget.events.filter(
+        event_type=BudgetRequestEvent.EventType.COMMENT,
+        payload__action="mass_assigned",
+    ).exists()
+    if is_mass_assigned:
+        return _user_is_budget_admin(user)
     if budget.status == BudgetRequest.Status.APPROVED:
         resolver = CapabilityResolver(user)
         return resolver.has(Capability.APPROVE_BUDGETS, building_id=budget.building_id)
@@ -165,13 +194,15 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        resolver = CapabilityResolver(self.request.user)
-        budget_qs = (
+        user = self.request.user
+        resolver = CapabilityResolver(user)
+        base_budget_qs = (
             BudgetRequest.objects.visible_to(self.request.user)
             .active()
             .select_related("building", "requester")
             .with_totals()
         )
+        budget_qs = base_budget_qs
         filter_form = BudgetFilterForm(self.request.GET or None, user=self.request.user)
         if filter_form.is_valid():
             data = filter_form.cleaned_data
@@ -191,7 +222,20 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
             default=models.F("requested_amount"),
             output_field=models.DecimalField(max_digits=12, decimal_places=2),
         )
-        totals = budget_qs.aggregate(
+        is_budget_admin = _user_is_budget_admin(user)
+        technician_requester_ids: list[int] = []
+        if is_budget_admin:
+            technician_requester_ids = list(
+                BuildingMembership.objects.filter(role=MembershipRole.TECHNICIAN)
+                .values_list("user_id", flat=True)
+                .distinct()
+            )
+        summary_qs = (
+            base_budget_qs.filter(requester_id__in=technician_requester_ids)
+            if is_budget_admin
+            else base_budget_qs.filter(requester=user)
+        )
+        totals = summary_qs.aggregate(
             requested_total=models.Sum("requested_amount"),
             approved_total=models.Sum(totals_expr),
             spent_total=models.Sum("spent_amount"),
@@ -202,14 +246,52 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                 )
             ),
         )
+        summary_by_requester = []
+        if is_budget_admin:
+            requester_totals = (
+                summary_qs.values("requester_id", "requester__username", "requester__first_name", "requester__last_name")
+                .annotate(
+                    remaining_total=models.Sum(
+                        models.ExpressionWrapper(
+                            totals_expr - models.F("spent_amount"),
+                            output_field=models.DecimalField(max_digits=12, decimal_places=2),
+                        )
+                    )
+                )
+                .order_by("requester__username")
+            )
+            for row in requester_totals:
+                full_name = " ".join(
+                    [part for part in [row.get("requester__first_name"), row.get("requester__last_name")] if part]
+                ).strip()
+                summary_by_requester.append(
+                    {
+                        "requester_id": row.get("requester_id"),
+                        "requester_label": full_name or row.get("requester__username") or _("Unknown"),
+                        "remaining_total": row.get("remaining_total") or Decimal("0.00"),
+                    }
+                )
+        # `with_totals()` adds aggregation; keep a deterministic order before paginating.
+        budget_qs = budget_qs.order_by("-created_at", "-id")
         paginator = Paginator(budget_qs, 20)
         page_number = self.request.GET.get("page") or 1
         page_obj = paginator.get_page(page_number)
+        reviewable_budget_ids = {
+            budget.pk
+            for budget in page_obj.object_list
+            if budget.status == BudgetRequest.Status.PENDING_REVIEW
+            and _budget_can_be_reviewed_by(budget, self.request.user)
+        }
         archiveable_ids = [
             budget.pk
             for budget in page_obj.object_list
             if getattr(budget, "spent_total", Decimal("0.00")) > Decimal("0.00")
             and _user_can_archive_budget(budget, self.request.user)
+        ]
+        budget_delete_ids = [
+            budget.pk
+            for budget in page_obj.object_list
+            if _user_can_delete_budget(budget, self.request.user)
         ]
         ctx.update(
             {
@@ -226,7 +308,104 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                 else "",
                 "can_create_budget": _user_can_request_budget(self.request.user),
                 "can_review_budgets": resolver.has(Capability.APPROVE_BUDGETS),
+                "can_mass_assign_budgets": _user_can_mass_assign_budgets(self.request.user),
                 "budget_archive_ids": archiveable_ids,
+                "budget_delete_ids": budget_delete_ids,
+                "reviewable_budget_ids": reviewable_budget_ids,
+                "is_budget_admin": is_budget_admin,
+                "summary_by_requester": summary_by_requester,
+            }
+        )
+        return ctx
+
+
+class BudgetMassAssignView(LoginRequiredMixin, BudgetFeatureRequiredMixin, FormView):
+    template_name = "core/budgets_mass_assign.html"
+    form_class = MassAssignBudgetsForm
+    success_url = reverse_lazy("core:budget_list")
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _user_can_mass_assign_budgets(request.user):
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_assignee_queryset(self):
+        assignee_ids = (
+            BuildingMembership.objects.filter(
+                role__in=[
+                    MembershipRole.TECHNICIAN,
+                    MembershipRole.BACKOFFICE,
+                ]
+            )
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+        administrator_ids = (
+            BuildingMembership.objects.filter(role=MembershipRole.ADMINISTRATOR)
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+        return (
+            User.objects.filter(pk__in=assignee_ids, is_active=True)
+            .exclude(pk__in=administrator_ids)
+            .order_by("username")
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user_queryset"] = self.get_assignee_queryset()
+        return kwargs
+
+    def form_valid(self, form):
+        selected_users = list(form.cleaned_data.get("users") or [])
+        title = (form.cleaned_data.get("title") or "").strip()
+        requested_amount = form.cleaned_data["requested_amount"]
+        description = (form.cleaned_data.get("description") or "").strip()
+        created = 0
+        for assignee in selected_users:
+            budget = BudgetRequest.objects.create(
+                requester=assignee,
+                title=title,
+                description=description,
+                requested_amount=requested_amount,
+                status=BudgetRequest.Status.DRAFT,
+            )
+            budget.transition(
+                status=BudgetRequest.Status.APPROVED,
+                actor=self.request.user,
+                comment=_("Budget request auto-approved via mass assignment."),
+            )
+            budget.log_event(
+                actor=self.request.user,
+                event_type=BudgetRequestEvent.EventType.COMMENT,
+                notes=_("Budget assigned in bulk."),
+                payload={
+                    "action": "mass_assigned",
+                    "assigned_to_user_id": assignee.pk,
+                },
+            )
+            created += 1
+
+        if created:
+            messages.success(
+                self.request,
+                ngettext(
+                    "Created %(count)s budget request.",
+                    "Created %(count)s budget requests.",
+                    created,
+                )
+                % {"count": created},
+            )
+        else:
+            messages.info(self.request, _("No users were selected."))
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        queryset = self.get_assignee_queryset()
+        ctx.update(
+            {
+                "assignee_count": queryset.count(),
             }
         )
         return ctx
@@ -276,22 +455,32 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
                     expense.label,
                     expense.notes,
                 )
+            work_order_title = (meta.get("work_order_title") or meta.get("work_order_name") or "").strip()
             building_id = _coerce_int(meta.get("building_id"))
             if building_id is None:
                 building_id = _coerce_int(meta.get("building"))
             work_order_url = ""
             building_url = ""
             work_order_label = ""
+            work_order_number_label = ""
             building_label = ""
             primary_url = ""
             primary_label = ""
             primary_kind = ""
             if work_order_id:
                 work_order_url = reverse("core:work_order_detail", args=[work_order_id])
-                work_order_label = _("Work order #%(id)s") % {"id": work_order_id}
+                work_order_number_label = _("Work order #%(id)s") % {"id": work_order_id}
+                work_order_label = work_order_title or work_order_number_label
                 primary_url = work_order_url
                 primary_label = work_order_label
                 primary_kind = "work_order"
+                if work_order_label == work_order_number_label:
+                    raw_label = (expense.label or "").strip()
+                    if raw_label and "·" in raw_label:
+                        prefix, suffix = raw_label.split("·", 1)
+                        candidate = suffix.strip()
+                        if candidate:
+                            work_order_label = candidate
             if building_id:
                 building_url = reverse("core:building_detail", args=[building_id])
                 building_label = meta.get("building_name") or _("Building %(id)s") % {"id": building_id}
@@ -305,7 +494,15 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
             expense.work_order_url = work_order_url
             expense.building_url = building_url
             expense.work_order_label = work_order_label
+            expense.work_order_number_label = work_order_number_label
             expense.building_label = building_label
+            expense.display_label = work_order_label or (expense.label or "")
+            auto_note_template = ""
+            if work_order_id:
+                auto_note_template = _("Logged automatically from work order %(id)s.") % {"id": work_order_id}
+            note_text = (expense.notes or "").strip()
+            expense.show_notes = bool(note_text and note_text != auto_note_template.strip())
+
             can_delete = can_manage_expenses or (
                 current_user_id and expense.created_by_id == current_user_id
             )
@@ -340,9 +537,13 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
             ctx["expense_form"] = BudgetExpenseForm(user=self.request.user, budget=budget)
         ctx["events"] = budget.events.select_related("actor")
         resolver = CapabilityResolver(self.request.user)
-        ctx["can_review_budget"] = resolver.has(
-            Capability.APPROVE_BUDGETS,
-            building_id=budget.building_id,
+        ctx["can_review_budget"] = (
+            budget.status == BudgetRequest.Status.PENDING_REVIEW
+            and resolver.has(
+                Capability.APPROVE_BUDGETS,
+                building_id=budget.building_id,
+            )
+            and _budget_can_be_reviewed_by(budget, self.request.user)
         )
         ctx["can_delete_budget"] = _user_can_delete_budget(budget, self.request.user)
         ctx["can_archive_budget"] = _user_can_archive_budget(budget, self.request.user)
@@ -384,6 +585,12 @@ class BudgetUpdateView(LoginRequiredMixin, BudgetFeatureRequiredMixin, UpdateVie
 
     def get_queryset(self):
         return BudgetRequest.objects.filter(requester=self.request.user).select_related("building")
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        if obj.status != BudgetRequest.Status.DRAFT:
+            raise Http404()
+        return obj
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -481,7 +688,13 @@ class BudgetReviewQueueView(LoginRequiredMixin, BudgetFeatureRequiredMixin, List
             .visible_to(self.request.user)
             .select_related("building", "requester")
         )
-        return qs.order_by("-updated_at")
+        reviewable_ids = [
+            budget.pk for budget in qs
+            if _budget_can_be_reviewed_by(budget, self.request.user)
+        ]
+        if not reviewable_ids:
+            return qs.none()
+        return qs.filter(pk__in=reviewable_ids).order_by("-updated_at")
 
 
 class BudgetReviewDecisionView(LoginRequiredMixin, BudgetFeatureRequiredMixin, FormView):
@@ -493,6 +706,8 @@ class BudgetReviewDecisionView(LoginRequiredMixin, BudgetFeatureRequiredMixin, F
             BudgetRequest.objects.visible_to(request.user),
             pk=kwargs["pk"],
         )
+        if self.budget.status != BudgetRequest.Status.PENDING_REVIEW:
+            raise Http404()
         if not _budget_can_be_reviewed_by(self.budget, request.user):
             raise Http404()
         return super().dispatch(request, *args, **kwargs)
@@ -727,6 +942,7 @@ class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Tem
             ctx["archive_purge_form"] = ArchivePurgeForm()
             ctx["archive_purge_action"] = reverse("core:budget_archived_purge")
             ctx["archive_purge_preview_url"] = reverse("core:budget_archived_purge_preview")
+            ctx["archive_requester_delete_action"] = reverse("core:budget_archived_requester_delete")
         return ctx
 
 
@@ -802,6 +1018,54 @@ class BudgetArchivePurgePreviewView(LoginRequiredMixin, BudgetFeatureRequiredMix
         if end:
             qs = qs.filter(archived_at__date__lte=end)
         return JsonResponse({"count": qs.count()})
+
+
+class BudgetArchivedRequesterDeleteView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
+    """
+    Permanently delete archived budgets for selected requesters.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        resolver = CapabilityResolver(request.user)
+        if not resolver.has(Capability.APPROVE_BUDGETS) or not user_is_admin_or_backoffice(request.user):
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        requester_ids_raw = request.POST.getlist("requester_ids")
+        requester_ids: list[int] = []
+        for value in requester_ids_raw:
+            try:
+                requester_ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        requester_ids = sorted(set(requester_ids))
+        if not requester_ids:
+            messages.error(request, _("Select at least one requester."))
+            return redirect("core:budget_archived_list")
+        if not request.POST.get("confirm"):
+            messages.error(request, _("Please confirm the permanent deletion."))
+            return redirect("core:budget_archived_list")
+
+        qs = (
+            BudgetRequest.objects.visible_to(request.user)
+            .filter(archived_at__isnull=False, requester_id__in=requester_ids)
+        )
+        deleted = qs.count()
+        if not deleted:
+            messages.info(request, _("No archived budgets matched the selected requesters."))
+            return redirect("core:budget_archived_list")
+        qs.delete()
+        messages.success(
+            request,
+            ngettext(
+                "Deleted %(count)s archived budget permanently.",
+                "Deleted %(count)s archived budgets permanently.",
+                deleted,
+            )
+            % {"count": deleted},
+        )
+        return redirect("core:budget_archived_list")
 
 
 class BudgetTechnicianSummaryView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateView):

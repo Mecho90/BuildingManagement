@@ -8,7 +8,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, SetPasswordForm
 from django.utils import formats, timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.text import capfirst
 from django.template.defaultfilters import filesizeformat
 from django.utils.translation import gettext_lazy as _
@@ -336,7 +336,8 @@ class TodoItemForm(forms.ModelForm):
     def _owner_queryset(self):
         qs = User.objects.filter(is_active=True).order_by(Lower("username"))
         user_id = getattr(self.user, "pk", None)
-        instance_owner = getattr(self.instance, "user_id", None)
+        if user_id and not getattr(self.instance, "pk", None):
+            qs = qs.exclude(pk=user_id)
         return qs
 
     def _current_user_label(self) -> str:
@@ -506,9 +507,10 @@ class WorkOrderForm(forms.ModelForm):
         return self._coerce_building(value)
 
     # ---------- init ----------
-    def __init__(self, *args, user=None, building=None, **kwargs):
+    def __init__(self, *args, user=None, building=None, force_lawyer_only=False, **kwargs):
         self._user = user
         self._building = building
+        self._force_lawyer_only = bool(force_lawyer_only)
         self._locked_building_obj = self._coerce_building(building)
         self._effective_building = None
         self._existing_attachments = []
@@ -579,8 +581,13 @@ class WorkOrderForm(forms.ModelForm):
             self, b_id, current_status=self._current_status, can_user_approve=self._can_user_approve
         )
         if self._current_status == WorkOrder.Status.AWAITING_APPROVAL and self._can_user_approve:
-            self._allowed_status_values = {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
+            self._allowed_status_values = {
+                WorkOrder.Status.DONE,
+                WorkOrder.Status.APPROVED,
+                WorkOrder.Status.REJECTED,
+            }
             self.fields["status"].choices = [
+                (WorkOrder.Status.DONE, WorkOrder.Status.DONE.label),
                 (WorkOrder.Status.REJECTED, WorkOrder.Status.REJECTED.label),
                 (WorkOrder.Status.APPROVED, WorkOrder.Status.APPROVED.label),
             ]
@@ -720,6 +727,16 @@ class WorkOrderForm(forms.ModelForm):
                 allowed = self._resolver.has(Capability.MANAGE_BUILDINGS, building_id=building_id) or self._resolver.has(
                     Capability.CREATE_WORK_ORDERS, building_id=building_id
                 )
+                if not allowed and getattr(self.instance, "pk", None):
+                    destination_id = getattr(self.instance, "forwarded_to_building_id", None)
+                    if destination_id:
+                        allowed = self._resolver.has(
+                            Capability.MANAGE_BUILDINGS,
+                            building_id=destination_id,
+                        ) or self._resolver.has(
+                            Capability.CREATE_WORK_ORDERS,
+                            building_id=destination_id,
+                        )
             if not allowed:
                 self.add_error("building", _("You cannot create work orders for buildings you do not have access to."))
 
@@ -769,8 +786,14 @@ class WorkOrderForm(forms.ModelForm):
                         _("Select a destination building for Office work orders."),
                     )
         else:
-            cleaned["forwarded_to_building"] = None
-            cleaned["forward_note"] = ""
+            # Preserve existing forwarding metadata for already-forwarded orders
+            # when forwarding controls are intentionally hidden.
+            if self.instance.pk and getattr(self.instance, "forwarded_to_building_id", None):
+                cleaned["forwarded_to_building"] = getattr(self.instance, "forwarded_to_building", None)
+                cleaned["forward_note"] = getattr(self.instance, "forward_note", "")
+            else:
+                cleaned["forwarded_to_building"] = None
+                cleaned["forward_note"] = ""
         self._clean_budget_section()
         return cleaned
 
@@ -793,7 +816,7 @@ class WorkOrderForm(forms.ModelForm):
             obj.building = self._locked_building_obj
 
         if not obj.pk:
-            if self._user_is_lawyer():
+            if self._force_lawyer_only or self._user_is_lawyer():
                 obj.lawyer_only = True
             if self._user and getattr(self._user, "is_authenticated", False) and not obj.created_by_id:
                 obj.created_by = self._user
@@ -819,10 +842,16 @@ class WorkOrderForm(forms.ModelForm):
                 obj.forwarded_by = None
                 obj.forward_note = ""
         else:
-            obj.forwarded_to_building = None
-            obj.forward_note = ""
-            if not obj.forwarded_to_building_id:
-                obj.forwarded_by = None
+            if self.instance.pk and getattr(self.instance, "forwarded_to_building_id", None):
+                obj.forwarded_to_building = getattr(self.instance, "forwarded_to_building", None)
+                obj.forward_note = getattr(self.instance, "forward_note", "")
+                obj.forwarded_by = getattr(self.instance, "forwarded_by", None)
+                obj.forwarded_at = getattr(self.instance, "forwarded_at", None)
+            else:
+                obj.forwarded_to_building = None
+                obj.forward_note = ""
+                if not obj.forwarded_to_building_id:
+                    obj.forwarded_by = None
 
         new_target_id = obj.forwarded_to_building_id or (forward_target.pk if forward_target else None)
         self._forwarding_changed = new_target_id != self._forward_target_initial
@@ -1068,7 +1097,11 @@ def _workorder_allowed_statuses(form, building_id, *, current_status=None, can_u
     allowed = transitions.get(current, {current})
     if current == WorkOrder.Status.AWAITING_APPROVAL:
         if can_user_approve:
-            return {WorkOrder.Status.APPROVED, WorkOrder.Status.REJECTED}
+            return {
+                WorkOrder.Status.DONE,
+                WorkOrder.Status.APPROVED,
+                WorkOrder.Status.REJECTED,
+            }
         return allowed
     if can_user_approve:
         allowed |= {
@@ -1268,11 +1301,24 @@ class BudgetFilterForm(forms.Form):
         super().__init__(*args, **kwargs)
         status_choices = [("", _("All statuses"))] + list(BudgetRequest.Status.choices)
         self.fields["status"].choices = status_choices
-        tech_qs = User.objects.filter(budget_requests__isnull=False).distinct().order_by(Lower("username"))
+        current_user_id = getattr(user, "pk", None)
+        tech_qs = User.objects.filter(
+            Q(budget_requests__isnull=False) | Q(pk=current_user_id)
+        ).distinct().order_by(Lower("username"))
         self.fields["technician"].queryset = tech_qs
+        self.fields["technician"].label_from_instance = (
+            lambda obj: obj.get_full_name() or obj.get_username()
+        )
         self.show_requester = self._can_filter_by_requester(user)
         if not self.show_requester:
             self.fields.pop("technician")
+        else:
+            technician_field = self.fields["technician"]
+            technician_field.empty_label = None
+            if user and getattr(user, "is_authenticated", False):
+                technician_field.initial = user.pk
+                if not self.is_bound:
+                    self.initial["technician"] = user.pk
 
     def _can_filter_by_requester(self, user) -> bool:
         if not user or not getattr(user, "is_authenticated", False):
@@ -1283,6 +1329,64 @@ class BudgetFilterForm(forms.Form):
             user=user,
             role__in=[MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR],
         ).exists()
+
+
+class MassAssignBudgetsForm(forms.Form):
+    users = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(),
+        required=True,
+        label=_("Requesters"),
+        widget=forms.CheckboxSelectMultiple,
+    )
+    title = forms.CharField(
+        max_length=255,
+        required=True,
+        label=_("Budget title"),
+        widget=forms.TextInput(attrs={"class": "input"}),
+    )
+    requested_amount = forms.DecimalField(
+        required=True,
+        min_value=Decimal("0.01"),
+        max_digits=12,
+        decimal_places=2,
+        label=_("Budget amount"),
+        widget=forms.NumberInput(attrs={"class": "input", "step": "0.01", "min": "0.01"}),
+    )
+    description = forms.CharField(
+        required=False,
+        label=_("Description"),
+        widget=forms.Textarea(attrs={"class": "input", "rows": 4}),
+    )
+
+    def __init__(self, *args, user_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        users_qs = user_queryset or User.objects.none()
+        users_field = self.fields["users"]
+        users_field.queryset = users_qs
+        users_field.widget.attrs.setdefault("class", "space-y-2")
+
+        if users_qs.exists() and not self.is_bound:
+            users_field.initial = list(users_qs.values_list("pk", flat=True))
+
+        self.fields["title"].widget.attrs.setdefault(
+            "placeholder",
+            _("Type a budget title."),
+        )
+        self.fields["description"].widget.attrs.setdefault(
+            "placeholder",
+            _("Add a short description."),
+        )
+
+        def _label_from_instance(user_obj: User) -> str:
+            return user_obj.get_full_name() or user_obj.get_username()
+
+        users_field.label_from_instance = _label_from_instance
+
+    def clean_users(self):
+        users = self.cleaned_data.get("users")
+        if self.fields["users"].queryset.exists() and not users:
+            raise forms.ValidationError(_("Select at least one requester."))
+        return users
 
 
 class ArchivePurgeForm(forms.Form):
@@ -1829,3 +1933,162 @@ class AdminUserPasswordForm(SetPasswordForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.setdefault("class", "input")
+
+
+class BuildingBulkDeleteForm(forms.Form):
+    items = forms.ModelMultipleChoiceField(
+        queryset=Building.objects.none(),
+        required=True,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "bulk-checkbox-list"}),
+        label=_("Select the buildings you want to delete."),
+        error_messages={"required": _("Select at least one building.")},
+    )
+
+    def __init__(self, *args, user=None, queryset=None, display_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = queryset
+        if qs is None:
+            qs = Building.objects.visible_to(user).order_by(Lower("name"))
+            office_id = Building.system_default_id()
+            if office_id:
+                qs = qs.exclude(pk=office_id)
+        self.fields["items"].queryset = qs
+        self.fields["items"].label_from_instance = self._build_label
+        display_choices = qs if display_queryset is None else display_queryset
+        if not isinstance(display_choices, (list, tuple)):
+            display_choices = list(display_choices)
+        self._attach_warning_flags(display_choices)
+        self._set_display_choices(display_choices)
+
+    def _set_display_choices(self, iterable):
+        widget = self.fields["items"].widget
+        labeler = self.fields["items"].label_from_instance
+        widget.choices = [(obj.pk, labeler(obj)) for obj in iterable]
+
+    def _attach_warning_flags(self, objects):
+        building_ids = [obj.pk for obj in objects if getattr(obj, "pk", None)]
+        if not building_ids:
+            return
+        budget_ids = set(
+            BudgetRequest.objects.filter(building_id__in=building_ids).values_list("building_id", flat=True)
+        )
+        expense_ids: set[int] = set()
+        for value in Expense.objects.filter(metadata__building_id__in=building_ids).values_list("metadata__building_id", flat=True):
+            try:
+                expense_ids.add(int(value))
+            except (TypeError, ValueError):
+                continue
+        lawyer_ids = set(
+            WorkOrder.objects.filter(lawyer_only=True, building_id__in=building_ids).values_list("building_id", flat=True)
+        )
+        lawyer_ids.update(
+            WorkOrder.objects.filter(
+                lawyer_only=True, forwarded_to_building_id__in=building_ids
+            ).values_list("forwarded_to_building_id", flat=True)
+        )
+        for obj in objects:
+            pk = getattr(obj, "pk", None)
+            if not pk:
+                continue
+            if pk in budget_ids or pk in expense_ids:
+                setattr(obj, "_has_budgets_override", True)
+            if pk in lawyer_ids:
+                setattr(obj, "_has_lawsuits_override", True)
+
+    def _build_label(self, obj):
+        address = obj.address or _("No address")
+        units = getattr(obj, "total_units", None)
+        if units is None:
+            units = obj.units.count()
+        work_orders = getattr(obj, "total_work_orders", None)
+        if work_orders is None:
+            work_orders = obj.work_orders.count()
+        has_budget_flag = getattr(obj, "_has_budgets_override", None)
+        if has_budget_flag is None:
+            has_budget_flag = getattr(obj, "has_budgets", False)
+        has_lawsuit_flag = getattr(obj, "_has_lawsuits_override", None)
+        if has_lawsuit_flag is None:
+            has_lawsuit_flag = getattr(obj, "has_lawsuits", False)
+
+        warnings = []
+        if has_budget_flag:
+            warnings.append(_("Budget or expense attached"))
+        if has_lawsuit_flag:
+            warnings.append(_("Lawyer-only work order"))
+        badge_html = ""
+        if warnings:
+            badge_html = format_html(
+                '<div class="flex flex-wrap gap-2 text-xs font-semibold text-amber-700">'
+                "{}"
+                "</div>",
+                format_html_join(
+                    "",
+                    '<span class="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-amber-800">{}</span>',
+                    ((warning,) for warning in warnings),
+                ),
+            )
+        return format_html(
+            '<div class="flex flex-col gap-1">'
+            '<span class="font-semibold text-slate-900 dark:text-slate-100">{}</span>'
+            '<span class="text-xs text-slate-500 dark:text-slate-400">{}</span>'
+            '<span class="text-xs text-slate-500 dark:text-slate-400">{}</span>'
+            '{}'
+            "</div>",
+            obj.name,
+            address,
+            _("Units: %(units)s · Work orders: %(orders)s") % {"units": units, "orders": work_orders},
+            badge_html,
+        )
+
+
+class WorkOrderBulkDeleteForm(forms.Form):
+    items = forms.ModelMultipleChoiceField(
+        queryset=WorkOrder.objects.none(),
+        required=True,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "bulk-checkbox-list"}),
+        label=_("Select the work orders you want to delete."),
+        error_messages={"required": _("Select at least one work order.")},
+    )
+
+    def __init__(self, *args, user=None, queryset=None, display_queryset=None, filter_kwargs=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = queryset
+        if qs is None:
+            qs = WorkOrder.objects.visible_to(user)
+            if filter_kwargs:
+                qs = qs.filter(**filter_kwargs)
+            qs = qs.select_related("building").order_by("-created_at")
+        self.fields["items"].queryset = qs
+        self.fields["items"].label_from_instance = lambda obj: f"{obj.title} · {obj.building.name if obj.building else _('No building')}"
+        display_choices = qs if display_queryset is None else display_queryset
+        self._set_display_choices(display_choices)
+
+    def _set_display_choices(self, iterable):
+        widget = self.fields["items"].widget
+        labeler = self.fields["items"].label_from_instance
+        widget.choices = [(obj.pk, labeler(obj)) for obj in iterable]
+
+
+class UserBulkDeleteForm(forms.Form):
+    items = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(),
+        required=True,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "bulk-checkbox-list"}),
+        label=_("Select the users you want to delete."),
+        error_messages={"required": _("Select at least one user.")},
+    )
+
+    def __init__(self, *args, user=None, queryset=None, display_queryset=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = queryset
+        if qs is None:
+            qs = User.objects.exclude(pk=getattr(user, "pk", None)).order_by(Lower("username"))
+        self.fields["items"].queryset = qs
+        self.fields["items"].label_from_instance = lambda obj: f"{obj.get_full_name() or obj.username} ({obj.username})"
+        display_choices = qs if display_queryset is None else display_queryset
+        self._set_display_choices(display_choices)
+
+    def _set_display_choices(self, iterable):
+        widget = self.fields["items"].widget
+        labeler = self.fields["items"].label_from_instance
+        widget.choices = [(obj.pk, labeler(obj)) for obj in iterable]

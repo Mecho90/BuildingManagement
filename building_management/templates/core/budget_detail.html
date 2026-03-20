@@ -39,21 +39,10 @@
       </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2">
       <div class="ui-card">
         <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requested" %}</p>
         <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.requested_amount|floatformat:2 }} {{ budget.currency }}</p>
-      </div>
-      <div class="ui-card">
-        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Approved" %}</p>
-        <p class="text-2xl font-semibold text-emerald-600 dark:text-emerald-300">{{ budget.approved_total|floatformat:2 }} {{ budget.currency }}</p>
-        {% if budget.approved_by %}
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            {% blocktrans with name=budget.approved_by.get_full_name|default:budget.approved_by.username %}
-              Approved by {{ name }}
-            {% endblocktrans %}
-          </p>
-        {% endif %}
       </div>
       <div class="ui-card">
         <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Remaining" %}</p>
@@ -96,7 +85,7 @@
             <div class="ui-panel space-y-2" data-expense-item>
               <div class="flex w-full flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 flex-1 space-y-1">
-                  <p class="font-semibold text-slate-900 dark:text-slate-100">{{ expense.label }}</p>
+                  <p class="font-semibold text-slate-900 dark:text-slate-100">{{ expense.display_label }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
                     {{ expense.incurred_on }}
                     {% with category=expense.expense_type.label %}
@@ -104,8 +93,11 @@
                         · {{ category }}
                       {% endif %}
                     {% endwith %}
-                    {% if expense.work_order_label %}
-                      · <span class="text-emerald-600 dark:text-emerald-300">{% trans "Linked work order" %} · {{ expense.work_order_label }}</span>
+                    {% if expense.work_order_label or expense.work_order_number_label %}
+                      · <span class="text-emerald-600 dark:text-emerald-300">
+                        {% trans "Linked work order" %}
+                        · {{ expense.work_order_label|default:expense.work_order_number_label }}
+                      </span>
                     {% elif expense.building_label %}
                       · <span class="text-emerald-600 dark:text-emerald-300">{% trans "Linked building" %} · {{ expense.building_label }}</span>
                     {% endif %}
@@ -150,15 +142,18 @@
                       {% if expense.work_order_url %}
                         <span>
                           {% trans "Work order" %}:
-                          <a href="{{ expense.work_order_url }}" class="link">{{ expense.work_order_label }}</a>
+                          <a href="{{ expense.work_order_url }}" class="link">{{ expense.work_order_label|default:expense.work_order_number_label }}</a>
                         </span>
                       {% elif meta.work_order_id %}
-                        <span>{% trans "Work order" %} #{{ meta.work_order_id }}</span>
+                        <span>
+                          {% trans "Work order" %}:
+                          {{ expense.work_order_label|default:expense.work_order_number_label }}
+                        </span>
                       {% endif %}
                     </p>
                   {% endif %}
                 {% endwith %}
-                {% if expense.notes %}
+                {% if expense.show_notes %}
                   <p>{{ expense.notes }}</p>
                 {% endif %}
                 <p class="text-xs text-slate-500 dark:text-slate-400">

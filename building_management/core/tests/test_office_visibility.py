@@ -199,3 +199,27 @@ class OfficeVisibilityTests(TestCase):
         response = self.client.get(reverse("core:buildings_list"))
         self.assertTrue(Building.objects.filter(is_system_default=True).exists())
         self.assertContains(response, "Office")
+
+    def test_lawyer_can_create_unit_without_related_object_error(self):
+        User = get_user_model()
+        lawyer = User.objects.create_user(username="lawyer-unit", password="pass")
+        BuildingMembership.objects.create(
+            user=lawyer,
+            building=None,
+            role=MembershipRole.LAWYER,
+        )
+        self.client.force_login(lawyer)
+        response = self.client.post(
+            reverse("core:unit_create", args=[self.another_building.pk]),
+            {
+                "number": "2B",
+                "floor": "2",
+                "owner_name": "",
+                "contact_phone": "",
+                "description": "",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Unit.objects.filter(building=self.another_building, number__iexact="2B").exists()
+        )

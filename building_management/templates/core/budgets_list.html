@@ -11,6 +11,9 @@
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
+        {% if can_mass_assign_budgets %}
+          <a href="{% url 'core:budget_mass_assign' %}" class="btn">{% trans "Mass assign budgets" %}</a>
+        {% endif %}
         {% if can_create_budget %}
           <a href="{% url 'core:budget_create' %}" class="btn btn-primary">{% trans "New budget request" %}</a>
         {% endif %}
@@ -19,12 +22,25 @@
     <div class="space-y-4">
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="ui-card">
-          <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total remaining" %}</p>
-          <p class="text-3xl font-semibold text-slate-900 dark:text-slate-100">
+          <p class="text-center text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total remaining" %}</p>
+          <p class="text-center text-3xl font-semibold text-slate-900 dark:text-slate-100">
             {{ summary_total_remaining|default:0|floatformat:2 }}
           </p>
+          {% if is_budget_admin and summary_by_requester %}
+            <div class="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
+              <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "By requester" %}</p>
+              <div class="mt-2 grid gap-2">
+                {% for row in summary_by_requester %}
+                  <div class="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-slate-700">
+                    <span class="text-slate-600 dark:text-slate-300">{{ row.requester_label }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-100">{{ row.remaining_total|floatformat:2 }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
         </div>
-        <div class="ui-card">
+        <div class="ui-card flex flex-col justify-center">
           <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total spent" %}</p>
           <p class="text-3xl font-semibold text-slate-900 dark:text-slate-100">
             {{ summary_total_spent|default:0|floatformat:2 }}
@@ -99,7 +115,7 @@
                 </td>
                 <td class="px-4 py-4 text-right">
                   <div class="flex flex-wrap items-center justify-end gap-2">
-                    {% if can_review_budgets and budget.status == 'pending_review' %}
+                    {% if can_review_budgets and budget.status == 'pending_review' and budget.pk in reviewable_budget_ids %}
                       <a href="{% url 'core:budget_review_decision' budget.pk %}" class="btn btn-xs btn-primary">{% trans "Review" %}</a>
                     {% endif %}
                     <a href="{% url 'core:budget_detail' budget.pk %}" class="btn btn-xs btn-secondary">{% trans "View" %}</a>
@@ -109,7 +125,7 @@
                         <button type="submit" class="btn btn-xs btn-outline">{% trans "Archive budget" %}</button>
                       </form>
                     {% endif %}
-                    {% if request.user.is_authenticated and budget.requester_id == request.user.id and budget.status != 'approved' %}
+                    {% if budget_delete_ids and budget.pk in budget_delete_ids %}
                       <a href="{% url 'core:budget_delete' budget.pk %}" class="btn btn-xs btn-danger">{% trans "Delete" %}</a>
                     {% endif %}
                   </div>

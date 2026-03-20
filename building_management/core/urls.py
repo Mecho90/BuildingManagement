@@ -18,8 +18,14 @@ urlpatterns = [
     path("budgets/archived/", views.BudgetArchivedListView.as_view(), name="budget_archived_list"),
     path("budgets/archived/purge/", views.BudgetArchivePurgeView.as_view(), name="budget_archived_purge"),
     path("budgets/archived/purge/preview/", views.BudgetArchivePurgePreviewView.as_view(), name="budget_archived_purge_preview"),
+    path(
+        "budgets/archived/requesters/delete/",
+        views.BudgetArchivedRequesterDeleteView.as_view(),
+        name="budget_archived_requester_delete",
+    ),
     path("budgets/review/", views.BudgetReviewQueueView.as_view(), name="budget_review_queue"),
     path("budgets/<int:pk>/review/", views.BudgetReviewDecisionView.as_view(), name="budget_review_decision"),
+    path("budgets/mass-assign/", views.BudgetMassAssignView.as_view(), name="budget_mass_assign"),
     path("budgets/technicians/", views.BudgetTechnicianSummaryView.as_view(), name="budget_technicians"),
     path("budgets/<int:pk>/delete/", views.BudgetDeleteView.as_view(), name="budget_delete"),
     path("budgets/export/", views.BudgetExportView.as_view(), name="budget_export"),
@@ -82,6 +88,11 @@ urlpatterns = [
     path("work-orders/archive/purge/", views.ArchivedWorkOrderPurgeView.as_view(), name="work_orders_archive_purge"),
     path("work-orders/archive/purge/preview/", views.ArchivedWorkOrderPurgePreviewView.as_view(), name="work_orders_archive_purge_preview"),
     path(
+        "work-orders/archive/buildings/delete/",
+        views.ArchivedWorkOrderBuildingDeleteView.as_view(),
+        name="work_orders_archive_building_delete",
+    ),
+    path(
         "work-orders/archive/<int:building_id>/",
         views.ArchivedWorkOrderDetailView.as_view(),
         name="work_orders_archive_building",
@@ -100,6 +111,10 @@ urlpatterns = [
     path("manage/users/<int:pk>/edit/", views.AdminUserUpdateView.as_view(), name="user_update"),
     path("manage/users/<int:pk>/password/", views.AdminUserPasswordView.as_view(), name="user_password"),
     path("manage/users/<int:pk>/delete/", views.AdminUserDeleteView.as_view(), name="user_delete"),
+    path("manage/mass-delete/buildings/", views.AdminBuildingBulkDeleteView.as_view(), name="mass_delete_buildings"),
+    path("manage/mass-delete/work-orders/", views.AdminWorkOrderBulkDeleteView.as_view(), name="mass_delete_work_orders"),
+    path("manage/mass-delete/lawyer-work-orders/", views.AdminLawyerWorkOrderBulkDeleteView.as_view(), name="mass_delete_lawyer_work_orders"),
+    path("manage/mass-delete/users/", views.AdminUserBulkDeleteView.as_view(), name="mass_delete_users"),
 
     # APIs (optional)
     path("api/buildings/", views.api_buildings, name="api_buildings"),

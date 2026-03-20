@@ -6,16 +6,39 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Case, Count, DecimalField, ExpressionWrapper, F, Q, Sum, When
-from django.db.models.functions import Lower
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import (
+    BooleanField,
+    CharField,
+    Case,
+    Count,
+    DecimalField,
+    Exists,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Q,
+    Sum,
+    When,
+)
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Lower, Cast
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, ngettext
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
-from ..forms import AdminUserCreateForm, AdminUserPasswordForm, AdminUserUpdateForm
-from ..models import Building, BuildingMembership, BudgetRequest, MembershipRole, WorkOrder
+from ..forms import (
+    AdminUserCreateForm,
+    AdminUserPasswordForm,
+    AdminUserUpdateForm,
+    BuildingBulkDeleteForm,
+    WorkOrderBulkDeleteForm,
+    UserBulkDeleteForm,
+)
+from ..models import Building, BuildingMembership, BudgetRequest, Expense, MembershipRole, Unit, WorkOrder
 from .common import AdminRequiredMixin, _querystring_without
 
 User = get_user_model()
@@ -27,6 +50,10 @@ __all__ = [
     "AdminUserUpdateView",
     "AdminUserPasswordView",
     "AdminUserDeleteView",
+    "AdminBuildingBulkDeleteView",
+    "AdminWorkOrderBulkDeleteView",
+    "AdminLawyerWorkOrderBulkDeleteView",
+    "AdminUserBulkDeleteView",
 ]
 
 class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
@@ -327,3 +354,210 @@ class AdminUserDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
     def delete(self, request, *args, **kwargs):
         # Ensure we destroy the object after messaging in post()
         return super().delete(request, *args, **kwargs)
+
+
+class BulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, FormView):
+    template_name = "core/mass_delete.html"
+    form_class = None
+    page_title = ""
+    intro_text = ""
+    empty_text = ""
+    submit_label = ""
+    success_url_name = ""
+    paginate_choices = (25, 50, 100, 200)
+    default_paginate_by = 25
+
+    def _get_request_value(self, param):
+        value = self.request.GET.get(param)
+        if value is None and self.request.method == "POST":
+            value = self.request.POST.get(param)
+        return value
+
+    def get_base_queryset(self):
+        if hasattr(self, "_base_queryset"):
+            return self._base_queryset
+        self._base_queryset = self.get_queryset()
+        return self._base_queryset
+
+    def get_success_url(self):
+        return reverse(self.success_url_name)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        kwargs["queryset"] = self.get_base_queryset()
+        kwargs["display_queryset"] = self.get_paginated_items()
+        return kwargs
+
+    def get_queryset(self):
+        raise NotImplementedError("BulkDeleteView subclasses must implement get_queryset().")
+
+    def get_page_size(self):
+        if hasattr(self, "_page_size"):
+            return self._page_size
+        raw = self._get_request_value("per")
+        try:
+            per = int(raw) if raw not in (None, "") else int(self.default_paginate_by)
+        except (TypeError, ValueError):
+            per = self.default_paginate_by
+        if per not in self.paginate_choices:
+            per = self.default_paginate_by
+        self._page_size = per
+        return per
+
+    def get_page_number(self):
+        if hasattr(self, "_page_number"):
+            return self._page_number
+        raw = self._get_request_value("page")
+        try:
+            page = int(raw) if raw not in (None, "") else 1
+        except (TypeError, ValueError):
+            page = 1
+        if page < 1:
+            page = 1
+        self._page_number = page
+        return page
+
+    def get_paginated_items(self):
+        if hasattr(self, "_paginated_items"):
+            return self._paginated_items
+        queryset = self.get_base_queryset()
+        paginator = Paginator(queryset, self.get_page_size())
+        page_obj = paginator.get_page(self.get_page_number())
+        self._paginator = paginator
+        self._page_obj = page_obj
+        self._paginated_items = page_obj.object_list
+        return self._paginated_items
+
+    def form_valid(self, form):
+        queryset = form.cleaned_data["items"]
+        count = queryset.count()
+        if count:
+            queryset.delete()
+            messages.success(
+                self.request,
+                ngettext(
+                    "Deleted %(count)s record.",
+                    "Deleted %(count)s records.",
+                    count,
+                )
+                % {"count": count},
+            )
+        else:
+            messages.info(self.request, _("No records selected."))
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        form = ctx.get("form")
+        paginator = getattr(self, "_paginator", None)
+        total_count = paginator.count if paginator else 0
+        has_options = total_count > 0
+        ctx.update(
+            {
+                "page_title": self.page_title,
+                "intro_text": self.intro_text,
+                "empty_text": self.empty_text,
+                "submit_label": self.submit_label or _("Delete selected"),
+                "has_options": has_options,
+                "page_obj": getattr(self, "_page_obj", None),
+                "paginator": paginator,
+                "per": self.get_page_size(),
+                "per_choices": self.paginate_choices,
+                "page_query": _querystring_without(self.request, "page"),
+            }
+        )
+        return ctx
+
+
+class AdminBuildingBulkDeleteView(BulkDeleteView):
+    form_class = BuildingBulkDeleteForm
+    page_title = _("Mass delete buildings")
+    intro_text = ""
+    empty_text = _("There are no buildings available to delete.")
+    submit_label = _("Delete buildings")
+    success_url_name = "core:mass_delete_buildings"
+
+    def get_queryset(self):
+        budget_exists = BudgetRequest.objects.filter(building_id=OuterRef("pk"))
+        expense_exists = Expense.objects.annotate(
+            metadata_building_id_text=KeyTextTransform("building_id", "metadata"),
+        ).filter(
+            Q(metadata_building_id_text=Cast(OuterRef("pk"), CharField()))
+            | Q(budget_request__building_id=OuterRef("pk"))
+        )
+        lawsuit_exists = WorkOrder.objects.filter(lawyer_only=True).filter(
+            Q(building_id=OuterRef("pk")) | Q(forwarded_to_building_id=OuterRef("pk"))
+        )
+        qs = (
+            Building.objects.visible_to(self.request.user)
+            .annotate(
+                total_units=Count("units", distinct=True),
+                total_work_orders=Count("work_orders", distinct=True),
+                has_budgets=ExpressionWrapper(
+                    Exists(budget_exists) | Exists(expense_exists),
+                    output_field=BooleanField(),
+                ),
+                has_lawsuits=Exists(lawsuit_exists),
+            )
+            .order_by(Lower("name"))
+        )
+        office_id = Building.system_default_id()
+        if office_id:
+            qs = qs.exclude(pk=office_id)
+        return qs
+
+    def form_valid(self, form):
+        queryset = form.cleaned_data["items"]
+        building_ids = list(queryset.values_list("pk", flat=True))
+        if building_ids:
+            with transaction.atomic():
+                WorkOrder.objects.filter(building_id__in=building_ids).delete()
+                Unit.objects.filter(building_id__in=building_ids).delete()
+                return super().form_valid(form)
+        return super().form_valid(form)
+
+
+class AdminWorkOrderBulkDeleteView(BulkDeleteView):
+    form_class = WorkOrderBulkDeleteForm
+    page_title = _("Mass delete work orders")
+    intro_text = ""
+    empty_text = _("There are no work orders available to delete.")
+    submit_label = _("Delete work orders")
+    success_url_name = "core:mass_delete_work_orders"
+
+    def get_queryset(self):
+        return (
+            WorkOrder.objects.visible_to(self.request.user)
+            .select_related("building")
+            .order_by("-created_at")
+        )
+
+
+class AdminLawyerWorkOrderBulkDeleteView(BulkDeleteView):
+    form_class = WorkOrderBulkDeleteForm
+    page_title = _("Mass delete lawyer work orders")
+    intro_text = ""
+    empty_text = _("There are no lawyer work orders available to delete.")
+    submit_label = _("Delete lawyer work orders")
+    success_url_name = "core:mass_delete_lawyer_work_orders"
+
+    def get_queryset(self):
+        return (
+            WorkOrder.objects.visible_to(self.request.user)
+            .filter(lawyer_only=True)
+            .select_related("building")
+            .order_by("-created_at")
+        )
+
+
+class AdminUserBulkDeleteView(BulkDeleteView):
+    form_class = UserBulkDeleteForm
+    page_title = _("Mass delete users")
+    intro_text = _("Select the users you want to delete permanently. Your account never appears in this list.")
+    empty_text = _("There are no additional user accounts available to delete.")
+    submit_label = _("Delete users")
+    success_url_name = "core:mass_delete_users"
+
+    def get_queryset(self):
+        return User.objects.exclude(pk=self.request.user.pk).order_by(Lower("username"))

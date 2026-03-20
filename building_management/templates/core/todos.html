@@ -43,6 +43,10 @@
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-5">
           <div class="flex flex-col gap-4">
             <nav class="planner-tabs building-tabs flex items-center gap-2 border-b border-slate-200 pb-2 dark:border-slate-700" aria-label="{% trans 'Planner tabs' %}">
+              <button type="button" class="todo-tab building-tabs__link rounded-t-2xl px-6 py-3 text-base font-semibold tracking-wide border-b-4 transition-all duration-200 relative border-transparent text-slate-500 hover:border-orange-300 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-200" data-tab="all">
+                {% trans "All tasks" %}
+              </button>
+              <span class="h-10 w-px rounded-full bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700" aria-hidden="true"></span>
               <button type="button" class="todo-tab building-tabs__link active rounded-t-2xl px-6 py-3 text-base font-semibold tracking-wide border-b-4 transition-all duration-200 relative border-orange-500 bg-orange-50 text-orange-600 shadow-sm hover:border-orange-300 hover:text-orange-600 dark:border-orange-400 dark:bg-orange-500/10 dark:text-orange-200 dark:hover:text-orange-200" data-tab="this-week">
                 {% trans "This Week" %}
               </button>
@@ -190,5 +194,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/todos.js' %}" defer></script>
+  <script src="{% static 'js/todos.js' %}?v=20260319-3" defer></script>
 {% endblock %}

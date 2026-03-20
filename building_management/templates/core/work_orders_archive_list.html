@@ -114,21 +114,46 @@
           {% blocktrans count total=building_summary_total %}{{ total }} building{% plural %}{{ total }} buildings{% endblocktrans %}
         </span>
       </div>
-      <ul class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {% with query=request.GET.urlencode %}
-          {% for item in building_summary_page %}
-            <li class="archive-building-card flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm dark:border-slate-600 dark:bg-slate-800/80">
-              <a class="archive-building-link font-medium break-words hyphens-auto" href="{% url 'core:work_orders_archive_building' item.id %}{% if query %}?{{ query }}{% endif %}">
-                <span class="archive-building-name block text-base font-semibold text-slate-700 dark:text-slate-100">{{ item.name }}</span>
-                <span class="archive-building-owner block text-xs text-slate-500 dark:text-slate-400">{{ item.owner }}</span>
-              </a>
-              <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200">
-                {% blocktrans with total=item.total %}{{ total }} archived{% endblocktrans %}
-              </span>
-            </li>
-          {% endfor %}
-        {% endwith %}
-      </ul>
+      <form method="post" action="{% if can_purge_archives %}{{ archive_building_delete_action }}{% else %}{% url 'core:work_orders_archive' %}{% endif %}" class="space-y-4">
+        {% csrf_token %}
+        <ul class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {% with query=request.GET.urlencode %}
+            {% for item in building_summary_page %}
+              <li class="archive-building-card flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm dark:border-slate-600 dark:bg-slate-800/80">
+                {% if can_purge_archives %}
+                  <label class="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      name="building_ids"
+                      value="{{ item.id }}"
+                      class="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                    />
+                  </label>
+                {% endif %}
+                <a class="archive-building-link font-medium break-words hyphens-auto flex-1" href="{% url 'core:work_orders_archive_building' item.id %}{% if query %}?{{ query }}{% endif %}">
+                  <span class="archive-building-name block text-base font-semibold text-slate-700 dark:text-slate-100">{{ item.name }}</span>
+                  <span class="archive-building-owner block text-xs text-slate-500 dark:text-slate-400">{{ item.owner }}</span>
+                </a>
+                <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200">
+                  {% blocktrans with total=item.total %}{{ total }} archived{% endblocktrans %}
+                </span>
+              </li>
+            {% endfor %}
+          {% endwith %}
+        </ul>
+        {% if can_purge_archives %}
+          <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              name="confirm"
+              value="1"
+              class="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 mt-1"
+            />
+            <span>{% trans "I understand selected archived buildings' work orders will be permanently removed." %}</span>
+          </label>
+          <button class="btn btn-danger" type="submit">{% trans "Delete selected buildings' archived work orders" %}</button>
+        {% endif %}
+      </form>
       {% include "core/includes/pagination.html" with page_obj=building_summary_page paginator=building_summary_page.paginator query_string=building_summary_query page_param="b_page" %}
     </section>
   {% else %}

@@ -6,11 +6,15 @@ This package re-exports the public-facing views so existing imports
 """
 
 from .admin import (
+    AdminBuildingBulkDeleteView,
+    AdminLawyerWorkOrderBulkDeleteView,
+    AdminUserBulkDeleteView,
     AdminUserCreateView,
     AdminUserDeleteView,
     AdminUserListView,
     AdminUserPasswordView,
     AdminUserUpdateView,
+    AdminWorkOrderBulkDeleteView,
 )
 from .api import (
     api_budget_expense_attachments,
@@ -45,6 +49,7 @@ from .audit import AuditTrailView
 from .budgets import (
     BudgetArchivePurgePreviewView,
     BudgetArchivePurgeView,
+    BudgetArchivedRequesterDeleteView,
     BudgetArchiveView,
     BudgetArchivedListView,
     BudgetCreateView,
@@ -53,6 +58,7 @@ from .budgets import (
     BudgetExpenseCreateView,
     BudgetExpenseDeleteView,
     BudgetListView,
+    BudgetMassAssignView,
     BudgetReviewDecisionView,
     BudgetReviewQueueView,
     BudgetDeleteView,
@@ -65,6 +71,7 @@ from .health import forwarding_health
 from .notifications import NotificationSnoozeView
 from .todos import TodoListPageView, TodoCreateView, TodoUpdateView, TodoDeleteView
 from .work_orders import (
+    ArchivedWorkOrderBuildingDeleteView,
     ArchivedWorkOrderDetailView,
     ArchivedWorkOrderListView,
     ArchivedWorkOrderPurgePreviewView,
@@ -86,6 +93,7 @@ from ..views_theme import toggle_theme
 __all__ = [
     "BudgetArchivePurgePreviewView",
     "BudgetArchivePurgeView",
+    "BudgetArchivedRequesterDeleteView",
     "BudgetArchiveView",
     "BudgetArchivedListView",
     "BudgetCreateView",
@@ -94,12 +102,17 @@ __all__ = [
     "BudgetExpenseCreateView",
     "BudgetExpenseDeleteView",
     "BudgetListView",
+    "BudgetMassAssignView",
     "BudgetReviewDecisionView",
     "BudgetReviewQueueView",
     "BudgetDeleteView",
     "BudgetTimelineApiView",
     "BudgetTechnicianSummaryView",
     "BudgetUpdateView",
+    "AdminBuildingBulkDeleteView",
+    "AdminWorkOrderBulkDeleteView",
+    "AdminLawyerWorkOrderBulkDeleteView",
+    "AdminUserBulkDeleteView",
     "AdminUserCreateView",
     "AdminUserDeleteView",
     "AdminUserListView",
@@ -138,6 +151,7 @@ __all__ = [
     "UnitDeleteView",
     "UnitDetailView",
     "UnitUpdateView",
+    "ArchivedWorkOrderBuildingDeleteView",
     "ArchivedWorkOrderDetailView",
     "ArchivedWorkOrderListView",
     "ArchivedWorkOrderPurgePreviewView",

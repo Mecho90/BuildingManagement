@@ -50,6 +50,33 @@ class TodoApiTests(TestCase):
         )
         return admin
 
+    def _make_backoffice(self, username="backoffice-user"):
+        user = self.User.objects.create_user(username=username, password="pass1234")
+        BuildingMembership.objects.create(
+            user=user,
+            building=None,
+            role=MembershipRole.BACKOFFICE,
+        )
+        return user
+
+    def _make_technician(self, username="tech-user"):
+        user = self.User.objects.create_user(username=username, password="pass1234")
+        BuildingMembership.objects.create(
+            user=user,
+            building=None,
+            role=MembershipRole.TECHNICIAN,
+        )
+        return user
+
+    def _make_lawyer(self, username="lawyer-user"):
+        user = self.User.objects.create_user(username=username, password="pass1234")
+        BuildingMembership.objects.create(
+            user=user,
+            building=None,
+            role=MembershipRole.LAWYER,
+        )
+        return user
+
     def test_due_date_in_past_rejected(self):
         yesterday = timezone.localdate() - timedelta(days=1)
         result = self._post(
@@ -184,6 +211,102 @@ class TodoApiTests(TestCase):
         payload = response.json()
         titles = {item["title"] for item in payload["results"]}
         self.assertEqual(titles, {"Alpha", "Beta"})
+
+    def test_backoffice_created_only_all_owners(self):
+        backoffice = self._make_backoffice("backoffice-all")
+        technician = self._make_technician("owner-tech")
+        lawyer = self._make_lawyer("owner-lawyer")
+        other = self.User.objects.create_user(username="owner-five", password="pass1234")
+        today = timezone.localdate()
+        current_week = start_of_week(today)
+        last_week = current_week - timedelta(days=7)
+        TodoItem.objects.create(user=backoffice, title="Mine task", due_date=last_week, week_start=last_week)
+        TodoItem.objects.create(user=technician, title="Tech task", due_date=last_week, week_start=last_week)
+        TodoItem.objects.create(user=lawyer, title="Lawyer task", due_date=last_week, week_start=last_week)
+        TodoItem.objects.create(user=other, title="тст3", due_date=last_week, week_start=last_week)
+        TodoItem.objects.create(user=backoffice, title="Current task", due_date=today, week_start=current_week)
+        self.client.force_login(backoffice)
+
+        response = self.client.get(f"{self.url}?created_only=1")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        titles = {item["title"] for item in payload["results"]}
+        self.assertEqual(titles, {"Mine task", "Tech task", "Lawyer task", "Current task"})
+
+    def test_technician_sees_only_own_todos(self):
+        technician = self._make_technician("tech-only")
+        backoffice = self._make_backoffice("backoffice-other")
+        today = timezone.localdate()
+        TodoItem.objects.create(user=technician, title="Mine", due_date=today, week_start=today)
+        TodoItem.objects.create(user=backoffice, title="Other", due_date=today, week_start=today)
+        self.client.force_login(technician)
+
+        response = self.client.get(f"{self.url}?owner=all")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        titles = {item["title"] for item in payload["results"]}
+        self.assertEqual(titles, {"Mine"})
+
+    def test_lawyer_sees_only_own_todos(self):
+        lawyer = self._make_lawyer("lawyer-only")
+        technician = self._make_technician("tech-other")
+        today = timezone.localdate()
+        TodoItem.objects.create(user=lawyer, title="Mine", due_date=today, week_start=today)
+        TodoItem.objects.create(user=technician, title="Other", due_date=today, week_start=today)
+        self.client.force_login(lawyer)
+
+        response = self.client.get(f"{self.url}?owner=all")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        titles = {item["title"] for item in payload["results"]}
+        self.assertEqual(titles, {"Mine"})
+
+    def test_created_only_lists_open_tasks_by_newest(self):
+        today = timezone.localdate()
+        current_week = start_of_week(today)
+        last_week = current_week - timedelta(days=7)
+        older_week = current_week - timedelta(days=14)
+        older = TodoItem.objects.create(
+            user=self.user,
+            title="Old open",
+            status=TodoItem.Status.PENDING,
+            due_date=older_week,
+            week_start=older_week,
+        )
+        newer = TodoItem.objects.create(
+            user=self.user,
+            title="New open",
+            status=TodoItem.Status.IN_PROGRESS,
+            due_date=last_week,
+            week_start=last_week,
+        )
+        TodoItem.objects.create(
+            user=self.user,
+            title="Done task",
+            status=TodoItem.Status.DONE,
+            due_date=today,
+            week_start=current_week,
+        )
+        current_pending = TodoItem.objects.create(
+            user=self.user,
+            title="Current pending",
+            status=TodoItem.Status.PENDING,
+            due_date=today,
+            week_start=current_week,
+        )
+
+        now = timezone.now()
+        TodoItem.objects.filter(pk=older.pk).update(created_at=now - timedelta(days=2))
+        TodoItem.objects.filter(pk=newer.pk).update(created_at=now - timedelta(hours=1))
+
+        response = self.client.get(f"{self.url}?created_only=1")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        titles = [item["title"] for item in payload["results"]]
+        self.assertEqual(titles, ["Current pending", "New open", "Old open"])
+        self.assertEqual(payload["count"], 3)
+        for item in payload["results"]:
+            self.assertIn(item["status"], {TodoItem.Status.PENDING, TodoItem.Status.IN_PROGRESS})
 
     def test_update_due_date_in_past_rejected(self):
         today = timezone.localdate()

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Mass assign budgets" %} · {{ block.super }}{% endblock %}
+
+{% block content %}
+  <div class="space-y-6">
+    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{% trans "Mass assign budgets" %}</h1>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+        {% blocktrans with total=assignee_count %}Eligible users: {{ total }}{% endblocktrans %}
+      </p>
+    </div>
+
+    <form method="post" class="ui-panel space-y-4">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
+          {{ form.non_field_errors|join:" " }}
+        </div>
+      {% endif %}
+      <div>
+        <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Budget title" %}</label>
+        {{ form.title }}
+        {% if form.title.errors %}
+          <p class="mt-1 text-sm text-rose-600">{{ form.title.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <label class="form-label" for="{{ form.requested_amount.id_for_label }}">{% trans "Budget amount" %}</label>
+        <div class="flex items-center gap-2">
+          <span class="text-lg font-semibold text-slate-600 dark:text-slate-300">€</span>
+          {{ form.requested_amount }}
+        </div>
+        {% if form.requested_amount.errors %}
+          <p class="mt-1 text-sm text-rose-600">{{ form.requested_amount.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <label class="form-label" for="{{ form.description.id_for_label }}">{% trans "Description" %}</label>
+        {{ form.description }}
+        {% if form.description.errors %}
+          <p class="mt-1 text-sm text-rose-600">{{ form.description.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <p class="form-label mb-2">{% trans "Select users" %}</p>
+        {% if assignee_count %}
+          <div class="max-h-96 overflow-auto rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+            {{ form.users }}
+          </div>
+        {% else %}
+          <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No eligible users found." %}</p>
+        {% endif %}
+        {% if form.users.errors %}
+          <p class="mt-1 text-sm text-rose-600">{{ form.users.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button type="submit" class="btn btn-primary">{% trans "Create budgets" %}</button>
+        <a href="{% url 'core:budget_list' %}" class="btn btn-ghost">{% trans "Back to budgets" %}</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

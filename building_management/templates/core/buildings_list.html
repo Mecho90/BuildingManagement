@@ -13,7 +13,12 @@
         </p>
       </div>
       {% if can_manage_buildings %}
-        <a class="btn self-start md:self-center" href="{% url 'core:building_create' %}">{% trans "Add new building" %}</a>
+        <div class="flex flex-wrap gap-2">
+          <a class="btn" href="{% url 'core:building_create' %}">{% trans "Add new building" %}</a>
+          {% if request.user.is_superuser %}
+            <a class="btn btn-outline" href="{% url 'core:mass_delete_buildings' %}">{% trans "Mass delete buildings" %}</a>
+          {% endif %}
+        </div>
       {% endif %}
     </div>
 
@@ -74,6 +79,7 @@
               <div class="flex flex-wrap items-center gap-2">
                 <a href="{% url 'core:building_detail' b.id %}" class="text-lg font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
                 {% include "components/lawyer_orders_indicator.html" with count=b.lawyer_orders_count %}
+                {% include "components/expense_amount_indicator.html" with amount=b.expense_total %}
               </div>
               <p class="text-sm text-slate-500 dark:text-slate-400">{{ b.get_role_display }}</p>
             </div>
@@ -152,6 +158,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <a href="{% url 'core:building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
                   {% include "components/lawyer_orders_indicator.html" with count=b.lawyer_orders_count %}
+                  {% include "components/expense_amount_indicator.html" with amount=b.expense_total %}
                 </div>
               </td>
               {% if show_owner_column %}

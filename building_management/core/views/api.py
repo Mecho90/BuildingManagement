@@ -478,7 +478,10 @@ def _todo_list_view(request):
     params = request.GET
     include_history = _parse_bool_param(params.get("include_history") or params.get("history"))
     upcoming_only = _parse_bool_param(params.get("upcoming"))
+    created_only = _parse_bool_param(params.get("created_only") or params.get("created"))
     can_assign_owner = _user_can_assign_todo_owner(request.user)
+    if created_only:
+        include_history = True
     week_filter = None
     if "week_start" in params:
         week_filter = _parse_week_param(params.get("week_start"))
@@ -494,6 +497,8 @@ def _todo_list_view(request):
         if invalid:
             return JsonResponse({"error": _("Invalid status filter.")}, status=400)
         status_requested = requested
+    if created_only:
+        status_requested = {TodoItem.Status.PENDING, TodoItem.Status.IN_PROGRESS}
 
     qs = _todo_queryset_for(request)
     if can_assign_owner and (not status_requested or TodoItem.Status.DONE not in status_requested):
@@ -543,7 +548,10 @@ def _todo_list_view(request):
         page_number = 1
     page_number = max(1, page_number)
 
-    ordered_qs = qs.order_by("week_start", "due_date", "pk")
+    ordering_fields = ["week_start", "due_date", "pk"]
+    if created_only:
+        ordering_fields = ["-created_at", "-id"]
+    ordered_qs = qs.order_by(*ordering_fields)
     paginator = Paginator(ordered_qs, per_value)
     page_obj = paginator.get_page(page_number)
     total_pages = max(paginator.num_pages, 1)

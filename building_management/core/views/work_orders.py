@@ -53,6 +53,7 @@ from ..services.notifications import (
 from .common import (
     CachedObjectMixin,
     CapabilityRequiredMixin,
+    attach_expense_totals_by_metadata,
     _querystring_without,
     _safe_next_url,
     _user_can_access_building,
@@ -124,6 +125,34 @@ def _maybe_handle_forwarding_change(request, form, work_order):
             previous_building=previous_target,
             actor=actor,
         )
+
+
+def _is_forwarded_office_order(order: WorkOrder) -> bool:
+    return bool(
+        getattr(order, "forwarded_to_building_id", None)
+        and getattr(getattr(order, "building", None), "is_system_default", False)
+    )
+
+
+def _is_technician_only_user(user) -> bool:
+    return user_has_role(user, MembershipRole.TECHNICIAN) and not (
+        user_has_role(user, MembershipRole.BACKOFFICE)
+        or user_has_role(user, MembershipRole.ADMINISTRATOR)
+    )
+
+
+def _technician_readonly_for_forwarded_office_order(user, order: WorkOrder) -> bool:
+    # Once Office-forwarded orders are in office-review/final states,
+    # technician-only users should no longer edit/archive them.
+    return (
+        _is_forwarded_office_order(order)
+        and _is_technician_only_user(user)
+        and order.status in {
+            WorkOrder.Status.AWAITING_APPROVAL,
+            WorkOrder.Status.DONE,
+            WorkOrder.Status.APPROVED,
+        }
+    )
 
 
 class LawyerOrAdminRequiredMixin(UserPassesTestMixin):
@@ -260,6 +289,13 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx["work_orders"] = attach_expense_totals_by_metadata(
+            ctx.get("work_orders"),
+            metadata_key="work_order_id",
+            metadata_keys=("work_order_id", "work_order"),
+            include_work_order_text_fallback=True,
+            target_attr="expense_total",
+        )
         paginator = ctx.get("paginator")
         if paginator is not None:
             ctx["lawyer_orders_total"] = paginator.count
@@ -294,6 +330,12 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
                 ],
                 "pagination_query": _querystring_without(self.request, "page"),
                 "show_owner_info": True,
+                "can_mass_delete_lawyer_orders": bool(getattr(self.request.user, "is_superuser", False)),
+                "mass_delete_lawyer_orders_url": reverse("core:mass_delete_lawyer_work_orders"),
+                "can_add_lawyer_order": not (
+                    bool(getattr(self.request.user, "is_superuser", False))
+                    or user_has_role(self.request.user, MembershipRole.ADMINISTRATOR)
+                ),
             }
         )
         return ctx
@@ -642,6 +684,12 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 .filter(archived_at__isnull=True)
             )
             qs = base_qs.select_related("building__owner", "unit", "forwarded_to_building", "forwarded_by")
+            if _is_technician_only_user(user):
+                qs = qs.exclude(
+                    building__is_system_default=True,
+                    forwarded_to_building__isnull=False,
+                    status__in=[WorkOrder.Status.DONE, WorkOrder.Status.APPROVED],
+                )
 
             # Build owner choices for staff (before additional filters)
             self._owner_choices: list[dict[str, str]] = []
@@ -745,6 +793,13 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx["orders"] = attach_expense_totals_by_metadata(
+            ctx.get("orders"),
+            metadata_key="work_order_id",
+            metadata_keys=("work_order_id", "work_order"),
+            include_work_order_text_fallback=True,
+            target_attr="expense_total",
+        )
         paginator = ctx.get("paginator")
         total_orders = 0
         if paginator is not None:
@@ -800,6 +855,26 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             .prefetch_related("attachments", "audit_entries__actor")
         )
 
+    def _manageable_building_for_user(self, order: WorkOrder):
+        if _technician_readonly_for_forwarded_office_order(self.request.user, order):
+            return None
+        if _user_has_building_capability(
+            self.request.user,
+            order.building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        ):
+            return order.building
+        destination = getattr(order, "forwarded_to_building", None)
+        if destination and _user_has_building_capability(
+            self.request.user,
+            destination,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        ):
+            return destination
+        return None
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         next_url = _safe_next_url(self.request)
@@ -807,20 +882,23 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         if next_url:
             ctx["cancel_url"] = next_url
         ctx.update(_render_attachment_panel(self.request, order=self.object))
-        ctx["can_edit_order"] = _user_has_building_capability(
+        manageable_building = self._manageable_building_for_user(self.object)
+        ctx["can_edit_order"] = manageable_building is not None
+        ctx["can_reroute_order"] = ctx["can_edit_order"] and not user_has_role(
             self.request.user,
-            self.object.building,
-            Capability.MANAGE_BUILDINGS,
-            Capability.CREATE_WORK_ORDERS,
+            MembershipRole.TECHNICIAN,
         )
         ctx["can_add_budget"] = ctx["can_edit_order"] and BudgetFeatureFlag.is_enabled_for(
             self.request.user,
-            building_id=self.object.building_id,
+            building_id=getattr(manageable_building, "pk", self.object.building_id),
         )
-        ctx["can_delete_order"] = _user_has_building_capability(
-            self.request.user,
-            self.object.building,
-            Capability.MANAGE_BUILDINGS,
+        ctx["can_delete_order"] = (
+            not _technician_readonly_for_forwarded_office_order(self.request.user, self.object)
+            and _user_has_building_capability(
+                self.request.user,
+                self.object.building,
+                Capability.MANAGE_BUILDINGS,
+            )
         )
         ctx["replacement_request_note"] = self.object.replacement_request_note
         ctx["awaiting_requested_by"] = self.object.awaiting_approval_by
@@ -981,8 +1059,7 @@ class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             return readable.capitalize() if readable else field_name
 
     def test_func(self):
-        wo = self.get_object()
-        return _user_can_access_building(self.request.user, wo.building)
+        return WorkOrder.objects.visible_to(self.request.user).filter(pk=self.kwargs.get("pk")).exists()
 
 
 class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
@@ -990,9 +1067,14 @@ class WorkOrderCreateView(LoginRequiredMixin, UnitsWidgetMixin, CreateView):
     form_class = WorkOrderForm
     template_name = "core/work_order_form.html"
 
+    def _is_lawyer_only_request(self) -> bool:
+        value = (self.request.GET.get("lawyer_only") or "").strip().lower()
+        return value in {"1", "true", "yes", "on"}
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
+        kwargs["force_lawyer_only"] = self._is_lawyer_only_request()
 
         # If opening from a building context (?building=<id>), lock to it
         self.building = None
@@ -1130,14 +1212,29 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             ctx.update(_render_attachment_panel(self.request, order=order_obj))
         return ctx
 
-    def test_func(self):
-        wo = self.get_object()
+    def _can_manage_order(self, order: WorkOrder) -> bool:
+        if _technician_readonly_for_forwarded_office_order(self.request.user, order):
+            return False
+        if _user_has_building_capability(
+            self.request.user,
+            order.building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        ):
+            return True
+        destination = getattr(order, "forwarded_to_building", None)
+        if destination is None:
+            return False
         return _user_has_building_capability(
             self.request.user,
-            wo.building,
+            destination,
             Capability.MANAGE_BUILDINGS,
             Capability.CREATE_WORK_ORDERS,
         )
+
+    def test_func(self):
+        wo = self.get_object()
+        return self._can_manage_order(wo)
 
     def form_valid(self, form):
         previous_obj = None
@@ -1149,14 +1246,9 @@ class WorkOrderUpdateView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
             except WorkOrder.DoesNotExist:
                 previous_obj = None
         obj = form.save(commit=False)
-        if not _user_can_access_building(self.request.user, obj.building):
+        if not WorkOrder.objects.visible_to(self.request.user).filter(pk=obj.pk).exists():
             raise Http404()
-        if not _user_has_building_capability(
-            self.request.user,
-            obj.building,
-            Capability.MANAGE_BUILDINGS,
-            Capability.CREATE_WORK_ORDERS,
-        ):
+        if not self._can_manage_order(obj):
             raise Http404()
         if obj.archived_at and obj.status not in {WorkOrder.Status.DONE, WorkOrder.Status.APPROVED}:
             obj.archived_at = None
@@ -1276,6 +1368,8 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
 
     def test_func(self):
         wo = self.get_object()
+        if _technician_readonly_for_forwarded_office_order(self.request.user, wo):
+            return False
         return _user_has_building_capability(
             self.request.user,
             wo.building,
@@ -1377,11 +1471,21 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def test_func(self):
         wo = self.get_object()
+        if _technician_readonly_for_forwarded_office_order(self.request.user, wo):
+            return False
         if _user_has_building_capability(
             self.request.user,
             wo.building,
             Capability.APPROVE_WORK_ORDERS,
             Capability.MANAGE_BUILDINGS,
+        ):
+            return True
+        destination = getattr(wo, "forwarded_to_building", None)
+        if destination and _user_has_building_capability(
+            self.request.user,
+            destination,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
         ):
             return True
         if wo.lawyer_only and user_is_lawyer(self.request.user, building_id=wo.building_id):
@@ -1394,7 +1498,25 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
         if wo.status not in {WorkOrder.Status.DONE, WorkOrder.Status.APPROVED}:
             raise Http404(_("Only completed work orders can be archived."))
 
+        archive_destination = getattr(wo, "forwarded_to_building", None)
         if not wo.is_archived:
+            # Forwarded Office orders should live under their destination building
+            # once archived so they appear in the destination archive context.
+            if getattr(wo.building, "is_system_default", False) and archive_destination is not None:
+                wo.building_id = archive_destination.pk
+                wo.forwarded_to_building = None
+                wo.forwarded_by = None
+                wo.forward_note = ""
+                wo.save(
+                    update_fields=[
+                        "building",
+                        "forwarded_to_building",
+                        "forwarded_by",
+                        "forward_note",
+                        "updated_at",
+                    ],
+                    validate=False,
+                )
             wo.archive()
             messages.success(request, _("Work order archived."))
             actor = request.user if request.user.is_authenticated else None
@@ -1402,12 +1524,29 @@ class WorkOrderArchiveView(LoginRequiredMixin, UserPassesTestMixin, View):
                 actor=actor,
                 work_order=wo,
                 action=WorkOrderAuditLog.Action.ARCHIVED,
-                payload={"status": wo.status},
+                payload={
+                    "status": wo.status,
+                    "archived_under_building_id": wo.building_id,
+                },
             )
 
         next_url = _safe_next_url(request)
         if next_url:
             return redirect(next_url)
+        requested_building_id = request.GET.get("building")
+        if requested_building_id:
+            try:
+                requested_building_id = int(requested_building_id)
+            except (TypeError, ValueError):
+                requested_building_id = None
+            if requested_building_id is not None:
+                target_building = Building.objects.filter(pk=requested_building_id).first()
+                if target_building and _user_can_access_building(request.user, target_building):
+                    return redirect("core:building_detail", requested_building_id)
+
+        destination = getattr(wo, "forwarded_to_building", None)
+        if destination and _user_can_access_building(request.user, destination):
+            return redirect("core:building_detail", destination.pk)
         return redirect("core:building_detail", wo.building_id)
 
 
@@ -1816,6 +1955,7 @@ class ArchivedWorkOrderFilterMixin:
             ctx["archive_purge_form"] = ArchivePurgeForm()
             ctx["archive_purge_action"] = reverse("core:work_orders_archive_purge")
             ctx["archive_purge_preview_url"] = reverse("core:work_orders_archive_purge_preview")
+            ctx["archive_building_delete_action"] = reverse("core:work_orders_archive_building_delete")
         return ctx
 
 
@@ -1946,6 +2086,50 @@ class ArchivedWorkOrderPurgeView(LoginRequiredMixin, View):
         return redirect("core:work_orders_archive")
 
 
+class ArchivedWorkOrderBuildingDeleteView(LoginRequiredMixin, View):
+    """
+    Permanently delete archived work orders for selected buildings.
+    """
+
+    def post(self, request, *args, **kwargs):
+        if not user_is_admin_or_backoffice(request.user):
+            raise Http404()
+        building_ids_raw = request.POST.getlist("building_ids")
+        building_ids: list[int] = []
+        for value in building_ids_raw:
+            try:
+                building_ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        building_ids = sorted(set(building_ids))
+        if not building_ids:
+            messages.error(request, _("Select at least one archived building."))
+            return redirect("core:work_orders_archive")
+        if not request.POST.get("confirm"):
+            messages.error(request, _("Please confirm the permanent deletion."))
+            return redirect("core:work_orders_archive")
+
+        qs = WorkOrder.objects.filter(
+            archived_at__isnull=False,
+            building_id__in=building_ids,
+        )
+        deleted = qs.count()
+        if not deleted:
+            messages.info(request, _("No archived work orders matched the selected buildings."))
+            return redirect("core:work_orders_archive")
+        qs.delete()
+        messages.success(
+            request,
+            ngettext(
+                "Deleted %(count)s archived work order permanently.",
+                "Deleted %(count)s archived work orders permanently.",
+                deleted,
+            )
+            % {"count": deleted},
+        )
+        return redirect("core:work_orders_archive")
+
+
 class ArchivedWorkOrderPurgePreviewView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         if not user_is_admin_or_backoffice(request.user):
@@ -2054,9 +2238,21 @@ class WorkOrderBudgetChargeView(LoginRequiredMixin, UserPassesTestMixin, FormVie
         return super().dispatch(request, *args, **kwargs)
 
     def test_func(self):
-        return _user_has_building_capability(
+        if _technician_readonly_for_forwarded_office_order(self.request.user, self.work_order):
+            return False
+        if _user_has_building_capability(
             self.request.user,
             self.work_order.building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        ):
+            return True
+        destination = getattr(self.work_order, "forwarded_to_building", None)
+        if destination is None:
+            return False
+        return _user_has_building_capability(
+            self.request.user,
+            destination,
             Capability.MANAGE_BUILDINGS,
             Capability.CREATE_WORK_ORDERS,
         )

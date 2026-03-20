@@ -91,42 +91,67 @@
     {% endif %}
 
     {% if owner_groups_page %}
-      <div class="space-y-6">
-        {% for group in owner_groups_page.object_list %}
-          <section class="space-y-3 rounded-3xl border border-emerald-50/80 bg-white/70 p-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/60">
-            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requester" %}</p>
-                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ group.owner_name }}</h2>
-              </div>
-              <div class="rounded-2xl px-4 py-2 text-sm font-semibold text-brand-foreground dark:text-white">
-                {% blocktrans with requested=group.total_requested|floatformat:2 spent=group.total_spent|floatformat:2 %}
-                  Requested {{ requested }} · Spent {{ spent }}
-                {% endblocktrans %}
-              </div>
-            </div>
-            <div class="space-y-3">
-              {% for budget in group.budgets %}
-                <div class="ui-panel flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <form method="post" action="{% if can_purge_archives %}{{ archive_requester_delete_action }}{% else %}{% url 'core:budget_archived_list' %}{% endif %}" class="space-y-4">
+        {% csrf_token %}
+        <div class="space-y-6">
+          {% for group in owner_groups_page.object_list %}
+            <section class="space-y-3 rounded-3xl border border-emerald-50/80 bg-white/70 p-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+              <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div class="flex items-start gap-2">
+                  {% if can_purge_archives and group.owner %}
+                    <input
+                      type="checkbox"
+                      name="requester_ids"
+                      value="{{ group.owner.id }}"
+                      class="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                    />
+                  {% endif %}
                   <div>
-                    <p class="font-semibold text-slate-900 dark:text-slate-100">
-                      {{ budget.title|default:_("Untitled budget") }}
-                    </p>
-                    <p class="text-xs text-brand-foreground dark:text-white">
-                      {% blocktrans with approved=budget.approved_total|floatformat:2 spent=budget.spent_total|floatformat:2 currency=budget.currency archived=budget.archived_at|date:"Y-m-d" %}
-                        Approved {{ approved }} {{ currency }} · Spent {{ spent }} {{ currency }} · Archived {{ archived }}
-                      {% endblocktrans %}
-                    </p>
-                  </div>
-                  <div class="flex flex-wrap gap-2">
-                    <a href="{% url 'core:budget_detail' budget.pk %}" class="btn btn-xs btn-secondary">{% trans "View" %}</a>
+                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requester" %}</p>
+                    <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ group.owner_name }}</h2>
                   </div>
                 </div>
-              {% endfor %}
-            </div>
-          </section>
-        {% endfor %}
-      </div>
+                <div class="rounded-2xl px-4 py-2 text-sm font-semibold text-brand-foreground dark:text-white">
+                  {% blocktrans with requested=group.total_requested|floatformat:2 spent=group.total_spent|floatformat:2 %}
+                    Requested {{ requested }} · Spent {{ spent }}
+                  {% endblocktrans %}
+                </div>
+              </div>
+              <div class="space-y-3">
+                {% for budget in group.budgets %}
+                  <div class="ui-panel flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p class="font-semibold text-slate-900 dark:text-slate-100">
+                        {{ budget.title|default:_("Untitled budget") }}
+                      </p>
+                      <p class="text-xs text-brand-foreground dark:text-white">
+                        {% blocktrans with approved=budget.approved_total|floatformat:2 spent=budget.spent_total|floatformat:2 currency=budget.currency archived=budget.archived_at|date:"Y-m-d" %}
+                          Approved {{ approved }} {{ currency }} · Spent {{ spent }} {{ currency }} · Archived {{ archived }}
+                        {% endblocktrans %}
+                      </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                      <a href="{% url 'core:budget_detail' budget.pk %}" class="btn btn-xs btn-secondary">{% trans "View" %}</a>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </section>
+          {% endfor %}
+        </div>
+        {% if can_purge_archives %}
+          <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              name="confirm"
+              value="1"
+              class="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+            />
+            <span>{% trans "I understand selected requesters' archived budgets will be permanently removed." %}</span>
+          </label>
+          <button class="btn btn-danger" type="submit">{% trans "Delete selected requesters' archived budgets" %}</button>
+        {% endif %}
+      </form>
       <div class="flex items-center justify-between">
         <div class="text-sm text-slate-500 dark:text-slate-400">
           {% blocktrans with number=owner_groups_page.number total=owner_groups_page.paginator.num_pages %}Page {{ number }} of {{ total }}{% endblocktrans %}

@@ -161,13 +161,23 @@ class WorkOrderQuerySet(models.QuerySet):
 
             resolver = CapabilityResolver(user)
         qs = self
+        owner_filter = Q(building__owner_id=user.pk) | Q(forwarded_to_building__owner_id=user.pk)
+        technician_assignment_filter = Q(
+            building__memberships__user_id=getattr(user, "pk", None),
+            building__memberships__role=MembershipRole.TECHNICIAN,
+        ) | Q(
+            forwarded_to_building__memberships__user_id=getattr(user, "pk", None),
+            forwarded_to_building__memberships__role=MembershipRole.TECHNICIAN,
+        )
         if scope == "subset":
-            if not building_ids:
-                return self.none()
-            qs = qs.filter(
-                Q(building_id__in=building_ids)
-                | Q(forwarded_to_building_id__in=building_ids)
-            )
+            visibility_filter = owner_filter
+            visibility_filter |= technician_assignment_filter
+            if building_ids:
+                visibility_filter |= (
+                    Q(building_id__in=building_ids)
+                    | Q(forwarded_to_building_id__in=building_ids)
+                )
+            qs = qs.filter(visibility_filter).distinct()
         can_view_confidential = resolver.has(Capability.VIEW_CONFIDENTIAL_WORK_ORDERS)
         if not can_view_confidential and _user_can_view_confidential_orders(user):
             can_view_confidential = True
@@ -214,11 +224,12 @@ class TodoItemQuerySet(models.QuerySet):
 
         base_filter = models.Q(user=user)
         if ROLE_BACKOFFICE in roles:
-            technician_ids = (
-                Membership.objects.filter(role=ROLE_TECHNICIAN)
-                .values_list("user_id", flat=True)
+            teammate_ids = (
+                Membership.objects.filter(
+                    role__in=[ROLE_TECHNICIAN, MembershipRole.LAWYER]
+                ).values_list("user_id", flat=True)
             )
-            base_filter |= models.Q(user_id__in=technician_ids)
+            base_filter |= models.Q(user_id__in=teammate_ids)
         return self.filter(base_filter)
 
     def for_week(self, week_start_date: date | None):
@@ -459,7 +470,12 @@ class Unit(TimeStampedModel):
 
     def clean(self):
         super().clean()
-        building = self.building if isinstance(self.building, Building) else None
+        building = None
+        try:
+            if self.building_id:
+                building = self.building
+        except Building.DoesNotExist:
+            building = None
         is_system_default = getattr(building, "is_system_default", None)
         if is_system_default is None and self.building_id:
             is_system_default = Building.objects.filter(
@@ -1774,6 +1790,12 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
     },
 }
 
+ROLE_MANDATORY_CAPABILITIES: dict[str, set[str]] = {
+    MembershipRole.LAWYER: {
+        Capability.CREATE_UNITS,
+    },
+}
+
 
 def _normalize_capability_list(values):
     normalized = []
@@ -1837,10 +1859,11 @@ class BuildingMembership(TimeStampedModel):
     @cached_property
     def resolved_capabilities(self) -> set[str]:
         defaults = ROLE_CAPABILITIES.get(self.role, set())
+        mandatory = ROLE_MANDATORY_CAPABILITIES.get(self.role, set())
         overrides = self.capabilities_override or {}
         add = set(overrides.get("add", []))
         remove = set(overrides.get("remove", []))
-        return (set(defaults) | add) - remove
+        return ((set(defaults) | add) - remove) | set(mandatory)
 
     def clean(self):
         super().clean()
