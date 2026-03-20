@@ -39,21 +39,10 @@
       </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2">
       <div class="ui-card">
         <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requested" %}</p>
         <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.requested_amount|floatformat:2 }} {{ budget.currency }}</p>
-      </div>
-      <div class="ui-card">
-        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Approved" %}</p>
-        <p class="text-2xl font-semibold text-emerald-600 dark:text-emerald-300">{{ budget.approved_total|floatformat:2 }} {{ budget.currency }}</p>
-        {% if budget.approved_by %}
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            {% blocktrans with name=budget.approved_by.get_full_name|default:budget.approved_by.username %}
-              Approved by {{ name }}
-            {% endblocktrans %}
-          </p>
-        {% endif %}
       </div>
       <div class="ui-card">
         <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Remaining" %}</p>
@@ -94,34 +83,77 @@
         <div class="space-y-3">
           {% for expense in expenses %}
             <div class="ui-panel space-y-2" data-expense-item>
-              <button class="flex w-full items-center justify-between text-left" type="button" data-expense-toggle>
-                <div>
-                  <p class="font-semibold text-slate-900 dark:text-slate-100">{{ expense.label }}</p>
+              <div class="flex w-full flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0 flex-1 space-y-1">
+                  <p class="font-semibold text-slate-900 dark:text-slate-100">{{ expense.display_label }}</p>
                   <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ expense.incurred_on }} · {{ expense.expense_type.label|default:_("Uncategorized") }}
+                    {{ expense.incurred_on }}
+                    {% with category=expense.expense_type.label %}
+                      {% if category %}
+                        · {{ category }}
+                      {% endif %}
+                    {% endwith %}
+                    {% if expense.work_order_label or expense.work_order_number_label %}
+                      · <span class="text-emerald-600 dark:text-emerald-300">
+                        {% trans "Linked work order" %}
+                        · {{ expense.work_order_label|default:expense.work_order_number_label }}
+                      </span>
+                    {% elif expense.building_label %}
+                      · <span class="text-emerald-600 dark:text-emerald-300">{% trans "Linked building" %} · {{ expense.building_label }}</span>
+                    {% endif %}
                   </p>
                 </div>
-                <div class="text-right">
+                <div class="text-right space-y-2">
                   <p class="text-lg font-semibold text-slate-900 dark:text-slate-100">
                     {{ expense.amount|floatformat:2 }} {{ budget.currency }}
                   </p>
-                  <span class="text-xs text-slate-400" aria-hidden="true">{% trans "Tap for details" %}</span>
+                  {% if expense.work_order_url %}
+                    <a href="{{ expense.work_order_url }}" class="btn btn-outline btn-xs">
+                      {% trans "View work order" %}
+                    </a>
+                  {% elif expense.building_url %}
+                    <a href="{{ expense.building_url }}" class="btn btn-outline btn-xs">
+                      {% trans "View building" %}
+                    </a>
+                  {% endif %}
+                  <button type="button" class="btn btn-ghost btn-xs" data-expense-toggle>
+                    {% trans "Show details" %}
+                  </button>
+                  {% if expense.can_delete %}
+                    <form method="post" action="{{ expense.delete_url }}" class="inline-flex justify-end" onsubmit="return confirm('{% trans "Are you sure you want to delete this expense?" %}');">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-danger btn-xs">{% trans "Delete expense" %}</button>
+                    </form>
+                  {% endif %}
                 </div>
-              </button>
+              </div>
               <div class="space-y-2 text-sm text-slate-600 dark:text-slate-300" data-expense-details hidden>
                 {% with meta=expense.metadata %}
-                  {% if meta.building_name or meta.work_order_id %}
-                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                      {% if meta.building_name %}
-                        {% trans "Building" %}: {{ meta.building_name }}
+                  {% if meta.building_id or meta.work_order_id %}
+                    <p class="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      {% if expense.building_url %}
+                        <span>
+                          {% trans "Building" %}:
+                          <a href="{{ expense.building_url }}" class="link">{{ expense.building_label }}</a>
+                        </span>
+                      {% elif meta.building_name %}
+                        <span>{% trans "Building" %}: {{ meta.building_name }}</span>
                       {% endif %}
-                      {% if meta.work_order_id %}
-                        · {% trans "Work order" %} #{{ meta.work_order_id }}
+                      {% if expense.work_order_url %}
+                        <span>
+                          {% trans "Work order" %}:
+                          <a href="{{ expense.work_order_url }}" class="link">{{ expense.work_order_label|default:expense.work_order_number_label }}</a>
+                        </span>
+                      {% elif meta.work_order_id %}
+                        <span>
+                          {% trans "Work order" %}:
+                          {{ expense.work_order_label|default:expense.work_order_number_label }}
+                        </span>
                       {% endif %}
                     </p>
                   {% endif %}
                 {% endwith %}
-                {% if expense.notes %}
+                {% if expense.show_notes %}
                   <p>{{ expense.notes }}</p>
                 {% endif %}
                 <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -202,16 +234,19 @@
         }
       });
     });
+    const toggleExpenseDetails = (btn) => {
+      const details = btn.closest("[data-expense-item]")?.querySelector("[data-expense-details]");
+      if (!details) return;
+      const isHidden = details.hasAttribute("hidden");
+      if (isHidden) {
+        details.removeAttribute("hidden");
+      } else {
+        details.setAttribute("hidden", "hidden");
+      }
+    };
     document.querySelectorAll("[data-expense-toggle]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const details = btn.closest("[data-expense-item]")?.querySelector("[data-expense-details]");
-        if (!details) return;
-        const isHidden = details.hasAttribute("hidden");
-        if (isHidden) {
-          details.removeAttribute("hidden");
-        } else {
-          details.setAttribute("hidden", "hidden");
-        }
+        toggleExpenseDetails(btn);
       });
     });
   </script>

@@ -3,11 +3,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.test import Client, RequestFactory, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from core.forms import WorkOrderForm
-from core.models import Building, Unit, WorkOrder, WorkOrderAuditLog
+from core.models import Building, BuildingMembership, MembershipRole, Unit, WorkOrder, WorkOrderAuditLog
 from core.views.work_orders import _maybe_handle_forwarding_change
 
 
@@ -149,6 +150,40 @@ class WorkOrderFormForwardingTests(TestCase):
         self.assertIn("forwarded_to_building", form.errors)
         self.assertIn("must stay assigned", form.errors["forwarded_to_building"][0])
 
+    def test_edit_forwarded_order_keeps_existing_forwarding_metadata(self):
+        technician = get_user_model().objects.create_user(username="dest-tech-form", password="pass")
+        BuildingMembership.objects.create(
+            user=technician,
+            building=self.destination,
+            role=MembershipRole.TECHNICIAN,
+        )
+        order = WorkOrder.objects.create(
+            building=self.office,
+            title="Forwarded leak",
+            deadline=timezone.localdate(),
+            forwarded_to_building=self.destination,
+            forwarded_by=self.admin,
+            forward_note="Keep destination",
+        )
+        form = WorkOrderForm(
+            data={
+                "title": order.title,
+                "building": str(self.office.pk),
+                "priority": order.priority,
+                "status": order.status,
+                "deadline": order.deadline.isoformat(),
+                "description": order.description,
+                "replacement_request_note": "",
+            },
+            user=technician,
+            building=self.office,
+            instance=order,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        updated = form.save()
+        self.assertEqual(updated.forwarded_to_building_id, self.destination.pk)
+        self.assertEqual(updated.forwarded_by_id, self.admin.pk)
+
 
 class WorkOrderForwardingAuditLogTests(TestCase):
     def setUp(self):
@@ -219,3 +254,33 @@ class WorkOrderForwardingAuditLogTests(TestCase):
         self.assertTrue(log_entry.payload.get("cleared"))
         self.assertEqual(log_entry.payload.get("previous_target_id"), self.destination.pk)
         self.assertIsNone(log_entry.payload.get("target_id"))
+
+
+class LawyerWorkOrdersPageTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.client = Client()
+        self.lawyer = User.objects.create_user(username="lawyer-ui", password="pass")
+        self.admin = User.objects.create_user(username="admin-ui", password="pass")
+        BuildingMembership.objects.create(
+            user=self.lawyer,
+            building=None,
+            role=MembershipRole.LAWYER,
+        )
+        BuildingMembership.objects.create(
+            user=self.admin,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+        )
+
+    def test_lawyer_page_shows_add_new_lawyer_order_option(self):
+        self.client.force_login(self.lawyer)
+        response = self.client.get(reverse("core:lawyer_work_orders"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Add new lawyer order")
+
+    def test_admin_page_does_not_show_add_new_lawyer_order_option(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("core:lawyer_work_orders"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Add new lawyer order")

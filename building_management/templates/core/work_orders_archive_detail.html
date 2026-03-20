@@ -5,32 +5,34 @@
 
 {% block content %}
 <section class="space-y-6">
-  <div class="flex flex-wrap items-center justify-between gap-3">
+  <div class="flex flex-wrap items-center gap-3">
     <a class="btn btn-secondary" href="{{ back_url }}{% if back_query %}?{{ back_query }}{% endif %}">‹ {% trans "Back to archived list" %}</a>
-    <div class="text-sm text-slate-500 dark:text-slate-300">
-      {% blocktrans count total=total_archived %}{{ total }} archived work order{% plural %}{{ total }} archived work orders{% endblocktrans %}
-    </div>
   </div>
 
   <article class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
     <header class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
       <div>
-        <h1 class="text-2xl font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
+        <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white break-words hyphens-auto">
           {{ building.name }}
         </h1>
         {% if building.address %}
           <p class="text-sm text-slate-500 dark:text-slate-400">{{ building.address }}</p>
         {% endif %}
       </div>
-      <div class="text-sm text-slate-500 dark:text-slate-300 md:text-right">
-        <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Owner" %}:</span>
-        {% with owner=building.owner %}
-          {% if owner %}
-            {{ owner.get_full_name|default:owner.username }}
-          {% else %}
-            —
-          {% endif %}
-        {% endwith %}
+      <div class="flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-300 md:justify-end">
+        <span>
+          {% blocktrans count total=total_archived %}{{ total }} archived work order{% plural %}{{ total }} archived work orders{% endblocktrans %}
+        </span>
+        <span>
+          <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Отговорник" %}:</span>
+          {% with owner=building.owner %}
+            {% if owner %}
+              {{ owner.get_full_name|default:owner.username }}
+            {% else %}
+              —
+            {% endif %}
+          {% endwith %}
+        </span>
       </div>
     </header>
 
@@ -56,17 +58,8 @@
         </div>
       </form>
 
-      {% if pagination_object %}
-        <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500 dark:text-slate-300">
-          <span>
-            {% blocktrans trimmed with start=pagination_object.start_index end=pagination_object.end_index total=total_archived %}
-              Showing {{ start }}–{{ end }} of {{ total }} archived work orders
-            {% endblocktrans %}
-          </span>
-        </div>
-      {% endif %}
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+      <div class="overflow-x-auto overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800">
+        <table class="min-w-full divide-y divide-slate-200 bg-white text-sm dark:divide-slate-800 dark:bg-slate-900">
           <thead class="bg-slate-50 dark:bg-slate-800">
             <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
               <th class="px-4 py-3">{% trans "Title" %}</th>
@@ -75,7 +68,7 @@
               <th class="px-4 py-3">{% trans "Status" %}</th>
               <th class="px-4 py-3">{% trans "Created" %}</th>
               <th class="px-4 py-3">{% trans "Archived" %}</th>
-              <th class="px-4 py-3">{% trans "Owner" %}</th>
+              <th class="px-4 py-3">{% trans "Отговорник" %}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">

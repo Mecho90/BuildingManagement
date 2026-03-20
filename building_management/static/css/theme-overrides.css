@@ -141,6 +141,14 @@ a:hover {
   color: rgba(226, 232, 240, 0.75) !important;
 }
 
+.text-on-dark {
+  color: inherit;
+}
+
+.dark .text-on-dark {
+  color: var(--brand-yellow-strong) !important;
+}
+
 /* Golden frames for feature cards/panels */
 .rounded-2xl.border,
 .rounded-3xl.border,
@@ -167,19 +175,14 @@ a:hover {
 
 .dark .rounded-2xl.border h1,
 .dark .rounded-2xl.border h2,
-.dark .rounded-2xl.border p,
 .dark .rounded-3xl.border h1,
 .dark .rounded-3xl.border h2,
-.dark .rounded-3xl.border p,
 .dark .ui-card h1,
 .dark .ui-card h2,
-.dark .ui-card p,
 .dark .ui-panel h1,
 .dark .ui-panel h2,
-.dark .ui-panel p,
 .dark .shadow-card h1,
 .dark .shadow-card h2,
-.dark .shadow-card p,
 .dark .filter-panel label,
 .dark .filter-panel span,
 .dark .filter-panel input,

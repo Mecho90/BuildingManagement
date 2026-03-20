@@ -184,3 +184,42 @@ class OfficeVisibilityTests(TestCase):
         self.assertContains(response, order.title)
         self.assertContains(response, "Origin · Office")
         self.assertContains(response, f"Destination · {destination_building.name}")
+
+    def test_building_list_bootstraps_office_for_global_staff(self):
+        Building.objects.all().delete()
+        User = get_user_model()
+        admin_user = User.objects.create_user(username="global-admin", password="pass")
+        BuildingMembership.objects.create(
+            user=admin_user,
+            building=None,
+            role=MembershipRole.ADMINISTRATOR,
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get(reverse("core:buildings_list"))
+        self.assertTrue(Building.objects.filter(is_system_default=True).exists())
+        self.assertContains(response, "Office")
+
+    def test_lawyer_can_create_unit_without_related_object_error(self):
+        User = get_user_model()
+        lawyer = User.objects.create_user(username="lawyer-unit", password="pass")
+        BuildingMembership.objects.create(
+            user=lawyer,
+            building=None,
+            role=MembershipRole.LAWYER,
+        )
+        self.client.force_login(lawyer)
+        response = self.client.post(
+            reverse("core:unit_create", args=[self.another_building.pk]),
+            {
+                "number": "2B",
+                "floor": "2",
+                "owner_name": "",
+                "contact_phone": "",
+                "description": "",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            Unit.objects.filter(building=self.another_building, number__iexact="2B").exists()
+        )

@@ -1,0 +1,13 @@
+{% load i18n %}
+{% if amount and amount > 0 %}
+  {% blocktrans with value=amount|floatformat:2 asvar indicator_label %}Expenses: {{ value }}{% endblocktrans %}
+  <span
+    class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-700 shadow-sm dark:border-emerald-500/60 dark:bg-emerald-500/10 dark:text-emerald-200"
+    role="status"
+    title="{{ title|default:indicator_label }}"
+    aria-label="{{ indicator_label }}"
+  >
+    <span class="text-sm leading-none" aria-hidden="true">€</span>
+    <span class="leading-none">{{ amount|floatformat:2 }}</span>
+  </span>
+{% endif %}

@@ -1,4 +1,7 @@
+import logging
+
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db.models.signals import post_delete, post_migrate, post_save
 from django.dispatch import receiver
 
@@ -11,6 +14,8 @@ from .models import (
     UserSecurityProfile,
 )
 from .utils.ownership import owner_capability_overrides
+
+logger = logging.getLogger(__name__)
 
 
 def _assign_backoffice_membership(user, building):
@@ -93,12 +98,27 @@ def ensure_owner_membership(sender, instance: Building, created, **kwargs):
         "capabilities_override": cap_overrides,
         "technician_subrole": instance.role or "",
     }
-    membership, created_membership = BuildingMembership.objects.get_or_create(
-        user=instance.owner,
-        building=instance,
-        role=desired_role,
-        defaults=defaults,
-    )
+    try:
+        membership, created_membership = BuildingMembership.objects.get_or_create(
+            user=instance.owner,
+            building=instance,
+            role=desired_role,
+            defaults=defaults,
+        )
+    except ValidationError as exc:
+        logger.debug(
+            "[core.signals] Skipping technician membership for owner %s: %s",
+            instance.owner_id,
+            exc,
+        )
+        membership = BuildingMembership.objects.filter(
+            user=instance.owner,
+            role=MembershipRole.TECHNICIAN,
+            building=instance,
+        ).first()
+        created_membership = False
+        if not membership:
+            return
     updated_fields = []
     desired_subrole = instance.role or ""
     overrides, overrides_changed = owner_capability_overrides(membership.capabilities_override)
@@ -161,5 +181,11 @@ def cleanup_backoffice_memberships(sender, instance: BuildingMembership, **kwarg
 
 
 @receiver(post_migrate)
-def clear_office_cache_post_migrate(**kwargs):
+def ensure_office_after_migrate(**kwargs):
     Building.clear_system_default_cache()
+    try:
+        from core.services.office import ensure_office_building
+
+        ensure_office_building(strict_owner=False)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug("[core] Skipping Office sync after migrate: %s", exc)

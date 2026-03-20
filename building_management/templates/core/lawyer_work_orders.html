@@ -6,12 +6,20 @@
 {% block content %}
 <section class="space-y-6">
   <header class="rounded-2xl border border-emerald-100 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Lawyer Orders" %}</h1>
         <p class="text-sm text-slate-600 dark:text-slate-300">
           {% blocktrans with total=lawyer_orders_total %}Total lawyer orders: {{ total }}{% endblocktrans %}
         </p>
+      </div>
+      <div class="flex flex-wrap gap-2 self-start sm:self-center">
+        {% if can_add_lawyer_order %}
+          <a class="btn" href="{% url 'core:work_order_create' %}?lawyer_only=1&next={{ request.get_full_path|urlencode }}">{% trans "Add new lawyer order" %}</a>
+        {% endif %}
+        {% if can_mass_delete_lawyer_orders and mass_delete_lawyer_orders_url %}
+          <a class="btn btn-outline" href="{{ mass_delete_lawyer_orders_url }}">{% trans "Delete lawyer orders" %}</a>
+        {% endif %}
       </div>
     </div>
   </header>
@@ -62,7 +70,7 @@
 
       {% if owner_choices %}
         <div class="space-y-2">
-          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Отговорник" %}</label>
           <select id="id_owner" name="owner" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
             {% for opt in owner_choices %}
@@ -81,7 +89,6 @@
           placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}"
           value="{{ deadline_range }}"
           class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-          onchange="this.form.submit()"
         />
       </div>
 
@@ -120,9 +127,12 @@
         {% for order in work_orders %}
           <tr class="text-slate-700 dark:text-slate-100">
             <td class="px-4 py-3 font-semibold">
-              <a href="{% url 'core:work_order_detail' order.pk %}" class="text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">
-                {{ order.title }}
-              </a>
+              <div class="flex flex-wrap items-center gap-2">
+                <a href="{% url 'core:work_order_detail' order.pk %}" class="text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">
+                  {{ order.title }}
+                </a>
+                {% include "components/expense_amount_indicator.html" with amount=order.expense_total %}
+              </div>
               {% if order.forwarded_to_building %}
                 <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
                   {% blocktrans with destination=order.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}

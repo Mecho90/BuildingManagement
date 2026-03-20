@@ -161,13 +161,23 @@ class WorkOrderQuerySet(models.QuerySet):
 
             resolver = CapabilityResolver(user)
         qs = self
+        owner_filter = Q(building__owner_id=user.pk) | Q(forwarded_to_building__owner_id=user.pk)
+        technician_assignment_filter = Q(
+            building__memberships__user_id=getattr(user, "pk", None),
+            building__memberships__role=MembershipRole.TECHNICIAN,
+        ) | Q(
+            forwarded_to_building__memberships__user_id=getattr(user, "pk", None),
+            forwarded_to_building__memberships__role=MembershipRole.TECHNICIAN,
+        )
         if scope == "subset":
-            if not building_ids:
-                return self.none()
-            qs = qs.filter(
-                Q(building_id__in=building_ids)
-                | Q(forwarded_to_building_id__in=building_ids)
-            )
+            visibility_filter = owner_filter
+            visibility_filter |= technician_assignment_filter
+            if building_ids:
+                visibility_filter |= (
+                    Q(building_id__in=building_ids)
+                    | Q(forwarded_to_building_id__in=building_ids)
+                )
+            qs = qs.filter(visibility_filter).distinct()
         can_view_confidential = resolver.has(Capability.VIEW_CONFIDENTIAL_WORK_ORDERS)
         if not can_view_confidential and _user_can_view_confidential_orders(user):
             can_view_confidential = True
@@ -216,7 +226,7 @@ class TodoItemQuerySet(models.QuerySet):
         if ROLE_BACKOFFICE in roles:
             technician_membership_exists = Membership.objects.filter(
                 user_id=OuterRef("user_id"),
-                role=ROLE_TECHNICIAN,
+                role__in=[ROLE_TECHNICIAN, MembershipRole.LAWYER],
             )
             return self.annotate(
                 _visible_technician=Exists(technician_membership_exists)
@@ -259,7 +269,7 @@ class Building(TimeStampedModel):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="buildings",
-        verbose_name=_("Owner"),
+        verbose_name=_("Отговорник"),
     )
     name = models.CharField(max_length=255, db_index=True, verbose_name=_("Name"))
     address = models.CharField(max_length=512, blank=True, verbose_name=_("Address"))
@@ -461,7 +471,12 @@ class Unit(TimeStampedModel):
 
     def clean(self):
         super().clean()
-        building = self.building if isinstance(self.building, Building) else None
+        building = None
+        try:
+            if self.building_id:
+                building = self.building
+        except Building.DoesNotExist:
+            building = None
         is_system_default = getattr(building, "is_system_default", None)
         if is_system_default is None and self.building_id:
             is_system_default = Building.objects.filter(
@@ -1784,6 +1799,12 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
     },
 }
 
+ROLE_MANDATORY_CAPABILITIES: dict[str, set[str]] = {
+    MembershipRole.LAWYER: {
+        Capability.CREATE_UNITS,
+    },
+}
+
 
 def _normalize_capability_list(values):
     normalized = []
@@ -1847,10 +1868,11 @@ class BuildingMembership(TimeStampedModel):
     @cached_property
     def resolved_capabilities(self) -> set[str]:
         defaults = ROLE_CAPABILITIES.get(self.role, set())
+        mandatory = ROLE_MANDATORY_CAPABILITIES.get(self.role, set())
         overrides = self.capabilities_override or {}
         add = set(overrides.get("add", []))
         remove = set(overrides.get("remove", []))
-        return (set(defaults) | add) - remove
+        return ((set(defaults) | add) - remove) | set(mandatory)
 
     def clean(self):
         super().clean()

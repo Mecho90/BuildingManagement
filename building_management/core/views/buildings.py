@@ -27,9 +27,11 @@ from ..models import (
     WorkOrder,
 )
 from ..utils.metrics import log_duration
+from ..utils.roles import user_has_role
 from .common import (
     CachedObjectMixin,
     CapabilityRequiredMixin,
+    attach_expense_totals_by_metadata,
     _querystring_without,
     _user_can_access_building,
     _user_has_building_capability,
@@ -73,6 +75,9 @@ class BuildingListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         user = self.request.user
         resolver = CapabilityResolver(user) if user.is_authenticated else None
+
+        self._ensure_office_building_for_user(user)
+
         self._can_manage_buildings = resolver.has(Capability.MANAGE_BUILDINGS) if resolver else False
         self._can_filter_owner = _user_can_filter_building_owner(user)
 
@@ -162,8 +167,36 @@ class BuildingListView(LoginRequiredMixin, ListView):
         self._effective_sort = sort
         return qs.order_by("-_office_priority", "-is_system_default", sort_field, "id")
 
+    def _ensure_office_building_for_user(self, user) -> None:
+        if not user or not user.is_authenticated:
+            return
+        if Building.system_default_id():
+            return
+        has_global_role = BuildingMembership.objects.filter(
+            user=user,
+            building__isnull=True,
+            role__in=(MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE),
+        ).exists()
+        if not has_global_role:
+            return
+        try:
+            from ..services.office import ensure_office_building
+
+            ensure_office_building(strict_owner=False)
+            Building.system_default_id(force_refresh=True)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("[core] Unable to bootstrap Office building for user %s: %s", user.pk, exc)
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx["buildings"] = attach_expense_totals_by_metadata(
+            ctx.get("buildings"),
+            metadata_key="building_id",
+            metadata_keys=("building_id", "building"),
+            include_budget_building_fallback=True,
+            include_work_order_text_fallback=True,
+            target_attr="expense_total",
+        )
         ctx["q"] = (self.request.GET.get("q") or "").strip()
         try:
             ctx["per"] = int(self.request.GET.get("per", 25))
@@ -216,11 +249,22 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         ctx = super().get_context_data(**kwargs)
         bld = self.object
         request = self.request
+        building_with_expenses = attach_expense_totals_by_metadata(
+            [bld],
+            metadata_key="building_id",
+            metadata_keys=("building_id", "building"),
+            include_budget_building_fallback=True,
+            include_work_order_text_fallback=True,
+            target_attr="expense_total",
+        )
+        if building_with_expenses:
+            ctx["building"] = building_with_expenses[0]
 
         show_units_tab = not bld.is_system_default
         ctx["show_units_tab"] = show_units_tab
 
         resolver = CapabilityResolver(request.user) if request.user.is_authenticated else None
+        is_technician_user = user_has_role(request.user, MembershipRole.TECHNICIAN)
         can_manage_building = resolver.has(Capability.MANAGE_BUILDINGS, building_id=bld.pk) if resolver else False
         can_manage_units = can_manage_building or (resolver.has(Capability.CREATE_UNITS, building_id=bld.pk) if resolver else False)
         can_manage_work_orders = can_manage_building or (resolver.has(Capability.CREATE_WORK_ORDERS, building_id=bld.pk) if resolver else False)
@@ -237,6 +281,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             ).filter(Q(building__isnull=True) | Q(building=bld))
             is_admin_for_building = admin_memberships.exists()
         ctx["show_manage_team_button"] = can_manage_members and is_admin_for_building
+        ctx["is_technician_user"] = is_technician_user
         if can_manage_members:
             ctx["memberships_manage_url"] = reverse("core:building_memberships", args=[bld.pk])
         tech_membership = None
@@ -338,16 +383,22 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             w_q = (self.request.GET.get("w_q") or "").strip()
             w_per = self._get_int("w_per", 25)
             w_status = (self.request.GET.get("w_status") or "").strip().upper()
+            w_deadline_from_raw = (self.request.GET.get("w_deadline_from") or "").strip()
+            w_deadline_to_raw = (self.request.GET.get("w_deadline_to") or "").strip()
             w_deadline_range_raw = (self.request.GET.get("w_deadline_range") or "").strip()
-            w_deadline_from = None
-            w_deadline_to = None
-            if w_deadline_range_raw:
+            w_deadline_from = parse_date(w_deadline_from_raw) if w_deadline_from_raw else None
+            w_deadline_to = parse_date(w_deadline_to_raw) if w_deadline_to_raw else None
+            if not (w_deadline_from or w_deadline_to) and w_deadline_range_raw:
                 normalized = w_deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
                 parts = [part.strip() for part in normalized.split("/") if part.strip()]
                 if parts:
                     w_deadline_from = parse_date(parts[0])
                     if len(parts) > 1:
                         w_deadline_to = parse_date(parts[1])
+                if w_deadline_from and not w_deadline_from_raw:
+                    w_deadline_from_raw = w_deadline_from.isoformat()
+                if w_deadline_to and not w_deadline_to_raw:
+                    w_deadline_to_raw = w_deadline_to.isoformat()
 
             filter_expr = Q(building=bld)
             awaiting_filter = Q(
@@ -408,6 +459,16 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                     ),
                 )
             )
+            if (
+                user_has_role(request.user, MembershipRole.TECHNICIAN)
+                and not user_has_role(request.user, MembershipRole.BACKOFFICE)
+                and not user_has_role(request.user, MembershipRole.ADMINISTRATOR)
+            ):
+                wo_qs = wo_qs.exclude(
+                    building__is_system_default=True,
+                    forwarded_to_building__isnull=False,
+                    status__in=[WorkOrder.Status.DONE, WorkOrder.Status.APPROVED],
+                )
 
             wo_qs = wo_qs.filter(archived_at__isnull=True)
 
@@ -426,6 +487,45 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
 
             wo_qs = wo_qs.order_by("priority_order", "deadline", "-id")
             workorders_page = Paginator(wo_qs, w_per).get_page(self.request.GET.get("w_page"))
+            workorders_page.object_list = attach_expense_totals_by_metadata(
+                workorders_page.object_list,
+                metadata_key="work_order_id",
+                metadata_keys=("work_order_id", "work_order"),
+                include_work_order_text_fallback=True,
+                target_attr="expense_total",
+            )
+            for work_order in workorders_page.object_list:
+                technician_readonly_forwarded_order = bool(
+                    is_technician_user
+                    and getattr(work_order, "forwarded_to_building_id", None)
+                    and getattr(getattr(work_order, "building", None), "is_system_default", False)
+                    and work_order.status == WorkOrder.Status.AWAITING_APPROVAL
+                )
+                can_edit_from_origin = _user_has_building_capability(
+                    request.user,
+                    work_order.building,
+                    Capability.MANAGE_BUILDINGS,
+                    Capability.CREATE_WORK_ORDERS,
+                )
+                destination_building = getattr(work_order, "forwarded_to_building", None)
+                can_edit_from_destination = destination_building is not None and _user_has_building_capability(
+                    request.user,
+                    destination_building,
+                    Capability.MANAGE_BUILDINGS,
+                    Capability.CREATE_WORK_ORDERS,
+                )
+                work_order.can_edit_in_building_list = (
+                    not technician_readonly_forwarded_order
+                    and (can_edit_from_origin or can_edit_from_destination)
+                )
+                work_order.can_delete_in_building_list = (
+                    not technician_readonly_forwarded_order
+                    and _user_has_building_capability(
+                        request.user,
+                        work_order.building,
+                        Capability.MANAGE_BUILDINGS,
+                    )
+                )
             ctx.update(
                 {
                     "workorders_page": workorders_page,
@@ -434,6 +534,8 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                     "w_status": w_status,
                     "w_status_choices": WorkOrder.Status.choices,
                     "w_deadline_range": w_deadline_range_raw,
+                    "w_deadline_from": w_deadline_from_raw,
+                    "w_deadline_to": w_deadline_to_raw,
                     "w_active": active_tab == "work_orders",
                     "awaiting_queue_badges": awaiting_queue_badges,
                 }

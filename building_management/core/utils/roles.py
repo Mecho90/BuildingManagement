@@ -47,3 +47,18 @@ def user_has_role(user, role: str, building_id: int | None = None) -> bool:
 
 def user_is_lawyer(user, building_id: int | None = None) -> bool:
     return user_has_role(user, MembershipRole.LAWYER, building_id=building_id)
+
+
+def user_is_admin_or_backoffice(user, building_id: int | None = None) -> bool:
+    """
+    Return True when the user holds a global Administrator/Backoffice role or is a superuser.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user_has_role(user, MembershipRole.ADMINISTRATOR, building_id=building_id) or user_has_role(
+        user,
+        MembershipRole.BACKOFFICE,
+        building_id=building_id,
+    )

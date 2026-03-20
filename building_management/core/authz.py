@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Iterable, Optional, Set
 
 from django.utils.functional import cached_property
@@ -12,6 +13,8 @@ from .models import (
     RoleAuditLog,
     WorkOrderAuditLog,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CapabilityResolver:
@@ -38,7 +41,12 @@ class CapabilityResolver:
 
     @cached_property
     def _office_building_id(self) -> int | None:
-        return Building.system_default_id()
+        office_id = Building.system_default_id()
+        if office_id:
+            return office_id
+        if not self._has_office_visibility_role:
+            return None
+        return self._bootstrap_office_building()
 
     @cached_property
     def _has_office_visibility_role(self) -> bool:
@@ -50,6 +58,22 @@ class CapabilityResolver:
             if membership.role in allowed:
                 return True
         return False
+
+    def _bootstrap_office_building(self) -> int | None:
+        try:
+            from core.services.office import ensure_office_building
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("[core.authz] Unable to import Office service: %s", exc)
+            return None
+
+        try:
+            result = ensure_office_building(strict_owner=False)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("[core.authz] Failed to bootstrap Office building: %s", exc)
+            return None
+        if result and getattr(result.building, "pk", None):
+            return result.building.pk
+        return Building.system_default_id()
 
     def visible_building_ids(self) -> Optional[Set[int]]:
         if Capability.VIEW_ALL_BUILDINGS in self._global_capabilities:

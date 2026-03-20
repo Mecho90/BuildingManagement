@@ -10,8 +10,10 @@
     }
     .login-page .layout-shell {
       background: transparent;
-      border: 0;
-      box-shadow: none;
+      border: 0 !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      outline: none !important;
       backdrop-filter: none;
       padding: 3rem 1rem 4rem;
     }
@@ -22,18 +24,51 @@
     }
     .login-logo-glass {
       position: relative;
-      padding: 2.5rem 4rem;
+      padding: 2rem 2.5rem;
       border-radius: 2.25rem;
       background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 236, 210, 0.85));
       box-shadow:
         0 25px 45px -30px rgba(15, 23, 42, 0.6),
         inset 0 0 25px rgba(255, 255, 255, 0.4);
-      border: 1.5px solid rgba(255, 255, 255, 0.9);
+      border: 0;
       backdrop-filter: blur(18px);
     }
     .dark .login-logo-glass {
       background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(76, 29, 149, 0.65));
       border-color: rgba(148, 163, 184, 0.5);
+    }
+    @media (min-width: 640px) {
+      .login-logo-glass {
+        padding: 2.5rem 3.25rem;
+      }
+    }
+    @media (min-width: 1024px) {
+      .login-logo-glass {
+        padding: 3rem 4.5rem;
+      }
+    }
+    .login-auth-layout {
+      display: flex;
+      min-height: 72vh;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+    @media (min-width: 1024px) {
+      .login-auth-layout {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 2rem;
+      }
+    }
+    .login-logo-shell {
+      width: 100%;
+      max-width: 40rem;
+      display: flex;
+      justify-content: center;
+      flex-shrink: 0;
     }
   </style>
 {% endblock %}
@@ -46,16 +81,16 @@
 {% block content %}
   {% get_current_language as LANGUAGE_CODE %}
   {% get_available_languages as AVAILABLE_LANGUAGES %}
-  <div class="mb-10 flex justify-center">
-    <div class="login-logo-glass">
-      <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" class="h-16 w-auto drop-shadow-md sm:h-20"/>
+  <div class="login-auth-layout">
+    <div class="login-logo-shell">
+      <div class="login-logo-glass">
+        <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" class="h-28 w-auto drop-shadow-md sm:h-36 lg:h-44"/>
+      </div>
     </div>
-  </div>
-  <div class="flex min-h-[60vh] items-center justify-center">
     <div class="w-full max-w-md space-y-6 rounded-2xl bg-white p-6 shadow-card dark:bg-slate-900">
       <header class="space-y-4 text-center">
         <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Sign in" %}</h1>
-        <div class="space-y-4 rounded-2xl border border-amber-100/60 bg-amber-50/60 p-4 text-left shadow-inner dark:border-slate-800/70 dark:bg-slate-900/60">
+        <div class="space-y-4 rounded-2xl border border-transparent bg-amber-50/60 p-4 text-left shadow-inner dark:border-transparent dark:bg-slate-900/60">
           <div class="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p class="text-xs font-semibold uppercase tracking-wide text-muted">{% trans "Today" %}</p>

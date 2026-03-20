@@ -11,18 +11,14 @@
         {% endblocktrans %}
       </p>
     </div>
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2">
       <div class="ui-card">
         <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requested" %}</p>
         <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.requested_amount|floatformat:2 }} {{ budget.currency }}</p>
       </div>
       <div class="ui-card">
-        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Spent" %}</p>
-        <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.spent_amount|floatformat:2 }} {{ budget.currency }}</p>
-      </div>
-      <div class="ui-card">
-        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Current status" %}</p>
-        <span class="status-chip status-chip--{{ budget.status|slugify }}">{{ budget.get_status_display }}</span>
+        <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Requested by" %}</p>
+        <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ budget.requester.get_full_name|default:budget.requester.username }}</p>
       </div>
     </div>
     <form method="post" class="ui-panel space-y-4">
