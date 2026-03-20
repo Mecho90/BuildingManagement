@@ -171,6 +171,25 @@ DATABASES: dict[str, dict[str, object]] = {
     "default": _database_config_from_env(),
 }
 
+_cache_url = os.environ.get("DJANGO_CACHE_URL", "").strip()
+if _cache_url:
+    if _cache_url.startswith("redis://") or _cache_url.startswith("rediss://"):
+        CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.redis.RedisCache",
+                "LOCATION": _cache_url,
+            }
+        }
+    else:
+        raise ImproperlyConfigured("DJANGO_CACHE_URL must use redis:// or rediss://.")
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "building-management-local",
+        }
+    }
+
 # --- Auth ---
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -308,5 +327,5 @@ if _csrf_origins:
 # --- Sessions ---
 SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes inactivity window
 SESSION_COOKIE_AGE = SESSION_IDLE_TIMEOUT_SECONDS
-SESSION_SAVE_EVERY_REQUEST = _env_bool("DJANGO_SESSION_SAVE_EVERY_REQUEST", default=True)  # sliding expiry keeps active users signed in
+SESSION_SAVE_EVERY_REQUEST = _env_bool("DJANGO_SESSION_SAVE_EVERY_REQUEST", default=True)
 SESSION_IDLE_TIMEOUT_EXEMPT_PATHS: tuple[str, ...] = ()

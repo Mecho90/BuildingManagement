@@ -3,3 +3,4 @@ django-markdownify==0.9.5
 psycopg[binary]==3.2.11
 gunicorn==22.0.0
 whitenoise==6.6.0
+redis==5.2.1
