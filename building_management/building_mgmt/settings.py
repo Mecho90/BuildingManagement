@@ -170,6 +170,25 @@ DATABASES: dict[str, dict[str, object]] = {
     "default": _database_config_from_env(),
 }
 
+_cache_url = os.environ.get("DJANGO_CACHE_URL", "").strip()
+if _cache_url:
+    if _cache_url.startswith("redis://") or _cache_url.startswith("rediss://"):
+        CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.redis.RedisCache",
+                "LOCATION": _cache_url,
+            }
+        }
+    else:
+        raise ImproperlyConfigured("DJANGO_CACHE_URL must use redis:// or rediss://.")
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "building-management-local",
+        }
+    }
+
 # --- Auth ---
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
