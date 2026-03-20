@@ -35,11 +35,11 @@ from .common import CapabilityRequiredMixin, _querystring_without
 User = get_user_model()
 
 
-def _user_can_delete_budget(budget: BudgetRequest, user) -> bool:
+def _user_can_delete_budget(budget: BudgetRequest, user, *, resolver: CapabilityResolver | None = None) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if budget.status == BudgetRequest.Status.APPROVED:
-        resolver = CapabilityResolver(user)
+        resolver = resolver or CapabilityResolver(user)
         return resolver.has(Capability.APPROVE_BUDGETS, building_id=budget.building_id)
     return (
         budget.requester_id == getattr(user, "pk", None)
@@ -47,7 +47,7 @@ def _user_can_delete_budget(budget: BudgetRequest, user) -> bool:
     )
 
 
-def _user_can_archive_budget(budget: BudgetRequest, user) -> bool:
+def _user_can_archive_budget(budget: BudgetRequest, user, *, resolver: CapabilityResolver | None = None) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if budget.is_archived:
@@ -61,7 +61,7 @@ def _user_can_archive_budget(budget: BudgetRequest, user) -> bool:
         return False
     if budget.requester_id == getattr(user, "pk", None):
         return True
-    resolver = CapabilityResolver(user)
+    resolver = resolver or CapabilityResolver(user)
     return resolver.has(Capability.APPROVE_BUDGETS, building_id=budget.building_id)
 
 
@@ -205,8 +205,8 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
             Capability.APPROVE_BUDGETS,
             building_id=budget.building_id,
         )
-        ctx["can_delete_budget"] = _user_can_delete_budget(budget, self.request.user)
-        ctx["can_archive_budget"] = _user_can_archive_budget(budget, self.request.user)
+        ctx["can_delete_budget"] = _user_can_delete_budget(budget, self.request.user, resolver=resolver)
+        ctx["can_archive_budget"] = _user_can_archive_budget(budget, self.request.user, resolver=resolver)
         ctx["archive_budget_url"] = reverse("core:budget_archive", args=[budget.pk])
         return ctx
 
