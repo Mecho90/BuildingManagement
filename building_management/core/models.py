@@ -15,7 +15,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.db.models.functions import Lower
 from django.utils.functional import cached_property
 from django.utils import timezone
@@ -214,11 +214,13 @@ class TodoItemQuerySet(models.QuerySet):
 
         base_filter = models.Q(user=user)
         if ROLE_BACKOFFICE in roles:
-            technician_ids = (
-                Membership.objects.filter(role=ROLE_TECHNICIAN)
-                .values_list("user_id", flat=True)
+            technician_membership_exists = Membership.objects.filter(
+                user_id=OuterRef("user_id"),
+                role=ROLE_TECHNICIAN,
             )
-            base_filter |= models.Q(user_id__in=technician_ids)
+            return self.annotate(
+                _visible_technician=Exists(technician_membership_exists)
+            ).filter(base_filter | models.Q(_visible_technician=True))
         return self.filter(base_filter)
 
     def for_week(self, week_start_date: date | None):
