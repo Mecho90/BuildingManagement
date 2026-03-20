@@ -307,5 +307,5 @@ if _csrf_origins:
 # --- Sessions ---
 SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes inactivity window
 SESSION_COOKIE_AGE = SESSION_IDLE_TIMEOUT_SECONDS
-SESSION_SAVE_EVERY_REQUEST = _env_bool("DJANGO_SESSION_SAVE_EVERY_REQUEST", default=True)  # sliding expiry keeps active users signed in
+SESSION_SAVE_EVERY_REQUEST = _env_bool("DJANGO_SESSION_SAVE_EVERY_REQUEST", default=False)
 SESSION_IDLE_TIMEOUT_EXEMPT_PATHS: tuple[str, ...] = ()
