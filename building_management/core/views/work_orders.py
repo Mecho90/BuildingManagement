@@ -14,6 +14,7 @@ from django.core.exceptions import FieldDoesNotExist
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Value, When
+from django.db.models.functions import Coalesce
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
@@ -179,9 +180,13 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
 
         # owner choices
         self._owner_choices = []
-        owner_ids = set(qs.values_list("building__owner_id", flat=True))
-        owner_ids.update(qs.values_list("forwarded_to_building__owner_id", flat=True))
-        owner_ids = [oid for oid in owner_ids if oid]
+        owner_ids = [
+            oid
+            for oid in qs.annotate(
+                owner_choice_id=Coalesce("forwarded_to_building__owner_id", "building__owner_id")
+            ).values_list("owner_choice_id", flat=True).distinct()
+            if oid
+        ]
         self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
 
         qs = qs.annotate(
@@ -630,13 +635,13 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
             # Build owner choices for staff (before additional filters)
             self._owner_choices: list[dict[str, str]] = []
             if self._can_filter_owner:
-                owner_ids = set(
-                    base_qs.values_list("building__owner_id", flat=True)
-                )
-                owner_ids.update(
-                    base_qs.values_list("forwarded_to_building__owner_id", flat=True)
-                )
-                owner_ids = [oid for oid in owner_ids if oid]
+                owner_ids = [
+                    oid
+                    for oid in base_qs.annotate(
+                        owner_choice_id=Coalesce("forwarded_to_building__owner_id", "building__owner_id")
+                    ).values_list("owner_choice_id", flat=True).distinct()
+                    if oid
+                ]
                 self._owner_choices = _cached_owner_choices(tuple(sorted(owner_ids)))
             else:
                 self._owner_choices = []
