@@ -125,7 +125,10 @@ def _user_has_capability(user, capability: str) -> bool:
         return False
     if user.is_superuser:
         return True
-    resolver = CapabilityResolver(user)
+    resolver = getattr(user, "_capability_resolver_cache", None)
+    if resolver is None:
+        resolver = CapabilityResolver(user)
+        setattr(user, "_capability_resolver_cache", resolver)
     return resolver.has(capability)
 
 
@@ -139,9 +142,21 @@ def _user_has_building_capability(user, building, *capabilities: str) -> bool:
     building_id = getattr(building, "pk", None)
     if building_id is None:
         return False
-    resolver = CapabilityResolver(user)
+    resolver = getattr(user, "_capability_resolver_cache", None)
+    if resolver is None:
+        resolver = CapabilityResolver(user)
+        setattr(user, "_capability_resolver_cache", resolver)
+    cache = getattr(user, "_building_capability_cache", None)
+    if cache is None:
+        cache = {}
+        setattr(user, "_building_capability_cache", cache)
     for capability in capabilities or (Capability.MANAGE_BUILDINGS,):
-        if resolver.has(capability, building_id=building_id):
+        key = (building_id, capability)
+        allowed = cache.get(key)
+        if allowed is None:
+            allowed = resolver.has(capability, building_id=building_id)
+            cache[key] = allowed
+        if allowed:
             return True
     return False
 
