@@ -300,6 +300,14 @@ def _parse_week_param(raw: str | None):
     return start_of_week(parsed)
 
 
+def _bounded_int_param(raw_value, *, default: int, min_value: int, max_value: int) -> int:
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        value = default
+    return max(min_value, min(max_value, value))
+
+
 def _todo_queryset_for(request):
     return (
         TodoItem.objects.visible_to(request.user)
@@ -996,12 +1004,29 @@ def api_budget_request_detail(request, pk: int):
 def api_budget_expenses(request, budget_id: int):
     budget = _get_budget_or_404(request, budget_id)
     if request.method == "GET":
-        expenses = (
+        per_value = _bounded_int_param(request.GET.get("per"), default=50, min_value=10, max_value=200)
+        page_value = _bounded_int_param(request.GET.get("page"), default=1, min_value=1, max_value=10_000)
+        expenses_qs = (
             budget.expenses.select_related("expense_type")
             .prefetch_related("attachments")
             .order_by("-incurred_on", "-id")
         )
-        return JsonResponse({"results": [_expense_payload(expense) for expense in expenses]}, status=200)
+        paginator = Paginator(expenses_qs, per_value)
+        page_obj = paginator.get_page(page_value)
+        return JsonResponse(
+            {
+                "results": [_expense_payload(expense) for expense in page_obj.object_list],
+                "count": paginator.count,
+                "pagination": {
+                    "page": page_obj.number,
+                    "per": per_value,
+                    "pages": max(1, paginator.num_pages),
+                    "has_previous": page_obj.has_previous(),
+                    "has_next": page_obj.has_next(),
+                },
+            },
+            status=200,
+        )
     if not _user_can_log_budget_expense(request.user, budget):
         return JsonResponse({"error": _("You cannot add expenses to this budget.")}, status=403)
     data = request.POST or None
@@ -1056,11 +1081,29 @@ def api_workorder_attachments(request, pk: int):
     order = _get_work_order_or_404(request, pk)
 
     if request.method == "GET":
+        per_value = _bounded_int_param(request.GET.get("per"), default=50, min_value=10, max_value=200)
+        page_value = _bounded_int_param(request.GET.get("page"), default=1, min_value=1, max_value=10_000)
+        attachments_qs = order.attachments.order_by("-created_at")
+        paginator = Paginator(attachments_qs, per_value)
+        page_obj = paginator.get_page(page_value)
         attachments = [
             _attachment_payload(request, obj, order)
-            for obj in order.attachments.order_by("-created_at")
+            for obj in page_obj.object_list
         ]
-        return JsonResponse({"attachments": attachments}, status=200)
+        return JsonResponse(
+            {
+                "attachments": attachments,
+                "count": paginator.count,
+                "pagination": {
+                    "page": page_obj.number,
+                    "per": per_value,
+                    "pages": max(1, paginator.num_pages),
+                    "has_previous": page_obj.has_previous(),
+                    "has_next": page_obj.has_next(),
+                },
+            },
+            status=200,
+        )
 
     if not _user_has_building_capability(
         request.user,
