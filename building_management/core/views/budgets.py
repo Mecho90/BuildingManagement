@@ -430,6 +430,8 @@ class BudgetArchiveView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
 
 class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateView):
     template_name = "core/budgets_archived.html"
+    PER_CHOICES = (10, 25, 50, 100)
+    PER_DEFAULT = 25
 
     def dispatch(self, request, *args, **kwargs):
         resolver = CapabilityResolver(request.user)
@@ -446,32 +448,55 @@ class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Tem
             .with_totals()
             .order_by("requester__username", "-archived_at")
         )
+        requester_summaries = budgets.values(
+            "requester_id",
+            "requester__first_name",
+            "requester__last_name",
+            "requester__username",
+        ).annotate(
+            total_requested=models.Sum("requested_amount"),
+            total_spent=models.Sum("spent_amount"),
+        ).order_by("requester__username", "requester_id")
+        try:
+            per_value = int(self.request.GET.get("per", self.PER_DEFAULT))
+        except (TypeError, ValueError):
+            per_value = self.PER_DEFAULT
+        if per_value not in self.PER_CHOICES:
+            per_value = self.PER_DEFAULT
+        page_obj = Paginator(requester_summaries, per_value).get_page(self.request.GET.get("page") or 1)
+        requester_ids = [row["requester_id"] for row in page_obj.object_list if row["requester_id"]]
+        budgets_by_requester: dict[int, list[BudgetRequest]] = {}
+        owner_map: dict[int, object] = {}
+        if requester_ids:
+            for budget in budgets.filter(requester_id__in=requester_ids):
+                budgets_by_requester.setdefault(budget.requester_id, []).append(budget)
+                if budget.requester_id not in owner_map:
+                    owner_map[budget.requester_id] = budget.requester
         groups = []
-        group_map = {}
-        for budget in budgets:
-            key = budget.requester_id or 0
-            if key not in group_map:
-                owner = budget.requester
-                if owner:
-                    name = owner.get_full_name() or owner.get_username()
-                else:
-                    name = _("Unknown requester")
-                group = {
+        for row in page_obj.object_list:
+            requester_id = row.get("requester_id")
+            owner = owner_map.get(requester_id) if requester_id else None
+            owner_name = " ".join(
+                [part for part in [row.get("requester__first_name"), row.get("requester__last_name")] if part]
+            ).strip()
+            if not owner_name:
+                owner_name = row.get("requester__username") or _("Unknown requester")
+            groups.append(
+                {
                     "owner": owner,
-                    "owner_name": name,
-                    "budgets": [],
-                    "total_requested": Decimal("0.00"),
-                    "total_spent": Decimal("0.00"),
+                    "owner_name": owner_name,
+                    "budgets": budgets_by_requester.get(requester_id, []),
+                    "total_requested": row.get("total_requested") or Decimal("0.00"),
+                    "total_spent": row.get("total_spent") or Decimal("0.00"),
                 }
-                group_map[key] = group
-                groups.append(group)
-            entry = group_map[key]
-            entry["budgets"].append(budget)
-            entry["total_requested"] += Decimal(budget.requested_amount or 0)
-            entry["total_spent"] += budget.spent_total
+            )
         ctx["owner_groups"] = groups
+        ctx["owner_groups_page"] = page_obj
+        ctx["pagination_query"] = _querystring_without(self.request, "page")
+        ctx["per"] = per_value
+        ctx["per_choices"] = self.PER_CHOICES
         ctx["back_url"] = reverse("core:work_orders_archive")
-        ctx["requester_total"] = len(groups)
+        ctx["requester_total"] = page_obj.paginator.count
         return ctx
 
 
