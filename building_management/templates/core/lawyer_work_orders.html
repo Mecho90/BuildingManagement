@@ -1,56 +1,46 @@
+{# path: templates/core/lawyer_work_orders.html #}
 {% extends "base.html" %}
 {% load i18n %}
 
 {% block title %}{% trans "Lawyer Orders" %} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
-<section class="space-y-6">
-  <header class="rounded-2xl border border-emerald-100 bg-white p-6 shadow-card dark:border-slate-800 dark:bg-slate-900">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Lawyer Orders" %}</h1>
-        <p class="text-sm text-slate-600 dark:text-slate-300">
-          {% blocktrans with total=lawyer_orders_total %}Total lawyer orders: {{ total }}{% endblocktrans %}
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-2 self-start sm:self-center">
-        {% if can_add_lawyer_order %}
-          <a class="btn" href="{% url 'core:work_order_create' %}?lawyer_only=1&next={{ request.get_full_path|urlencode }}">{% trans "Add new lawyer order" %}</a>
-        {% endif %}
-        {% if can_mass_delete_lawyer_orders and mass_delete_lawyer_orders_url %}
-          <a class="btn btn-outline" href="{{ mass_delete_lawyer_orders_url }}">{% trans "Delete lawyer orders" %}</a>
-        {% endif %}
-      </div>
+<section class="space-y-8">
+  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Lawyer Orders" %}</h1>
+      <p class="text-sm font-medium text-slate-600 dark:text-slate-300">
+        {% blocktrans with count=total_orders %}Total lawyer orders: {{ count }}{% endblocktrans %}
+      </p>
     </div>
-  </header>
+    <div class="flex flex-wrap gap-2 self-start md:self-center">
+      {% if can_add_lawyer_order %}
+        <a class="btn" href="{% url 'core:work_order_create' %}?lawyer_only=1&next={{ request.get_full_path|urlencode }}">{% trans "Add new lawyer order" %}</a>
+      {% endif %}
+      {% if can_mass_delete_lawyer_orders and mass_delete_lawyer_orders_url %}
+        <a class="btn btn-outline" href="{{ mass_delete_lawyer_orders_url }}">{% trans "Delete lawyer orders" %}</a>
+      {% endif %}
+    </div>
+  </div>
 
-  <form method="get" class="filter-panel">
-    <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-3">
-      <div class="space-y-2 md:col-span-2 lg:col-span-3">
-        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search lawyer work orders" %}</label>
-        <input
-          id="id_q"
-          class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-          type="text"
-          name="q"
-          value="{{ q }}"
-          placeholder="{% trans "Title or description" %}"
-          autocomplete="off"
-        />
-      </div>
+  <form method="get" class="ui-panel filter-panel space-y-3" id="work-order-filter-form">
+    <div class="space-y-1">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search work orders" %}</label>
+      <input
+        id="id_q"
+        class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+        type="text"
+        name="q"
+        value="{{ q }}"
+        placeholder="{% trans "Title or description" %}"
+        autocomplete="off"
+      />
+    </div>
 
-      <div class="space-y-2">
-        <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-        <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-          {% for opt in per_choices %}
-            <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="space-y-2">
+    <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="space-y-1">
         <label for="id_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
-        <select id="id_status" name="status" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+        <select id="id_status" name="status" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           <option value="" {% if not status %}selected{% endif %}>{% trans "All" %}</option>
           {% for val, label in status_choices %}
             <option value="{{ val }}" {% if status == val %}selected{% endif %}>{{ label }}</option>
@@ -58,20 +48,20 @@
         </select>
       </div>
 
-      <div class="space-y-2">
+      <div class="space-y-1">
         <label for="id_priority" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Priority" %}</label>
-        <select id="id_priority" name="priority" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
-          <option value="" {% if not priority %}selected{% endif %}>{% trans "All priorities" %}</option>
-          {% for val, label in priority_choices %}
-            <option value="{{ val }}" {% if priority == val %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
+        <select id="id_priority" name="priority" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+          <option value="" {% if not priority %}selected{% endif %}>{% trans "All" %}</option>
+          <option value="HIGH" {% if priority == 'HIGH' %}selected{% endif %}>{% trans "High" %}</option>
+          <option value="MEDIUM" {% if priority == 'MEDIUM' %}selected{% endif %}>{% trans "Medium" %}</option>
+          <option value="LOW" {% if priority == 'LOW' %}selected{% endif %}>{% trans "Low" %}</option>
         </select>
       </div>
 
       {% if owner_choices %}
-        <div class="space-y-2">
-          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Отговорник" %}</label>
-          <select id="id_owner" name="owner" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+        <div class="space-y-1">
+          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+          <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
             {% for opt in owner_choices %}
               <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
@@ -80,114 +70,266 @@
         </div>
       {% endif %}
 
-      <div class="space-y-2">
-        <label for="id_deadline_range" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Deadline range" %}</label>
-        <input
-          id="id_deadline_range"
-          name="deadline_range"
-          type="text"
-          placeholder="{% trans 'YYYY-MM-DD / YYYY-MM-DD' %}"
-          value="{{ deadline_range }}"
-          class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-        />
-      </div>
-
-      <div class="space-y-2">
+      <div class="space-y-1">
         <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
-        <select id="id_sort" name="sort" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+        <select id="id_sort" name="sort" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+          <option value="" {% if not sort or sort == 'priority' %}selected{% endif %}>{% trans "All" %}</option>
           {% for value, label in sort_choices %}
-            <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+            {% if value != 'priority' %}
+              <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+            {% endif %}
           {% endfor %}
         </select>
+      </div>
+
+      <div class="space-y-1 md:col-span-2 lg:col-span-4">
+        <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+        <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+          {% for opt in per_choices %}
+            <option value="{{ opt }}" {% if per == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="space-y-1 md:col-span-2 lg:col-span-2">
+        <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Date range" %}</span>
+        <div class="grid gap-2 md:grid-cols-2">
+          <label for="id_deadline_from" class="sr-only">{% trans "From date" %}</label>
+          <input
+            id="id_deadline_from"
+            name="deadline_from"
+            type="date"
+            value="{{ deadline_from }}"
+            class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+          />
+          <label for="id_deadline_to" class="sr-only">{% trans "To date" %}</label>
+          <input
+            id="id_deadline_to"
+            name="deadline_to"
+            type="date"
+            value="{{ deadline_to }}"
+            class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+          />
+        </div>
       </div>
     </div>
 
     <div class="filter-panel__actions">
-      {% if q or status or owner or sort != 'priority' or per != 25 or priority or deadline_range %}
+      {% if has_active_filters %}
         <a class="btn btn-secondary" href="{% url 'core:lawyer_work_orders' %}">{% trans "Reset" %}</a>
       {% endif %}
-      <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
+      <button class="btn" type="submit">{% trans "Apply filters" %}</button>
     </div>
   </form>
 
-  <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-900">
-    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-      <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-        <tr>
+  {% if active_filter_chips %}
+    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+      <div class="flex flex-wrap items-center gap-2">
+        {% for chip in active_filter_chips %}
+          <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+            {{ chip.label }}
+            <a href="{{ chip.remove_url }}" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-800/60" aria-label="{% trans 'Remove filter' %}">×</a>
+          </span>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {% if is_paginated %}
+    <div class="space-y-3">
+      {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
+      {% if paginator.num_pages > 10 %}
+        <form method="get" class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          {% for key, value in request.GET.items %}
+            {% if key != "page" %}
+              <input type="hidden" name="{{ key }}" value="{{ value }}" />
+            {% endif %}
+          {% endfor %}
+          <label for="id_lawyer_page_jump_top" class="font-medium">{% trans "Jump to page" %}</label>
+          <input id="id_lawyer_page_jump_top" type="number" name="page" min="1" max="{{ paginator.num_pages }}" value="{{ page_obj.number }}" class="input w-24 rounded-xl border border-slate-300 px-2 py-1 dark:border-slate-600" />
+          <button type="submit" class="btn btn-secondary btn-sm">{% trans "Go" %}</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="grid gap-4 md:hidden">
+    {% for w in orders %}
+      <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
+              <a href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200">{{ w.title }}</a>
+            </h2>
+            {% include "components/expense_amount_indicator.html" with amount=w.expense_total %}
+          </div>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            <span class="font-semibold">{% trans "Building" %}:</span>
+            <a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'core:building_detail' w.building_id %}">{{ w.building.name }}</a>
+          </p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            <span class="font-semibold">{% trans "Budget" %}:</span>
+            {% if w.expense_total %}
+              {{ w.expense_total|floatformat:2 }}
+            {% else %}
+              —
+            {% endif %}
+          </p>
+          <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
+            {% if w.priority == 'HIGH' %}
+              <span class="inline-flex items-center gap-1 rounded-full border border-rose-700 bg-rose-600 px-2.5 py-1 text-white shadow-sm">⬤ {% trans "High" %}</span>
+            {% elif w.priority == 'MEDIUM' %}
+              <span class="inline-flex items-center gap-1 rounded-full border border-amber-500 bg-amber-300 px-2.5 py-1 text-amber-950 shadow-sm">⬤ {% trans "Medium" %}</span>
+            {% else %}
+              <span class="inline-flex items-center gap-1 rounded-full border border-emerald-700 bg-emerald-600 px-2.5 py-1 text-white shadow-sm">⬤ {% trans "Low" %}</span>
+            {% endif %}
+            {% with code=w.status|stringformat:"s" %}
+              {% if code == 'OPEN' %}<span class="status-chip status-chip--info">{% trans "New" %}</span>
+              {% elif code == 'IN_PROGRESS' %}<span class="status-chip status-chip--warning">{% trans "In Progress" %}</span>
+              {% elif code == 'AWAITING_APPROVAL' %}<span class="status-chip status-chip--warning">{% trans "Awaiting Approval" %}</span>
+              {% elif code == 'DONE' %}<span class="status-chip status-chip--success">{% trans "Done" %}</span>
+              {% elif code == 'APPROVED' %}<span class="status-chip status-chip--success">{% trans "Approved" %}</span>
+              {% elif code == 'ARCHIVED' %}<span class="status-chip bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-100">{% trans "Archived" %}</span>
+              {% else %}<span class="status-chip status-chip--info">{{ w.get_status_display }}</span>{% endif %}
+            {% endwith %}
+          </div>
+          <p class="text-sm {% if w.is_overdue %}font-semibold text-rose-700 dark:text-rose-300{% else %}text-slate-600 dark:text-slate-300{% endif %}">
+            <span class="font-semibold">{% trans "Deadline" %}:</span>
+            {% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% if w.deadline_hint %} · {{ w.deadline_hint }}{% endif %}{% else %}—{% endif %}
+          </p>
+        </div>
+
+        <div class="grid gap-2">
+          <a class="btn w-full" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "View" %}</a>
+          <a class="btn btn-secondary w-full" href="{% url 'core:work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Edit" %}</a>
+          <div class="grid gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2 dark:border-rose-800 dark:bg-rose-900/20">
+            {% if w.status == 'DONE' %}
+              <form action="{% url 'core:work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post">
+                {% csrf_token %}
+                <button class="btn btn-archive btn-sm w-full" type="submit">{% trans "Archive" %}</button>
+              </form>
+            {% endif %}
+            <a class="btn btn-danger btn-sm w-full" href="{% url 'core:work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
+          </div>
+        </div>
+      </article>
+    {% empty %}
+      <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        {% if has_active_filters %}
+          <p class="text-sm text-slate-600 dark:text-slate-300">{% trans "No work orders match your filters." %}</p>
+          <a class="btn btn-secondary mt-3" href="{% url 'core:lawyer_work_orders' %}">{% trans "Reset filters" %}</a>
+        {% else %}
+          <p class="text-sm text-slate-600 dark:text-slate-300">{% trans "No work orders yet." %}</p>
+          {% if can_add_lawyer_order %}
+            <a class="btn mt-3" href="{% url 'core:work_order_create' %}?lawyer_only=1&next={{ request.get_full_path|urlencode }}">{% trans "Create your first work order" %}</a>
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="hidden md:block">
+    <div class="overflow-x-auto overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-700">
+    <table class="min-w-full divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
+      <thead class="bg-slate-50 dark:bg-slate-800">
+        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
           <th class="px-4 py-3">{% trans "Title" %}</th>
           <th class="px-4 py-3">{% trans "Building" %}</th>
-          <th class="px-4 py-3">{% trans "Deadline" %}</th>
+          {% if show_owner_info %}
+            <th class="px-4 py-3">{% trans "Owner" %}</th>
+            <th class="px-4 py-3">{% trans "Role" %}</th>
+          {% endif %}
+          <th class="px-4 py-3">{% trans "Unit" %}</th>
           <th class="px-4 py-3">{% trans "Priority" %}</th>
           <th class="px-4 py-3">{% trans "Status" %}</th>
-          <th class="px-4 py-3">{% trans "Created by" %}</th>
+          <th class="px-4 py-3">{% trans "Budget" %}</th>
+          <th class="px-4 py-3">{% trans "Deadline" %}</th>
+          <th class="px-4 py-3">{% trans "Created" %}</th>
           <th class="px-4 py-3 text-right">{% trans "Actions" %}</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-        {% for order in work_orders %}
-          <tr class="text-slate-700 dark:text-slate-100">
-            <td class="px-4 py-3 font-semibold">
-              <div class="flex flex-wrap items-center gap-2">
-                <a href="{% url 'core:work_order_detail' order.pk %}" class="text-emerald-600 hover:text-emerald-700 dark:text-emerald-300 dark:hover:text-emerald-200">
-                  {{ order.title }}
-                </a>
-                {% include "components/expense_amount_indicator.html" with amount=order.expense_total %}
-              </div>
-              {% if order.forwarded_to_building %}
-                <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
-                  {% blocktrans with destination=order.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
-                </div>
-              {% endif %}
+        {% for w in orders %}
+          <tr class="text-sm text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
+              <a class="break-words hyphens-auto" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
+            </td>
+            <td class="px-4 py-3"><a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'core:building_detail' w.building_id %}">{{ w.building.name }}</a></td>
+            {% if show_owner_info %}
+              <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
+                {% with owner=w.building.owner %}
+                  {% if owner %}{{ owner.get_full_name|default:owner.username }}{% else %}—{% endif %}
+                {% endwith %}
+              </td>
+              <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ w.building.get_role_display|default:"—" }}</td>
+            {% endif %}
+            <td class="px-4 py-3">{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</td>
+            <td class="px-4 py-3">
+              {% include "components/badges/priority.html" with level=w.priority label=w.get_priority_display size="sm" %}
             </td>
             <td class="px-4 py-3">
-              <div class="space-y-1">
-                {{ order.building.name|default:"—" }}
-                {% if order.forwarded_to_building %}
-                  <div class="text-xs text-slate-500 dark:text-slate-400">
-                    {% blocktrans with destination=order.forwarded_to_building.name %}→ {{ destination }}{% endblocktrans %}
-                  </div>
-                {% endif %}
-              </div>
-            </td>
-            <td class="px-4 py-3">{{ order.deadline|date:"Y-m-d" }}</td>
-            <td class="px-4 py-3">
-              {% include "components/badges/priority.html" with level=order.priority label=order.get_priority_display size="sm" %}
+              {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
             </td>
             <td class="px-4 py-3">
-              {% include "core/includes/status_badge.html" with status=order.status label=order.get_status_display %}
-            </td>
-            <td class="px-4 py-3">
-              {% if order.created_by %}
-                {{ order.created_by.get_full_name|default:order.created_by.username }}
+              {% if w.expense_total %}
+                {{ w.expense_total|floatformat:2 }}
               {% else %}
-                {% trans "Unknown" %}
+                —
               {% endif %}
             </td>
-            <td class="px-4 py-3">
-              <div class="flex flex-wrap justify-end gap-2">
-                {% if order.status == 'DONE' %}
-                  <form action="{% url 'core:work_order_archive' order.pk %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
+            <td class="px-4 py-3 {% if w.is_overdue %}font-semibold text-rose-700 dark:text-rose-300{% endif %}">
+              {% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% if w.deadline_hint %}<div class="text-xs">{{ w.deadline_hint }}</div>{% endif %}{% else %}—{% endif %}
+            </td>
+            <td class="px-4 py-3">{{ w.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="px-4 py-3 text-right">
+              <div class="flex justify-end items-center gap-2">
+                <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "View" %}</a>
+                <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Edit" %}</a>
+                {% if w.status == 'DONE' %}
+                  <form action="{% url 'core:work_order_archive' w.id %}?next={{ request.get_full_path|urlencode }}" method="post" class="inline-flex">
                     {% csrf_token %}
                     <button class="btn btn-archive btn-sm" type="submit">{% trans "Archive" %}</button>
                   </form>
                 {% endif %}
-                <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' order.pk %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
+                <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Delete" %}</a>
               </div>
             </td>
           </tr>
         {% empty %}
           <tr>
-            <td colspan="7" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">
-              {% trans "No lawyer-created work orders found." %}
+            <td colspan="{% if show_owner_info %}11{% else %}9{% endif %}" class="px-4 py-12 text-center text-slate-500 dark:text-slate-300">
+              {% if has_active_filters %}
+                <div class="space-y-3">
+                  <p class="text-sm">{% trans "No work orders match your filters." %}</p>
+                  <a class="btn btn-secondary btn-sm" href="{% url 'core:lawyer_work_orders' %}">{% trans "Reset filters" %}</a>
+                </div>
+              {% else %}
+                <p class="text-sm">{% trans "No work orders yet." %}</p>
+              {% endif %}
             </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 
   {% if is_paginated %}
-    {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=request.GET.urlencode %}
+    <div class="space-y-3">
+      {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
+      {% if paginator.num_pages > 10 %}
+        <form method="get" class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          {% for key, value in request.GET.items %}
+            {% if key != "page" %}
+              <input type="hidden" name="{{ key }}" value="{{ value }}" />
+            {% endif %}
+          {% endfor %}
+          <label for="id_lawyer_page_jump_bottom" class="font-medium">{% trans "Jump to page" %}</label>
+          <input id="id_lawyer_page_jump_bottom" type="number" name="page" min="1" max="{{ paginator.num_pages }}" value="{{ page_obj.number }}" class="input w-24 rounded-xl border border-slate-300 px-2 py-1 dark:border-slate-600" />
+          <button type="submit" class="btn btn-secondary btn-sm">{% trans "Go" %}</button>
+        </form>
+      {% endif %}
+    </div>
   {% endif %}
 </section>
 {% endblock %}

@@ -14,6 +14,7 @@ from .admin import (
     AdminUserListView,
     AdminUserPasswordView,
     AdminUserUpdateView,
+    AdminWorkOrderBulkArchiveView,
     AdminWorkOrderBulkDeleteView,
 )
 from .api import (
@@ -25,6 +26,7 @@ from .api import (
     api_todo_calendar,
     api_todo_completed_clear,
     api_todo_detail,
+    api_todo_summary,
     api_todos,
     api_units,
     api_workorder_attachment_detail,
@@ -86,6 +88,7 @@ from .work_orders import (
     WorkOrderDeleteView,
     WorkOrderDetailView,
     WorkOrderListView,
+    WorkOrderQuickStatusView,
     WorkOrderUpdateView,
 )
 from ..views_theme import toggle_theme
@@ -118,6 +121,7 @@ __all__ = [
     "AdminUserListView",
     "AdminUserPasswordView",
     "AdminUserUpdateView",
+    "AdminWorkOrderBulkArchiveView",
     "api_buildings",
     "api_budget_requests",
     "api_budget_request_detail",
@@ -126,6 +130,7 @@ __all__ = [
     "api_todos",
     "api_todo_calendar",
     "api_todo_completed_clear",
+    "api_todo_summary",
     "api_todo_detail",
     "api_units",
     "api_workorder_attachments",
@@ -166,6 +171,7 @@ __all__ = [
     "WorkOrderDetailView",
     "WorkOrderBudgetChargeView",
     "WorkOrderListView",
+    "WorkOrderQuickStatusView",
     "WorkOrderUpdateView",
     "forwarding_health",
 ]

@@ -27,60 +27,73 @@
         </div>
       </div>
     </div>
-    <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
-      <div class="flex items-center justify-end text-xs text-slate-500">
-        <button type="button" id="todo-calendar-cancel" class="hidden font-semibold text-emerald-600 hover:text-emerald-500">{% trans "Cancel move" %}</button>
-      </div>
+    <div class="overflow-hidden">
       <div class="mt-3" id="todo-calendar-grid"></div>
     </div>
   </section>
-  <div class="grid gap-6 lg:grid-cols-3">
-    <div class="space-y-6 lg:col-span-2">
+
+  <section class="todo-priority-zone">
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+      <article class="todo-stat todo-stat--due-today">
+        <p class="todo-stat__label">{% trans "Due today" %}</p>
+        <p class="todo-stat__value" id="todo-stat-due-today">0</p>
+      </article>
+      <article class="todo-stat todo-stat--overdue">
+        <p class="todo-stat__label">{% trans "Overdue" %}</p>
+        <p class="todo-stat__value" id="todo-stat-overdue">0</p>
+      </article>
+      <article class="todo-stat todo-stat--next-week">
+        <p class="todo-stat__label">{% trans "Due in next 7 days" %}</p>
+        <p class="todo-stat__value" id="todo-stat-due-next-week">0</p>
+      </article>
+      <article class="todo-stat todo-stat--completed">
+        <p class="todo-stat__label">{% trans "Completed" %}</p>
+        <p class="todo-stat__value" id="todo-stat-completed">0</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <div class="space-y-6">
       <section class="space-y-4">
         <div class="flex items-center justify-between gap-3">
-          <h2 class="text-xl font-semibold text-brand-foreground dark:text-white mt-2">{% trans "Planner" %}</h2>
+          <h2 class="text-xl font-semibold text-brand-foreground dark:text-white mt-1">{% trans "Planner" %}</h2>
         </div>
         <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-5">
           <div class="flex flex-col gap-4">
-            <nav class="planner-tabs building-tabs flex items-center gap-2 border-b border-slate-200 pb-2 dark:border-slate-700" aria-label="{% trans 'Planner tabs' %}">
-              <button type="button" class="todo-tab building-tabs__link rounded-t-2xl px-6 py-3 text-base font-semibold tracking-wide border-b-4 transition-all duration-200 relative border-transparent text-slate-500 hover:border-orange-300 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-200" data-tab="all">
+            <nav class="planner-tabs flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-slate-700" aria-label="{% trans 'Planner tabs' %}">
+              <button type="button" class="todo-tab nav-link" data-tab="all">
                 {% trans "All tasks" %}
               </button>
-              <span class="h-10 w-px rounded-full bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700" aria-hidden="true"></span>
-              <button type="button" class="todo-tab building-tabs__link active rounded-t-2xl px-6 py-3 text-base font-semibold tracking-wide border-b-4 transition-all duration-200 relative border-orange-500 bg-orange-50 text-orange-600 shadow-sm hover:border-orange-300 hover:text-orange-600 dark:border-orange-400 dark:bg-orange-500/10 dark:text-orange-200 dark:hover:text-orange-200" data-tab="this-week">
-                {% trans "This Week" %}
+              <button type="button" class="todo-tab nav-link nav-link--active" data-tab="this-week">
+                {% trans "Pending" %}
               </button>
-              <span class="h-10 w-px rounded-full bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700" aria-hidden="true"></span>
-              <button type="button" class="todo-tab building-tabs__link rounded-t-2xl px-6 py-3 text-base font-semibold tracking-wide border-b-4 transition-all duration-200 relative border-transparent text-slate-500 hover:border-orange-300 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-200" data-tab="upcoming">
+              <button type="button" class="todo-tab nav-link" data-tab="upcoming">
                 {% trans "Upcoming" %}
               </button>
               {% if show_completed_tab %}
-                <span class="h-10 w-px rounded-full bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700" aria-hidden="true"></span>
-                <button type="button" class="todo-tab building-tabs__link rounded-t-2xl px-6 py-3 text-base font-semibold tracking-wide border-b-4 transition-all duration-200 relative border-transparent text-slate-500 hover:border-orange-300 hover:text-orange-600 dark:text-slate-300 dark:hover:text-orange-200" data-tab="completed">
+                <button type="button" class="todo-tab nav-link" data-tab="completed">
                   {% trans "Completed" %}
                 </button>
               {% endif %}
             </nav>
-            <form class="filter-panel">
-              {% if show_completed_tab %}
-                <div class="flex items-center justify-end gap-3">
-                  <button class="btn btn-danger btn-sm hidden" id="todo-completed-delete-all" data-confirm="{% trans "Delete all completed tasks? This cannot be undone." %}">{% trans "Delete all" %}</button>
-                </div>
-              {% endif %}
-              <div class="filter-panel__grid md:grid-cols-{% if owner_filter_options %}3{% else %}2{% endif %}">
-                <div class="space-y-2">
-                  <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-search">{% trans "Search tasks" %}</label>
-                  <input
-                    id="todo-search"
-                    class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-                    type="text"
-                    placeholder="{% trans 'Name or description' %}"
-                    autocomplete="off"
-                  />
-                </div>
+
+            <form class="filter-panel" id="todo-filter-form">
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-search">{% trans "Search tasks" %}</label>
+                <input
+                  id="todo-search"
+                  class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+                  type="text"
+                  placeholder="{% trans 'Name or description' %}"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 {% if owner_filter_options %}lg:grid-cols-3{% else %}lg:grid-cols-2{% endif %}">
                 {% if owner_filter_options %}
                   <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-owner-filter">{% trans "Отговорник" %}</label>
+                    <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-owner-filter">{% trans "Owner" %}</label>
                     <select id="todo-owner-filter" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
                       <option value="all"{% if owner_filter_default == "all" %} selected{% endif %}>{% trans "All owners" %}</option>
                       {% for owner in owner_filter_options %}
@@ -98,29 +111,58 @@
                   </select>
                 </div>
               </div>
-              <div class="filter-panel__actions">
-                <button type="button" class="btn" id="todo-filter-apply">{% trans "Приложи филтрите" %}</button>
+
+              <div class="filter-panel__actions flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button type="button" class="btn" id="todo-filter-apply">{% trans "Apply filters" %}</button>
               </div>
             </form>
           </div>
+
+          <div id="todo-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+          <div id="todo-bulk-bar" class="hidden sticky top-2 z-20 rounded-xl border border-orange-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur dark:border-orange-500/40 dark:bg-slate-900/95">
+            <div class="flex flex-wrap items-center gap-2">
+              <span id="todo-bulk-count" class="text-sm font-semibold text-slate-700 dark:text-slate-100">0 {% trans "tasks selected" %}</span>
+              <button type="button" class="btn btn-sm" id="todo-bulk-mark-done">{% trans "Mark done" %}</button>
+              <button type="button" class="btn btn-danger btn-sm" id="todo-bulk-delete">{% trans "Delete" %}</button>
+            </div>
+          </div>
+
+          <div id="todo-pagination-top" data-todo-pagination class="hidden sticky top-16 z-10 items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-sm text-slate-600 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-200">
+            <p data-pagination-label class="text-sm font-medium text-slate-600 dark:text-slate-300"></p>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" class="btn btn-secondary btn-sm" data-pagination-prev>{% trans "Previous" %}</button>
+              <span data-pagination-page class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300"></span>
+              <button type="button" class="btn btn-secondary btn-sm" data-pagination-next>{% trans "Next" %}</button>
+              <label class="hidden items-center gap-2 text-xs text-slate-600 dark:text-slate-300" data-pagination-jump-wrap>
+                {% trans "Jump to" %}
+                <input type="number" min="1" class="input h-8 w-20 rounded-lg px-2 py-1 text-xs" data-pagination-jump-input />
+                <button type="button" class="btn btn-secondary btn-sm" data-pagination-jump-btn>{% trans "Go" %}</button>
+              </label>
+            </div>
+          </div>
+
           <div id="todo-list" class="space-y-3" aria-live="polite"></div>
           <div id="todo-empty" class="hidden rounded-2xl border border-dashed border-slate-200 bg-gradient-to-br from-white via-slate-50 to-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-            {% trans "No tasks for this view. Create one above to get started." %}
+            <p id="todo-empty-text">{% trans "No tasks for this view." %}</p>
           </div>
-          <div id="todo-pagination" class="hidden items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-            <p id="todo-pagination-label" class="text-sm font-medium text-slate-600 dark:text-slate-300"></p>
-            <div class="flex items-center gap-2">
-              <button type="button" class="btn btn-secondary btn-sm" id="todo-pagination-prev">{% trans "Previous" %}</button>
-              <span id="todo-pagination-page" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300"></span>
-              <button type="button" class="btn btn-secondary btn-sm" id="todo-pagination-next">{% trans "Next" %}</button>
+          <div id="todo-pagination" data-todo-pagination class="hidden items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <p id="todo-pagination-label" data-pagination-label class="text-sm font-medium text-slate-600 dark:text-slate-300"></p>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" class="btn btn-secondary btn-sm" id="todo-pagination-prev" data-pagination-prev>{% trans "Previous" %}</button>
+              <span id="todo-pagination-page" data-pagination-page class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300"></span>
+              <button type="button" class="btn btn-secondary btn-sm" id="todo-pagination-next" data-pagination-next>{% trans "Next" %}</button>
+              <label class="hidden items-center gap-2 text-xs text-slate-600 dark:text-slate-300" data-pagination-jump-wrap>
+                {% trans "Jump to" %}
+                <input type="number" min="1" class="input h-8 w-20 rounded-lg px-2 py-1 text-xs" data-pagination-jump-input />
+                <button type="button" class="btn btn-secondary btn-sm" data-pagination-jump-btn>{% trans "Go" %}</button>
+              </label>
             </div>
           </div>
         </div>
       </section>
     </div>
-
-    <div class="space-y-6"></div>
-  </div>
+  </section>
 </section>
 
 {{ todo_config|json_script:"todo-config" }}
@@ -129,6 +171,163 @@
 {% block extra_css %}
   {{ block.super }}
   <style>
+    .todo-priority-zone {}
+    .todo-stat {
+      border: 1px solid rgba(250, 204, 21, 0.8);
+      border-radius: 1.75rem;
+      background: rgba(255, 255, 255, 0.98);
+      padding: 1rem 1.25rem;
+      min-height: 6.8rem;
+    }
+    .todo-stat__label {
+      margin: 0;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #334155;
+    }
+    .todo-stat__value {
+      margin: 0.65rem 0 0;
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: #1e293b;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
+    }
+    .todo-stat--due-today .todo-stat__label {
+      color: #64748b;
+    }
+    .todo-stat--overdue .todo-stat__label {
+      color: #c2410c;
+    }
+    .todo-stat--next-week .todo-stat__label {
+      color: #1f2937;
+    }
+    .todo-stat--completed .todo-stat__label {
+      color: #e11d48;
+    }
+    .todo-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border-radius: 999px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(248, 250, 252, 0.95);
+      color: #334155;
+    }
+    .todo-chip button {
+      border: 0;
+      background: transparent;
+      font-size: 0.75rem;
+      color: #b45309;
+      line-height: 1;
+    }
+    .todo-card__priority {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border-radius: 999px;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+    }
+    .todo-card__priority--high {
+      color: #b91c1c;
+      background: #fee2e2;
+      border-color: #fca5a5;
+    }
+    .todo-card__priority--medium {
+      color: #92400e;
+      background: #fef3c7;
+      border-color: #fcd34d;
+    }
+    .todo-card__priority--low {
+      color: #1e3a8a;
+      background: #dbeafe;
+      border-color: #93c5fd;
+    }
+    .todo-card__due--overdue {
+      color: #b91c1c;
+      font-weight: 700;
+    }
+    .todo-card__quick-edit {
+      margin-top: 0.6rem;
+      display: grid;
+      gap: 0.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+    .todo-card__quick-edit label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .todo-card__quick-edit .input {
+      height: 2.25rem;
+      font-size: 0.85rem;
+    }
+    #todo-filter-apply:focus-visible,
+    [data-pagination-prev]:focus-visible,
+    [data-pagination-next]:focus-visible,
+    [data-pagination-jump-btn]:focus-visible,
+    #todo-bulk-mark-done:focus-visible,
+    #todo-bulk-delete:focus-visible {
+      outline: 3px solid rgba(249, 115, 22, 0.35);
+      outline-offset: 2px;
+    }
+    @media (max-width: 640px) {
+      .todo-card__actions {
+        width: 100%;
+      }
+      .todo-card__actions .btn {
+        width: 100%;
+      }
+      #todo-bulk-bar .btn,
+      #todo-bulk-bar .input {
+        width: 100%;
+      }
+    }
+    html.dark .todo-stat {
+      border-color: rgba(250, 204, 21, 0.55);
+      background: rgba(15, 23, 42, 0.9);
+    }
+    html.dark .todo-stat__label {
+      color: #cbd5e1;
+    }
+    html.dark .todo-stat__value {
+      color: #f8fafc;
+    }
+    html.dark .todo-chip {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: rgba(148, 163, 184, 0.4);
+      color: #e2e8f0;
+    }
+    html.dark .todo-card__priority--high {
+      background: rgba(220, 38, 38, 0.25);
+      border-color: rgba(248, 113, 113, 0.6);
+      color: #fecaca;
+    }
+    html.dark .todo-card__priority--medium {
+      background: rgba(245, 158, 11, 0.25);
+      border-color: rgba(251, 191, 36, 0.55);
+      color: #fef3c7;
+    }
+    html.dark .todo-card__priority--low {
+      background: rgba(37, 99, 235, 0.25);
+      border-color: rgba(96, 165, 250, 0.55);
+      color: #dbeafe;
+    }
     #todo-calendar-grid table {
       border-radius: 1.5rem;
       overflow: hidden;
@@ -194,5 +393,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/todos.js' %}?v=20260319-3" defer></script>
+  <script src="{% static 'js/todos.js' %}?v=20260321-1" defer></script>
 {% endblock %}

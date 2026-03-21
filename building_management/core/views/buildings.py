@@ -7,12 +7,13 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import BooleanField, Case, Count, IntegerField, Q, Value, When
+from django.db.models import BooleanField, Case, Count, IntegerField, Q, Sum, Value, When
 from django.db.models.functions import Lower
 from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.dateparse import parse_date
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
@@ -67,14 +68,17 @@ class BuildingListView(LoginRequiredMixin, ListView):
     context_object_name = "buildings"
 
     def get_paginate_by(self, queryset):
+        allowed = {25, 50, 100, 200}
         try:
-            return int(self.request.GET.get("per", 25))
+            value = int(self.request.GET.get("per", 25))
         except (TypeError, ValueError):
-            return 25
+            value = 25
+        return value if value in allowed else 25
 
     def get_queryset(self):
         user = self.request.user
         resolver = CapabilityResolver(user) if user.is_authenticated else None
+        today = timezone.localdate()
 
         self._ensure_office_building_for_user(user)
 
@@ -86,6 +90,22 @@ class BuildingListView(LoginRequiredMixin, ListView):
             Building.objects.visible_to(user)
             .with_unit_stats()
             .with_lawyer_alerts()
+            .annotate(
+                occupied_units_count=Count("units", filter=Q(units__is_occupied=True), distinct=True),
+                overdue_items_count=Count(
+                    "work_orders",
+                    filter=Q(
+                        work_orders__archived_at__isnull=True,
+                        work_orders__status__in=[
+                            WorkOrder.Status.OPEN,
+                            WorkOrder.Status.IN_PROGRESS,
+                            WorkOrder.Status.AWAITING_APPROVAL,
+                        ],
+                        work_orders__deadline__lt=today,
+                    ),
+                    distinct=True,
+                ),
+            )
             .select_related("owner")
         )
         office_id = Building.system_default_id()
@@ -106,8 +126,11 @@ class BuildingListView(LoginRequiredMixin, ListView):
             )
 
         owner_param = (self.request.GET.get("owner") or "").strip()
+        role_param = (self.request.GET.get("role") or "").strip()
         self._owner_filter = ""
         self._owner_options: list[dict[str, str]] = []
+        self._role_filter = ""
+        self._role_options = [{"value": value, "label": str(label)} for value, label in Building.Role.choices]
         if self._can_filter_owner:
             owner_ids = list(qs.values_list("owner_id", flat=True).distinct())
             owners = (
@@ -132,6 +155,10 @@ class BuildingListView(LoginRequiredMixin, ListView):
                     self._owner_filter = str(owner_id)
         else:
             owner_param = ""
+        valid_roles = {value for value, _ in Building.Role.choices}
+        if role_param and role_param in valid_roles:
+            qs = qs.filter(role=role_param)
+            self._role_filter = role_param
 
         # Sorting
         sort = (self.request.GET.get("sort") or "name").strip()
@@ -165,6 +192,12 @@ class BuildingListView(LoginRequiredMixin, ListView):
             sort_field = "-" + base if sort.startswith("-") else base
 
         self._effective_sort = sort
+        self._filtered_metrics = qs.aggregate(
+            total_buildings=Count("id", distinct=True),
+            occupied_units=Sum("occupied_units_count"),
+            open_work_orders=Sum("_work_orders_count"),
+            overdue_items=Sum("overdue_items_count"),
+        )
         return qs.order_by("-_office_priority", "-is_system_default", sort_field, "id")
 
     def _ensure_office_building_for_user(self, user) -> None:
@@ -208,6 +241,8 @@ class BuildingListView(LoginRequiredMixin, ListView):
         ctx["can_manage_buildings"] = can_manage_buildings
         ctx["owner_options"] = getattr(self, "_owner_options", [])
         ctx["owner_filter"] = getattr(self, "_owner_filter", "")
+        ctx["role_options"] = getattr(self, "_role_options", [])
+        ctx["role_filter"] = getattr(self, "_role_filter", "")
 
         ctx["pagination_query"] = _querystring_without(self.request, "page")
         paginator = ctx.get("paginator")
@@ -216,6 +251,65 @@ class BuildingListView(LoginRequiredMixin, ListView):
         else:
             object_list = ctx.get("object_list") or []
             ctx["buildings_total"] = len(object_list)
+        page_obj = ctx.get("page_obj")
+        total_buildings = ctx["buildings_total"]
+        ctx["result_start"] = page_obj.start_index() if page_obj and total_buildings else 0
+        ctx["result_end"] = page_obj.end_index() if page_obj and total_buildings else 0
+
+        metrics = getattr(self, "_filtered_metrics", {}) or {}
+        ctx["summary_total_buildings"] = metrics.get("total_buildings") or 0
+        ctx["summary_occupied_units"] = metrics.get("occupied_units") or 0
+        ctx["summary_open_work_orders"] = metrics.get("open_work_orders") or 0
+        ctx["summary_overdue_items"] = metrics.get("overdue_items") or 0
+
+        def _remove_filter_url(*keys: str) -> str:
+            params = self.request.GET.copy()
+            for key in keys:
+                params.pop(key, None)
+            params.pop("page", None)
+            encoded = params.urlencode()
+            base = reverse("core:buildings_list")
+            return f"{base}?{encoded}" if encoded else base
+
+        active_filter_chips: list[dict[str, str]] = []
+        q_value = ctx.get("q", "")
+        if q_value:
+            active_filter_chips.append(
+                {"label": _("Search: %(value)s") % {"value": q_value}, "remove_url": _remove_filter_url("q")}
+            )
+        owner_value = ctx.get("owner_filter", "")
+        if owner_value:
+            owner_label = owner_value
+            for opt in ctx.get("owner_options", []):
+                if str(opt.get("value")) == str(owner_value):
+                    owner_label = opt.get("label") or owner_label
+                    break
+            active_filter_chips.append(
+                {"label": _("Owner: %(value)s") % {"value": owner_label}, "remove_url": _remove_filter_url("owner")}
+            )
+        role_value = ctx.get("role_filter", "")
+        if role_value:
+            role_label = role_value
+            for opt in ctx.get("role_options", []):
+                if opt.get("value") == role_value:
+                    role_label = opt.get("label") or role_label
+                    break
+            active_filter_chips.append(
+                {"label": _("Role: %(value)s") % {"value": role_label}, "remove_url": _remove_filter_url("role")}
+            )
+        if ctx.get("sort", "name") != "name":
+            active_filter_chips.append(
+                {"label": _("Sort changed"), "remove_url": _remove_filter_url("sort")}
+            )
+        if ctx.get("per", 25) != 25:
+            active_filter_chips.append(
+                {
+                    "label": _("Page size: %(value)s") % {"value": ctx.get("per", 25)},
+                    "remove_url": _remove_filter_url("per"),
+                }
+            )
+        ctx["active_filter_chips"] = active_filter_chips
+        ctx["has_active_filters"] = bool(active_filter_chips)
         return ctx
 
 class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DetailView):

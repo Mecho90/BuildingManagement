@@ -324,14 +324,10 @@ class TodoItemForm(forms.ModelForm):
         return obj
 
     def _user_can_assign_owner(self, user):
+        # Todo assignment is self-only across roles.
         if not user or not getattr(user, "is_authenticated", False):
             return False
-        if getattr(user, "is_superuser", False):
-            return True
-        roles = set(
-            BuildingMembership.objects.filter(user=user).values_list("role", flat=True)
-        )
-        return bool(roles & {MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR})
+        return False
 
     def _owner_queryset(self):
         qs = User.objects.filter(is_active=True).order_by(Lower("username"))
@@ -1294,6 +1290,22 @@ class BudgetFilterForm(forms.Form):
     status = forms.ChoiceField(required=False)
     technician = forms.ModelChoiceField(queryset=User.objects.none(), required=False, label=_("Requester"))
     q = forms.CharField(required=False, label=_("Search"))
+    date_from = forms.DateField(
+        required=False,
+        label=_("From"),
+        widget=forms.DateInput(attrs={"type": "date", "class": "input"}),
+    )
+    date_to = forms.DateField(
+        required=False,
+        label=_("To"),
+        widget=forms.DateInput(attrs={"type": "date", "class": "input"}),
+    )
+    per = forms.TypedChoiceField(
+        required=False,
+        label=_("Page size"),
+        coerce=int,
+        choices=((25, "25"), (50, "50"), (100, "100"), (200, "200")),
+    )
     show_requester = False
 
     def __init__(self, *args, user=None, **kwargs):
@@ -1301,6 +1313,11 @@ class BudgetFilterForm(forms.Form):
         super().__init__(*args, **kwargs)
         status_choices = [("", _("All statuses"))] + list(BudgetRequest.Status.choices)
         self.fields["status"].choices = status_choices
+        self.fields["q"].widget.attrs.setdefault("class", "input")
+        self.fields["status"].widget.attrs.setdefault("class", "input")
+        self.fields["date_from"].widget.attrs.setdefault("class", "input")
+        self.fields["date_to"].widget.attrs.setdefault("class", "input")
+        self.fields["per"].widget.attrs.setdefault("class", "input")
         current_user_id = getattr(user, "pk", None)
         tech_qs = User.objects.filter(
             Q(budget_requests__isnull=False) | Q(pk=current_user_id)
@@ -1309,6 +1326,8 @@ class BudgetFilterForm(forms.Form):
         self.fields["technician"].label_from_instance = (
             lambda obj: obj.get_full_name() or obj.get_username()
         )
+        self.fields["technician"].widget.attrs.setdefault("class", "input")
+        self.fields["per"].initial = 25
         self.show_requester = self._can_filter_by_requester(user)
         if not self.show_requester:
             self.fields.pop("technician")
@@ -1364,9 +1383,6 @@ class MassAssignBudgetsForm(forms.Form):
         users_field = self.fields["users"]
         users_field.queryset = users_qs
         users_field.widget.attrs.setdefault("class", "space-y-2")
-
-        if users_qs.exists() and not self.is_bound:
-            users_field.initial = list(users_qs.values_list("pk", flat=True))
 
         self.fields["title"].widget.attrs.setdefault(
             "placeholder",
@@ -2047,6 +2063,34 @@ class WorkOrderBulkDeleteForm(forms.Form):
         required=True,
         widget=forms.CheckboxSelectMultiple(attrs={"class": "bulk-checkbox-list"}),
         label=_("Select the work orders you want to delete."),
+        error_messages={"required": _("Select at least one work order.")},
+    )
+
+    def __init__(self, *args, user=None, queryset=None, display_queryset=None, filter_kwargs=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = queryset
+        if qs is None:
+            qs = WorkOrder.objects.visible_to(user)
+            if filter_kwargs:
+                qs = qs.filter(**filter_kwargs)
+            qs = qs.select_related("building").order_by("-created_at")
+        self.fields["items"].queryset = qs
+        self.fields["items"].label_from_instance = lambda obj: f"{obj.title} · {obj.building.name if obj.building else _('No building')}"
+        display_choices = qs if display_queryset is None else display_queryset
+        self._set_display_choices(display_choices)
+
+    def _set_display_choices(self, iterable):
+        widget = self.fields["items"].widget
+        labeler = self.fields["items"].label_from_instance
+        widget.choices = [(obj.pk, labeler(obj)) for obj in iterable]
+
+
+class WorkOrderBulkArchiveForm(forms.Form):
+    items = forms.ModelMultipleChoiceField(
+        queryset=WorkOrder.objects.none(),
+        required=True,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "bulk-checkbox-list"}),
+        label=_("Select the completed work orders you want to archive."),
         error_messages={"required": _("Select at least one work order.")},
     )
 

@@ -13,7 +13,7 @@
       </p>
     </div>
     <div class="flex flex-wrap gap-3">
-      <a href="{{ archive_work_orders_url }}" class="btn btn-primary">{% trans "Archived Working Orders" %}</a>
+      <a href="{{ archive_work_orders_url }}" class="btn btn-primary">{% trans "Archived Work Orders" %}</a>
       {% if archive_budgets_url %}
         <a href="{{ archive_budgets_url }}" class="btn btn-primary">{% trans "Archived Budgets" %}</a>
       {% endif %}
@@ -22,18 +22,18 @@
 
   <form method="get" class="filter-panel">
     {% url 'core:work_orders_archive' as archive_reset_url %}
-    <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-4">
-      {% with placeholder=_('Title, description, or building') %}
-        <div class="space-y-2 md:col-span-2 lg:col-span-4">
-          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search archived work orders" %}</label>
-          <input id="id_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="q" value="{{ q }}" placeholder="{{ placeholder }}" autocomplete="off" />
-        </div>
-      {% endwith %}
+    {% with placeholder=_('Title, description, or building') %}
+      <div class="space-y-2">
+        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search archived work orders" %}</label>
+        <input id="id_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="q" value="{{ q }}" placeholder="{{ placeholder }}" autocomplete="off" />
+      </div>
+    {% endwith %}
 
+    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {% if owner_choices %}
         <div class="space-y-2">
-          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Отговорник" %}</label>
-          <select id="id_owner" name="owner" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+          <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
             {% for opt in owner_choices %}
               <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
@@ -44,7 +44,7 @@
 
       <div class="space-y-2">
         <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
-        <select id="id_sort" name="sort" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+        <select id="id_sort" name="sort" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           {% for value, label in sort_choices %}
             <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
@@ -53,7 +53,7 @@
 
       <div class="space-y-2">
         <label for="id_b_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-        <select id="id_b_per" name="b_per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+        <select id="id_b_per" name="b_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           {% for option in building_summary_per_choices %}
             <option value="{{ option }}" {% if building_summary_per == option %}selected{% endif %}>{{ option }}</option>
           {% endfor %}
@@ -63,78 +63,95 @@
       <div class="space-y-2">
         <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Archived range" %}</span>
         <div class="grid gap-3 md:grid-cols-2">
+          <label for="id_archived_from" class="sr-only">{% trans "Archived from date" %}</label>
           <input id="id_archived_from" name="archived_from" type="date" value="{{ archived_from }}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" />
+          <label for="id_archived_to" class="sr-only">{% trans "Archived to date" %}</label>
           <input id="id_archived_to" name="archived_to" type="date" value="{{ archived_to }}" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" />
         </div>
       </div>
     </div>
 
-    <div class="filter-panel__actions">
-      {% if q or owner or sort != 'archived_desc' or has_archived_filter %}
-        <a class="btn btn-secondary" href="{{ archive_reset_url }}">{% trans "Reset" %}</a>
-      {% endif %}
-      <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
-    </div>
+      <div class="filter-panel__actions flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {% if q or owner or sort != 'archived_desc' or has_archived_filter %}
+          <a class="btn btn-secondary" href="{{ archive_reset_url }}">{% trans "Reset" %}</a>
+        {% endif %}
+        <button class="btn" type="submit">{% trans "Apply filters" %}</button>
+      </div>
   </form>
 
-  {% if can_purge_archives %}
-    <section class="rounded-2xl border border-red-200 bg-red-50/80 p-4 shadow-card space-y-4 dark:border-red-500/40 dark:bg-slate-900">
-      <div>
-        <h2 class="text-lg font-semibold text-red-700 dark:text-red-300">{% trans "Permanent deletion" %}</h2>
-        <p class="text-sm text-slate-700 dark:text-slate-200" data-archive-preview
-           data-preview-url="{{ archive_purge_preview_url }}"
-           data-label-singular="{% trans 'work order' %}"
-           data-label-plural="{% trans 'work orders' %}"
-           data-empty-text="{% trans 'Select both dates to preview the total.' %}"
-           data-error-text="{% trans 'Unable to load count.' %}"
-           data-loading-text="{% trans 'Calculating…' %}"
-           data-result-suffix="{% trans 'will be permanently deleted.' %}">
-        </p>
+  {% if active_filter_chips %}
+    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+      <div class="flex flex-wrap items-center gap-2">
+        {% for chip in active_filter_chips %}
+          <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+            {{ chip.label }}
+            <a href="{{ chip.remove_url }}" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-800/60" aria-label="{% trans 'Remove filter' %}">×</a>
+          </span>
+        {% endfor %}
       </div>
-      <form method="post" action="{{ archive_purge_action }}" class="space-y-4">
-        {% csrf_token %}
-        <div class="grid gap-3 md:grid-cols-2">
-          {{ archive_purge_form.from_date }}
-          {{ archive_purge_form.to_date }}
-        </div>
-        <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
-          {{ archive_purge_form.confirm }}
-          <span>{% trans "I understand the selected work orders will be permanently removed and cannot be restored." %}</span>
-        </label>
-        <button class="btn btn-danger" type="submit">{% trans "Delete archived work orders" %}</button>
-      </form>
     </section>
   {% endif %}
 
   {% if building_summary_page %}
     <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-
-        <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-          {% blocktrans count total=building_summary_total %}{{ total }} building{% plural %}{{ total }} buildings{% endblocktrans %}
-        </span>
-      </div>
-      <form method="post" action="{% if can_purge_archives %}{{ archive_building_delete_action }}{% else %}{% url 'core:work_orders_archive' %}{% endif %}" class="space-y-4">
+      {% if building_summary_page.paginator.num_pages > 1 %}
+        <div class="space-y-3">
+          {% include "core/includes/pagination.html" with page_obj=building_summary_page paginator=building_summary_page.paginator query_string=building_summary_query page_param="b_page" %}
+          {% if building_summary_page.paginator.num_pages > 10 %}
+            <form method="get" class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              {% for key, value in request.GET.items %}
+                {% if key != "b_page" %}
+                  <input type="hidden" name="{{ key }}" value="{{ value }}" />
+                {% endif %}
+              {% endfor %}
+              <label for="id_b_page_jump_top" class="font-medium">{% trans "Jump to page" %}</label>
+              <input id="id_b_page_jump_top"
+                     type="number"
+                     name="b_page"
+                     min="1"
+                     max="{{ building_summary_page.paginator.num_pages }}"
+                     value="{{ building_summary_page.number }}"
+                     class="input w-24 rounded-xl border border-slate-300 px-2 py-1 dark:border-slate-600" />
+              <button type="submit" class="btn btn-secondary btn-sm">{% trans "Go" %}</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+      <form method="post" action="{% if can_purge_archives %}{{ archive_building_delete_action }}{% else %}{% url 'core:work_orders_archive' %}{% endif %}" class="space-y-4" id="archive-building-bulk-form">
         {% csrf_token %}
+        {% if can_purge_archives %}
+          <div class="flex flex-wrap items-center justify-between gap-2 px-1 py-1">
+            <span class="text-sm font-medium text-slate-600 dark:text-slate-300"
+                  id="archive-selection-count"
+                  data-label-singular="{% trans 'building selected' %}"
+                  data-label-plural="{% trans 'buildings selected' %}">
+              0 {% trans "buildings selected" %}
+            </span>
+            <div class="flex items-center gap-2">
+              <button type="button" class="btn" id="archive-select-all">{% trans "Select all on page" %}</button>
+            </div>
+          </div>
+        {% endif %}
         <ul class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {% with query=request.GET.urlencode %}
             {% for item in building_summary_page %}
-              <li class="archive-building-card flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm dark:border-slate-600 dark:bg-slate-800/80">
+              <li class="archive-building-card flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm shadow-sm transition-colors duration-150 hover:border-slate-300 hover:bg-white dark:border-slate-600 dark:bg-slate-800/80 dark:hover:border-slate-500 dark:hover:bg-slate-800">
                 {% if can_purge_archives %}
                   <label class="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
                       name="building_ids"
                       value="{{ item.id }}"
+                      data-building-select
                       class="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
                     />
                   </label>
                 {% endif %}
-                <a class="archive-building-link font-medium break-words hyphens-auto flex-1" href="{% url 'core:work_orders_archive_building' item.id %}{% if query %}?{{ query }}{% endif %}">
-                  <span class="archive-building-name block text-base font-semibold text-slate-700 dark:text-slate-100">{{ item.name }}</span>
-                  <span class="archive-building-owner block text-xs text-slate-500 dark:text-slate-400">{{ item.owner }}</span>
+                <a class="archive-building-link font-medium break-words hyphens-auto flex-1 min-w-0" href="{% url 'core:work_orders_archive_building' item.id %}{% if query %}?{{ query }}{% endif %}">
+                  <span class="archive-building-name block text-base font-semibold text-slate-700 dark:text-slate-100 break-words leading-snug">{{ item.name }}</span>
+                  <span class="archive-building-owner block text-xs font-medium text-slate-700 dark:text-slate-300">{{ item.owner }}</span>
                 </a>
-                <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200">
+                <span class="inline-flex flex-shrink-0 items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none tracking-wide text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200">
                   {% blocktrans with total=item.total %}{{ total }} archived{% endblocktrans %}
                 </span>
               </li>
@@ -147,19 +164,155 @@
               type="checkbox"
               name="confirm"
               value="1"
+              id="archive-confirm-delete"
               class="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 mt-1"
             />
             <span>{% trans "I understand selected archived buildings' work orders will be permanently removed." %}</span>
           </label>
-          <button class="btn btn-danger" type="submit">{% trans "Delete selected buildings' archived work orders" %}</button>
+          <button class="btn btn-danger w-full sm:w-auto" type="submit" id="archive-delete-buildings-btn">{% trans "Delete selected buildings' archived work orders" %}</button>
         {% endif %}
       </form>
-      {% include "core/includes/pagination.html" with page_obj=building_summary_page paginator=building_summary_page.paginator query_string=building_summary_query page_param="b_page" %}
+      {% if building_summary_page.paginator.num_pages > 1 %}
+        <div class="space-y-3">
+          {% include "core/includes/pagination.html" with page_obj=building_summary_page paginator=building_summary_page.paginator query_string=building_summary_query page_param="b_page" %}
+          {% if building_summary_page.paginator.num_pages > 10 %}
+            <form method="get" class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              {% for key, value in request.GET.items %}
+                {% if key != "b_page" %}
+                  <input type="hidden" name="{{ key }}" value="{{ value }}" />
+                {% endif %}
+              {% endfor %}
+              <label for="id_b_page_jump_bottom" class="font-medium">{% trans "Jump to page" %}</label>
+              <input id="id_b_page_jump_bottom"
+                     type="number"
+                     name="b_page"
+                     min="1"
+                     max="{{ building_summary_page.paginator.num_pages }}"
+                     value="{{ building_summary_page.number }}"
+                     class="input w-24 rounded-xl border border-slate-300 px-2 py-1 dark:border-slate-600" />
+              <button type="submit" class="btn btn-secondary btn-sm">{% trans "Go" %}</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
     </section>
   {% else %}
-    <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-      {% trans "No archived work orders yet." %}
-    </p>
+    {% if active_filter_chips %}
+      <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 space-y-3">
+        <p>{% trans "No archived work orders match your filters." %}</p>
+        <a class="btn btn-secondary btn-sm" href="{{ archive_reset_url|default:archive_work_orders_url }}">{% trans "Reset filters" %}</a>
+      </div>
+    {% else %}
+      <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+        {% trans "No archived work orders yet." %}
+      </p>
+    {% endif %}
+  {% endif %}
+
+  {% if can_purge_archives %}
+    <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+      <div>
+        <h2 class="text-lg font-semibold text-brand-foreground dark:text-white">{% trans "Permanent deletion" %}</h2>
+        <p class="text-sm text-slate-700 dark:text-slate-200" data-archive-preview role="status" aria-live="polite" aria-atomic="true"
+           data-preview-url="{{ archive_purge_preview_url }}"
+           data-label-singular="{% trans 'work order' %}"
+           data-label-plural="{% trans 'work orders' %}"
+           data-empty-text="{% trans 'Select both dates to preview the total.' %}"
+           data-error-text="{% trans 'Unable to load count.' %}"
+           data-loading-text="{% trans 'Calculating…' %}"
+           data-result-suffix="{% trans 'will be permanently deleted.' %}">
+        </p>
+      </div>
+      <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+        <span class="inline-flex items-center gap-2">
+          <span class="text-amber-600 dark:text-amber-300" aria-hidden="true">⚠️</span>
+          <span>{% trans "Deletion is permanent and cannot be undone." %}</span>
+        </span>
+      </div>
+      <form method="post" action="{{ archive_purge_action }}" class="space-y-4" id="archive-purge-form">
+        {% csrf_token %}
+        <div class="grid gap-3 md:grid-cols-2">
+          <label for="{{ archive_purge_form.from_date.id_for_label }}" class="sr-only">{% trans "Permanent delete from date" %}</label>
+          {{ archive_purge_form.from_date }}
+          <label for="{{ archive_purge_form.to_date.id_for_label }}" class="sr-only">{% trans "Permanent delete to date" %}</label>
+          {{ archive_purge_form.to_date }}
+        </div>
+        <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+          {{ archive_purge_form.confirm }}
+          <span>{% trans "I understand the selected work orders will be permanently removed and cannot be restored." %}</span>
+        </label>
+        <button class="btn btn-danger w-full sm:w-auto" type="submit" id="archive-purge-delete-btn">{% trans "Delete archived work orders" %}</button>
+      </form>
+    </section>
   {% endif %}
 </section>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script>
+    (function () {
+      const form = document.getElementById("archive-building-bulk-form");
+      if (!form) return;
+      const checkboxes = Array.from(form.querySelectorAll("input[data-building-select]"));
+      const confirmEl = document.getElementById("archive-confirm-delete");
+      const deleteBtn = document.getElementById("archive-delete-buildings-btn");
+      const selectAllBtn = document.getElementById("archive-select-all");
+      const clearBtn = document.getElementById("archive-clear-selection");
+      const countEl = document.getElementById("archive-selection-count");
+      if (!checkboxes.length || !confirmEl || !deleteBtn || !countEl) return;
+
+      function selectedCount() {
+        return checkboxes.filter((cb) => cb.checked).length;
+      }
+
+      function updateState() {
+        const count = selectedCount();
+        const singular = countEl.dataset.labelSingular || "building selected";
+        const plural = countEl.dataset.labelPlural || "buildings selected";
+        countEl.textContent = `${count} ${count === 1 ? singular : plural}`;
+        deleteBtn.disabled = !(count > 0 && confirmEl.checked);
+      }
+
+      checkboxes.forEach((checkbox) => {
+        checkbox.addEventListener("change", updateState);
+      });
+      confirmEl.addEventListener("change", updateState);
+
+      if (selectAllBtn) {
+        selectAllBtn.addEventListener("click", () => {
+          checkboxes.forEach((cb) => {
+            cb.checked = true;
+          });
+          updateState();
+        });
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          checkboxes.forEach((cb) => {
+            cb.checked = false;
+          });
+          updateState();
+        });
+      }
+
+      updateState();
+    })();
+
+    (function () {
+      const purgeForm = document.getElementById("archive-purge-form");
+      if (!purgeForm) return;
+      const confirmEl = purgeForm.querySelector("input[type='checkbox'][name='confirm']");
+      const deleteBtn = document.getElementById("archive-purge-delete-btn");
+      if (!confirmEl || !deleteBtn) return;
+
+      function updatePurgeState() {
+        deleteBtn.disabled = !confirmEl.checked;
+      }
+
+      confirmEl.addEventListener("change", updatePurgeState);
+      updatePurgeState();
+    })();
+  </script>
 {% endblock %}

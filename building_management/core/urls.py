@@ -83,6 +83,7 @@ urlpatterns = [
     path("work-orders/<int:pk>/delete/", views.WorkOrderDeleteView.as_view(), name="work_order_delete"),
     path("work-orders/<int:pk>/approval/", views.WorkOrderApprovalDecisionView.as_view(), name="work_order_approval_decide"),
     path("work-orders/<int:pk>/archive/", views.WorkOrderArchiveView.as_view(), name="work_order_archive"),
+    path("work-orders/<int:pk>/quick-status/", views.WorkOrderQuickStatusView.as_view(), name="work_order_quick_status"),
     path("work-orders/mass-assign/", views.MassAssignWorkOrdersView.as_view(), name="work_orders_mass_assign"),
     path("work-orders/archive/", views.ArchivedWorkOrderListView.as_view(), name="work_orders_archive"),
     path("work-orders/archive/purge/", views.ArchivedWorkOrderPurgeView.as_view(), name="work_orders_archive_purge"),
@@ -113,6 +114,7 @@ urlpatterns = [
     path("manage/users/<int:pk>/delete/", views.AdminUserDeleteView.as_view(), name="user_delete"),
     path("manage/mass-delete/buildings/", views.AdminBuildingBulkDeleteView.as_view(), name="mass_delete_buildings"),
     path("manage/mass-delete/work-orders/", views.AdminWorkOrderBulkDeleteView.as_view(), name="mass_delete_work_orders"),
+    path("manage/mass-archive/work-orders/", views.AdminWorkOrderBulkArchiveView.as_view(), name="mass_archive_work_orders"),
     path("manage/mass-delete/lawyer-work-orders/", views.AdminLawyerWorkOrderBulkDeleteView.as_view(), name="mass_delete_lawyer_work_orders"),
     path("manage/mass-delete/users/", views.AdminUserBulkDeleteView.as_view(), name="mass_delete_users"),
 
@@ -122,6 +124,7 @@ urlpatterns = [
     path("api/todos/", views.api_todos, name="api_todos"),
     path("api/todos/<int:pk>/", views.api_todo_detail, name="api_todo_detail"),
     path("api/todos/completed/", views.api_todo_completed_clear, name="api_todo_completed_clear"),
+    path("api/todos/summary/", views.api_todo_summary, name="api_todo_summary"),
     path("api/todos/ics/", views.todo_ics_feed, name="todo_ics_feed"),
     path("api/todos/calendar/", views.api_todo_calendar, name="api_todo_calendar"),
     path(

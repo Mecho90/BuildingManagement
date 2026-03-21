@@ -4,62 +4,303 @@
 {% block title %}{% trans "Mass assign budgets" %} · {{ block.super }}{% endblock %}
 
 {% block content %}
-  <div class="space-y-6">
-    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+  <section class="space-y-6" data-budget-mass-assign>
+    <header class="rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
       <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{% trans "Mass assign budgets" %}</h1>
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-        {% blocktrans with total=assignee_count %}Eligible users: {{ total }}{% endblocktrans %}
+      <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+        {% trans "Create one budget template and assign it to selected users." %}
       </p>
-    </div>
+    </header>
 
-    <form method="post" class="ui-panel space-y-4">
-      {% csrf_token %}
-      {% if form.non_field_errors %}
-        <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
-          {{ form.non_field_errors|join:" " }}
+    <section class="grid grid-cols-1 gap-3 md:grid-cols-3" aria-live="polite" aria-atomic="true" data-assignment-summary>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Selected budgets" %}</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100" data-summary-budgets>{{ summary_selected_budgets|default:0 }}</p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Selected users" %}</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100" data-summary-users>{{ summary_selected_users|default:0 }}</p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total assignments" %}</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100" data-summary-assignments>{{ summary_total_assignments|default:0 }}</p>
+      </article>
+    </section>
+
+    {% if form.errors %}
+      <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
+        <p class="font-semibold">{% trans "Please fix the highlighted fields." %}</p>
+        <ul class="mt-2 list-disc pl-5">
+          {% for field in form %}
+            {% if field.errors %}
+              <li><a href="#{{ field.id_for_label }}" class="underline">{{ field.label }}</a>: {{ field.errors|join:", " }}</li>
+            {% endif %}
+          {% endfor %}
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <form method="get" class="filter-panel" aria-label="{% trans 'Filter assignees' %}">
+      <div class="space-y-2 md:col-span-6">
+        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search users" %}</label>
+        <input id="id_q" name="q" type="text" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" value="{{ assignee_filter_q }}" placeholder="{% trans 'Username, name, or email' %}" autocomplete="off" />
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_role">{% trans "Role" %}</label>
+          <select id="id_role" name="role" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            {% for value, label in assignee_role_choices %}
+              <option value="{{ value }}" {% if assignee_filter_role == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
-      {% endif %}
-      <div>
-        <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Budget title" %}</label>
-        {{ form.title }}
-        {% if form.title.errors %}
-          <p class="mt-1 text-sm text-rose-600">{{ form.title.errors|join:", " }}</p>
-        {% endif %}
-      </div>
-      <div>
-        <label class="form-label" for="{{ form.requested_amount.id_for_label }}">{% trans "Budget amount" %}</label>
-        <div class="flex items-center gap-2">
-          <span class="text-lg font-semibold text-slate-600 dark:text-slate-300">€</span>
-          {{ form.requested_amount }}
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_sort">{% trans "Sort" %}</label>
+          <select id="id_sort" name="sort" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            {% for value, label in assignee_sort_choices %}
+              <option value="{{ value }}" {% if assignee_filter_sort == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
-        {% if form.requested_amount.errors %}
-          <p class="mt-1 text-sm text-rose-600">{{ form.requested_amount.errors|join:", " }}</p>
-        {% endif %}
+        <div class="space-y-2">
+          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_per">{% trans "Page size" %}</label>
+          <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            {% for option in assignee_per_choices %}
+              <option value="{{ option }}" {% if assignee_filter_per == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
-      <div>
-        <label class="form-label" for="{{ form.description.id_for_label }}">{% trans "Description" %}</label>
-        {{ form.description }}
-        {% if form.description.errors %}
-          <p class="mt-1 text-sm text-rose-600">{{ form.description.errors|join:", " }}</p>
+      <div class="filter-panel__actions">
+        {% if has_active_filters %}
+          <a class="btn btn-secondary" href="{% url 'core:budget_mass_assign' %}">{% trans "Reset" %}</a>
         {% endif %}
-      </div>
-      <div>
-        <p class="form-label mb-2">{% trans "Select users" %}</p>
-        {% if assignee_count %}
-          <div class="max-h-96 overflow-auto rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-            {{ form.users }}
-          </div>
-        {% else %}
-          <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No eligible users found." %}</p>
-        {% endif %}
-        {% if form.users.errors %}
-          <p class="mt-1 text-sm text-rose-600">{{ form.users.errors|join:", " }}</p>
-        {% endif %}
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <button type="submit" class="btn btn-primary">{% trans "Create budgets" %}</button>
-        <a href="{% url 'core:budget_list' %}" class="btn btn-ghost">{% trans "Back to budgets" %}</a>
+        <button type="submit" class="btn">{% trans "Apply filters" %}</button>
       </div>
     </form>
-  </div>
+
+    {% if active_filter_chips %}
+      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex flex-wrap items-center gap-2">
+          {% for chip in active_filter_chips %}
+            <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+              {{ chip.label }}
+              <a href="{{ chip.remove_url }}" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-800/60" aria-label="{% trans 'Remove filter' %}">×</a>
+            </span>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    <form method="post" class="space-y-6" id="budget-mass-assign-form" novalidate>
+      {% csrf_token %}
+
+      <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-900" aria-labelledby="mass-step-1">
+        <h2 id="mass-step-1" class="text-lg font-semibold text-slate-900 dark:text-slate-100">1. {% trans "Select budgets" %}</h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{% trans "Define the budget template that will be created per selected user." %}</p>
+        <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="md:col-span-2">
+            <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Budget title" %}</label>
+            {{ form.title }}
+            {% if form.title.errors %}
+              <p class="mt-1 text-sm font-medium text-rose-700 dark:text-rose-300">{{ form.title.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+          <div>
+            <label class="form-label" for="{{ form.requested_amount.id_for_label }}">{% trans "Budget amount" %}</label>
+            <div class="flex items-center gap-2">
+              <span class="text-lg font-semibold text-slate-600 dark:text-slate-300">€</span>
+              {{ form.requested_amount }}
+            </div>
+            {% if form.requested_amount.errors %}
+              <p class="mt-1 text-sm font-medium text-rose-700 dark:text-rose-300">{{ form.requested_amount.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+          <div class="md:col-span-2">
+            <label class="form-label" for="{{ form.description.id_for_label }}">{% trans "Description" %}</label>
+            {{ form.description }}
+            {% if form.description.errors %}
+              <p class="mt-1 text-sm font-medium text-rose-700 dark:text-rose-300">{{ form.description.errors|join:", " }}</p>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-900" aria-labelledby="mass-step-2">
+        <h2 id="mass-step-2" class="text-lg font-semibold text-slate-900 dark:text-slate-100">2. {% trans "Select users" %}</h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300" aria-live="polite" data-selected-live>
+          {% blocktrans with count=selected_on_page %}{{ count }} users selected on this page.{% endblocktrans %}
+        </p>
+
+        {% if assignee_filtered_total %}
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-800/40">
+            <div class="font-medium text-slate-700 dark:text-slate-200">
+              {% blocktrans with start=assignee_showing_start end=assignee_showing_end total=assignee_filtered_total %}Showing {{ start }}–{{ end }} of {{ total }} users{% endblocktrans %}
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" class="btn btn-secondary btn-sm" data-select-all>{% trans "Select all on page" %}</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-clear-selection>{% trans "Clear selection" %}</button>
+              <span class="text-sm font-semibold text-slate-700 dark:text-slate-200" data-selected-count-label>
+                {% blocktrans with count=summary_selected_users %}{{ count }} selected{% endblocktrans %}
+              </span>
+            </div>
+          </div>
+
+          {% if assignee_page.has_other_pages %}
+            <div class="mt-4">{% include "core/includes/pagination.html" with page_obj=assignee_page paginator=assignee_page.paginator query_string=assignee_pagination_query %}</div>
+          {% endif %}
+
+          <div class="mt-4 hidden overflow-x-auto md:block rounded-2xl border border-slate-200 dark:border-slate-700">
+            <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+              <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <tr>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Select" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Username" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Name" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Role" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Last login" %}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 bg-white dark:divide-slate-700 dark:bg-slate-900">
+                {% for assignee in assignee_list %}
+                  <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/70">
+                    <td class="px-4 py-3 align-top">
+                      <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="users" value="{{ assignee.pk }}" class="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500" {% if assignee.pk|stringformat:"s" in selected_user_values %}checked{% endif %} data-user-checkbox />
+                        <span class="sr-only">{% blocktrans with username=assignee.username %}Select {{ username }}{% endblocktrans %}</span>
+                      </label>
+                    </td>
+                    <td class="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{{ assignee.username }}</td>
+                    <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ assignee.get_full_name|default:"—" }}</td>
+                    <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ assignee.mass_assign_role_display }}</td>
+                    <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ assignee.last_login|date:"Y-m-d H:i"|default:"—" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-4 grid gap-3 md:hidden">
+            {% for assignee in assignee_list %}
+              <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <label class="flex items-start gap-3">
+                  <input type="checkbox" name="users" value="{{ assignee.pk }}" class="mt-1 h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500" {% if assignee.pk|stringformat:"s" in selected_user_values %}checked{% endif %} data-user-checkbox />
+                  <span class="space-y-1">
+                    <span class="block text-base font-semibold text-slate-900 dark:text-slate-100">{{ assignee.username }}</span>
+                    <span class="block text-sm text-slate-700 dark:text-slate-200">{{ assignee.get_full_name|default:"—" }}</span>
+                    <span class="block text-xs text-slate-500 dark:text-slate-400">{{ assignee.last_login|date:"Y-m-d H:i"|default:"—" }}</span>
+                  </span>
+                </label>
+              </article>
+            {% endfor %}
+          </div>
+
+          {% if assignee_page.has_other_pages %}
+            <div class="mt-4">{% include "core/includes/pagination.html" with page_obj=assignee_page paginator=assignee_page.paginator query_string=assignee_pagination_query %}</div>
+          {% endif %}
+        {% else %}
+          <div class="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-900">
+            {% if no_results_with_filters %}
+              <p class="text-sm text-slate-700 dark:text-slate-300">{% trans "No users match your filters." %}</p>
+              <a href="{% url 'core:budget_mass_assign' %}" class="btn btn-secondary mt-3">{% trans "Reset filters" %}</a>
+            {% elif no_users_available %}
+              <p class="text-sm text-slate-700 dark:text-slate-300">{% trans "No eligible users available." %}</p>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        {% if form.users.errors %}
+          <p class="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300">{{ form.users.errors|join:", " }}</p>
+        {% endif %}
+      </section>
+
+      <section class="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900 dark:bg-amber-950/20" aria-labelledby="mass-step-3">
+        <h2 id="mass-step-3" class="text-lg font-semibold text-slate-900 dark:text-slate-100">3. {% trans "Confirm & assign" %}</h2>
+        <p class="mt-1 text-sm text-slate-700 dark:text-slate-300" data-confirm-summary>
+          {% blocktrans with budgets=summary_selected_budgets users=summary_selected_users assignments=summary_total_assignments %}You are assigning {{ budgets }} budget template to {{ users }} users ({{ assignments }} total assignments).{% endblocktrans %}
+        </p>
+        <label class="mt-4 inline-flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
+          <input id="id_confirm_assignment" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500" data-confirm-assignment />
+          <span>{% trans "I confirm the selected users will immediately receive approved budget requests." %}</span>
+        </label>
+
+        <div class="mt-5 flex flex-wrap gap-3">
+          <button type="submit" class="btn btn-primary min-h-[44px]" data-assign-submit {% if submit_disabled %}disabled{% endif %}>{% trans "Assign selected" %}</button>
+          <a href="{% url 'core:budget_list' %}" class="btn btn-ghost min-h-[44px]">{% trans "Back to budgets" %}</a>
+        </div>
+      </section>
+    </form>
+  </section>
+
+  <script>
+    (function () {
+      var root = document.querySelector('[data-budget-mass-assign]');
+      if (!root) return;
+
+      var checkboxes = Array.prototype.slice.call(root.querySelectorAll('[data-user-checkbox]'));
+      var selectAllBtn = root.querySelector('[data-select-all]');
+      var clearBtn = root.querySelector('[data-clear-selection]');
+      var selectedCountLabel = root.querySelector('[data-selected-count-label]');
+      var selectedLive = root.querySelector('[data-selected-live]');
+      var submitBtn = root.querySelector('[data-assign-submit]');
+      var confirmBox = root.querySelector('[data-confirm-assignment]');
+      var titleField = root.querySelector('#{{ form.title.id_for_label }}');
+      var amountField = root.querySelector('#{{ form.requested_amount.id_for_label }}');
+      var budgetsSummary = root.querySelector('[data-summary-budgets]');
+      var usersSummary = root.querySelector('[data-summary-users]');
+      var assignmentsSummary = root.querySelector('[data-summary-assignments]');
+      var confirmSummary = root.querySelector('[data-confirm-summary]');
+
+      function selectedCount() {
+        return checkboxes.filter(function (input) { return input.checked; }).length;
+      }
+
+      function templateSelectedCount() {
+        var hasTitle = titleField && titleField.value.trim().length > 0;
+        var hasAmount = amountField && amountField.value.trim().length > 0;
+        return hasTitle && hasAmount ? 1 : 0;
+      }
+
+      function updateState() {
+        var users = selectedCount();
+        var budgets = templateSelectedCount();
+        var assignments = users * budgets;
+
+        if (selectedCountLabel) selectedCountLabel.textContent = users + ' selected';
+        if (selectedLive) selectedLive.textContent = users + ' users selected on this page.';
+        if (budgetsSummary) budgetsSummary.textContent = String(budgets);
+        if (usersSummary) usersSummary.textContent = String(users);
+        if (assignmentsSummary) assignmentsSummary.textContent = String(assignments);
+        if (confirmSummary) {
+          confirmSummary.textContent = 'You are assigning ' + budgets + ' budget template to ' + users + ' users (' + assignments + ' total assignments).';
+        }
+
+        if (submitBtn) {
+          submitBtn.disabled = !(budgets > 0 && users > 0 && confirmBox && confirmBox.checked);
+        }
+      }
+
+      if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function () {
+          checkboxes.forEach(function (input) { input.checked = true; });
+          updateState();
+        });
+      }
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          checkboxes.forEach(function (input) { input.checked = false; });
+          updateState();
+        });
+      }
+      checkboxes.forEach(function (input) { input.addEventListener('change', updateState); });
+      if (confirmBox) confirmBox.addEventListener('change', updateState);
+      if (titleField) titleField.addEventListener('input', updateState);
+      if (amountField) amountField.addEventListener('input', updateState);
+
+      updateState();
+    })();
+  </script>
 {% endblock %}

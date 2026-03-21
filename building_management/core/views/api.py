@@ -52,6 +52,7 @@ __all__ = [
     "core:api_todos",
     "core:api_todo_detail",
     "core:api_todo_completed_clear",
+    "core:api_todo_summary",
     "core:todo_ics_feed",
     "core:api_todo_calendar",
     "core:api_budget_requests",
@@ -317,26 +318,31 @@ def _todo_queryset_for(request):
 
 
 def _user_can_assign_todo_owner(user) -> bool:
+    # Task assignment is intentionally self-only for all roles.
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return False
+
+
+def _user_can_view_all_todos(user) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if getattr(user, "is_superuser", False):
         return True
     memberships = BuildingMembership.objects.filter(user=user).values_list("role", flat=True)
-    allowed = {MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR}
-    return any(role in allowed for role in memberships)
+    return any(role == MembershipRole.ADMINISTRATOR for role in memberships)
 
 
 def _resolve_todo_owner(request, raw_owner, *, required: bool = False, allow_self: bool = False):
-    if not _user_can_assign_todo_owner(request.user):
-        return request.user
     if raw_owner in (None, "", "null"):
         return request.user
     try:
         owner_id = int(raw_owner)
     except (TypeError, ValueError):
         raise ValidationError(_("Invalid owner."))
-    if not allow_self and owner_id == getattr(request.user, "pk", None):
-        raise ValidationError(_("Select a different owner."))
+    current_user_id = getattr(request.user, "pk", None)
+    if owner_id != current_user_id:
+        raise ValidationError(_("You can only assign tasks to yourself."))
     try:
         owner = User.objects.get(pk=owner_id, is_active=True)
     except User.DoesNotExist as exc:  # pragma: no cover - defensive
@@ -487,7 +493,7 @@ def _todo_list_view(request):
     include_history = _parse_bool_param(params.get("include_history") or params.get("history"))
     upcoming_only = _parse_bool_param(params.get("upcoming"))
     created_only = _parse_bool_param(params.get("created_only") or params.get("created"))
-    can_assign_owner = _user_can_assign_todo_owner(request.user)
+    can_view_all = _user_can_view_all_todos(request.user)
     if created_only:
         include_history = True
     week_filter = None
@@ -509,7 +515,7 @@ def _todo_list_view(request):
         status_requested = {TodoItem.Status.PENDING, TodoItem.Status.IN_PROGRESS}
 
     qs = _todo_queryset_for(request)
-    if can_assign_owner and (not status_requested or TodoItem.Status.DONE not in status_requested):
+    if can_view_all and (not status_requested or TodoItem.Status.DONE not in status_requested):
         qs = qs.exclude(status=TodoItem.Status.DONE)
     if upcoming_only:
         include_history = True
@@ -525,7 +531,7 @@ def _todo_list_view(request):
 
     owner_param = (params.get("owner") or "").strip()
     owner_filter_value: int | None = None
-    if can_assign_owner:
+    if can_view_all:
         if owner_param:
             if owner_param.lower() == "all":
                 owner_filter_value = None
@@ -621,7 +627,7 @@ def _todo_create_view(request):
         owner = _resolve_todo_owner(
             request,
             payload.get("owner"),
-            required=_user_can_assign_todo_owner(request.user),
+            required=False,
             allow_self=True,
         )
     except ValidationError as exc:
@@ -703,7 +709,7 @@ def _todo_update_view(request, item: TodoItem):
         if new_status != item.status:
             status_change = new_status
 
-    if "owner" in payload and _user_can_assign_todo_owner(request.user):
+    if "owner" in payload:
         try:
             new_owner = _resolve_todo_owner(
                 request,
@@ -755,6 +761,9 @@ def api_todo_detail(request, pk: int):
     if request.method in {"PATCH", "PUT"}:
         return _todo_update_view(request, item)
 
+    if item.user_id != getattr(request.user, "pk", None):
+        return JsonResponse({"error": _("You can delete only your own tasks.")}, status=403)
+
     item.log_activity(
         action=TodoActivity.Action.DELETED,
         actor=request.user,
@@ -773,27 +782,48 @@ def api_todo_completed_clear(request):
     params = request.GET
     qs = _todo_queryset_for(request).filter(status=TodoItem.Status.DONE)
 
+    raw_ids = params.getlist("ids")
+    parsed_ids: set[int] = set()
+    if raw_ids:
+        for chunk in raw_ids:
+            values = [part.strip() for part in str(chunk).split(",") if part and part.strip()]
+            for value in values:
+                try:
+                    parsed_ids.add(int(value))
+                except (TypeError, ValueError):
+                    return JsonResponse({"error": _("Invalid ids filter.")}, status=400)
+        if parsed_ids:
+            qs = qs.filter(pk__in=parsed_ids)
+
     owner_param = (params.get("owner") or "").strip()
     owner = request.user
+    owner_is_all = False
     if owner_param:
-        if owner_param.lower() in {"me", "self"}:
+        owner_token = owner_param.lower()
+        if owner_token == "all":
+            return JsonResponse(
+                {"error": _("You can clear only your own completed tasks.")},
+                status=403,
+            )
+        elif owner_token in {"me", "self"}:
             owner_id = getattr(request.user, "pk", None)
         else:
             try:
                 owner_id = int(owner_param)
             except (TypeError, ValueError):
                 return JsonResponse({"error": _("Invalid owner filter.")}, status=400)
-        if owner_id != getattr(request.user, "pk", None):
-            if not _user_can_assign_todo_owner(request.user):
+        if not owner_is_all:
+            if owner_id != getattr(request.user, "pk", None):
                 return JsonResponse(
-                    {"error": _("You do not have permission to clear tasks for this owner.")},
+                    {"error": _("You can clear only your own completed tasks.")},
                     status=403,
                 )
-        try:
-            owner = User.objects.get(pk=owner_id)
-        except User.DoesNotExist:
-            return JsonResponse({"error": _("Отговорник not found.")}, status=404)
-    qs = qs.filter(user=owner)
+            try:
+                owner = User.objects.get(pk=owner_id)
+            except User.DoesNotExist:
+                return JsonResponse({"error": _("Отговорник not found.")}, status=404)
+    if not owner_is_all:
+        qs = qs.filter(user=owner)
 
     week_start_param = params.get("week_start")
     if week_start_param:
@@ -824,6 +854,29 @@ def api_todo_completed_clear(request):
             deleted += 1
 
     return JsonResponse({"deleted": deleted}, status=200)
+
+
+@require_http_methods(["GET"])
+def api_todo_summary(request):
+    if not request.user.is_authenticated:
+        raise Http404()
+
+    today = timezone.localdate()
+    next_week = today + timedelta(days=7)
+    qs = _todo_queryset_for(request).filter(user=request.user)
+    active_statuses = [TodoItem.Status.PENDING, TodoItem.Status.IN_PROGRESS]
+
+    summary = {
+        "due_today": qs.filter(status__in=active_statuses, due_date=today).count(),
+        "overdue": qs.filter(status__in=active_statuses, due_date__lt=today).count(),
+        "due_next_7_days": qs.filter(
+            status__in=active_statuses,
+            due_date__gt=today,
+            due_date__lte=next_week,
+        ).count(),
+        "completed": qs.filter(status=TodoItem.Status.DONE).count(),
+    }
+    return JsonResponse(summary, status=200)
 
 
 @require_http_methods(["GET"])

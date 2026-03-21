@@ -20,101 +20,102 @@
   <body class="min-h-screen text-brand-foreground transition-colors dark:text-slate-100 {% block body_class %}{% endblock %}" style="--ui-hero-bg-image: url('{% static 'img/slide-1.jpg' %}');">
     <div class="relative z-10 flex min-h-screen flex-col">
       <header class="site-header border-b border-emerald-100/60 bg-white/90 shadow-md backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/85">
-        <div class="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+        <div class="mx-auto w-full max-w-none px-4 py-4 sm:px-6 lg:px-8">
           <div class="header-row">
             <a href="{% url 'core:dashboard' %}" class="inline-flex items-center gap-3" aria-label="{% trans 'Dashboard' %}">
-              <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" class="h-9 w-auto"/>
+              <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" class="site-logo h-10 w-auto sm:h-12"/>
             </a>
-          <div class="header-meta">
-            {% block header_meta %}
-              <div class="header-meta__pill header-meta__pill--accent" style="border:2px solid #fde68a; padding:0.35rem 1.25rem;">
-                <time datetime="{% now 'c' %}" class="body-sm text-black font-semibold">{% now 'D, M j, Y' %}</time>
-                {% if user.is_authenticated %}
-                  <span class="body-sm text-black hidden sm:inline-flex font-semibold">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>
-                {% endif %}
-              </div>
-            {% endblock %}
-          </div>
-            <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle>
-              <span class="sr-only">{% trans "Toggle navigation" %}</span>
-              <svg class="nav-toggle__icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              </svg>
-              <span class="nav-toggle__label">{% trans "Menu" %}</span>
-            </button>
-          </div>
+            <div class="header-right">
+              <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle>
+                <span class="sr-only">{% trans "Toggle navigation" %}</span>
+                <svg class="nav-toggle__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+                <span class="nav-toggle__label">{% trans "Menu" %}</span>
+              </button>
+              <nav id="primary-navigation" class="primary-nav" data-nav-menu data-open="false" aria-label="{% trans 'Primary navigation' %}">
+                <div class="nav-links">
+                  {% block topbar_left %}
+                    <a href="{% url 'core:dashboard' %}" class="nav-link {% active_nav '/' css_class='nav-link--active' %}">
+                      {% trans "Dashboard" %}
+                    </a>
+                    {% if todos_enabled and todos_url %}
+                      <a href="{{ todos_url }}" class="nav-link {% active_nav '/todos/' css_class='nav-link--active' %}">
+                        {% trans "To-Dos" %}
+                      </a>
+                    {% endif %}
+                    <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/$' css_class='nav-link--active' %}">
+                      {% trans "Buildings" %}
+                    </a>
+                    {% if work_orders_enabled and work_orders_url %}
+                      <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url|add:'$' css_class='nav-link--active' %}">
+                        {% trans "Work Orders" %}
+                      </a>
+                    {% endif %}
+                    {% if lawyer_orders_enabled and lawyer_orders_url %}
+                      <a href="{{ lawyer_orders_url }}" class="nav-link {% active_nav lawyer_orders_url css_class='nav-link--active' %}">
+                        {% trans "Lawyer Orders" %}
+                      </a>
+                    {% endif %}
+                    {% if budgets_enabled and budgets_url %}
+                      <a href="{{ budgets_url }}" class="nav-link {% active_nav budgets_url|add:'$' css_class='nav-link--active' %}">
+                        {% trans "Budgets" %}
+                      </a>
+                    {% endif %}
+                    {% if work_orders_archive_enabled and work_orders_archive_url %}
+                      <a href="{{ work_orders_archive_url }}" class="nav-link {% active_nav work_orders_archive_url css_class='nav-link--active' %}">
+                        {% trans "Archive" %}
+                      </a>
+                    {% endif %}
+                    {% if can_view_user_management and user_management_url %}
+                      <a href="{{ user_management_url }}" class="nav-link {% active_nav '/manage/users/' css_class='nav-link--active' %}">
+                        {% trans "User Management" %}
+                      </a>
+                    {% elif user.is_staff %}
+                      <a href="{% url 'admin:index' %}" class="nav-link {% active_nav '/admin/' css_class='nav-link--active' %}">
+                        {% trans "Admin Panel" %}
+                      </a>
+                    {% endif %}
+                  {% endblock %}
+                </div>
 
-          <nav id="primary-navigation" class="primary-nav" data-nav-menu data-open="false" aria-label="{% trans 'Primary navigation' %}">
-            <div class="nav-links">
-              {% block topbar_left %}
-                <a href="{% url 'core:dashboard' %}" class="nav-link {% active_nav '/' css_class='nav-link--active' %}">
-                  {% trans "Dashboard" %}
-                </a>
-                {% if todos_enabled and todos_url %}
-                  <a href="{{ todos_url }}" class="nav-link {% active_nav '/todos/' css_class='nav-link--active' %}">
-                    {% trans "To-Dos" %}
-                  </a>
-                {% endif %}
-                <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/$' css_class='nav-link--active' %}">
-                  {% trans "Buildings" %}
-                </a>
-                {% if work_orders_enabled and work_orders_url %}
-                  <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url|add:'$' css_class='nav-link--active' %}">
-                    {% trans "Work Orders" %}
-                  </a>
-                {% endif %}
-                {% if budgets_enabled and budgets_url %}
-                  <a href="{{ budgets_url }}" class="nav-link {% active_nav budgets_url|add:'$' css_class='nav-link--active' %}">
-                    {% trans "Budgets" %}
-                  </a>
-                {% endif %}
-                {% if lawyer_orders_enabled and lawyer_orders_url %}
-                  <a href="{{ lawyer_orders_url }}" class="nav-link {% active_nav lawyer_orders_url css_class='nav-link--active' %}">
-                    {% trans "Lawyer Orders" %}
-                  </a>
-                {% endif %}
-                {% if work_orders_archive_enabled and work_orders_archive_url %}
-                  <a href="{{ work_orders_archive_url }}" class="nav-link {% active_nav work_orders_archive_url css_class='nav-link--active' %}">
-                    {% trans "Archive" %}
-                  </a>
-                {% endif %}
-                {% if can_view_user_management and user_management_url %}
-                  <a href="{{ user_management_url }}" class="nav-link {% active_nav '/manage/users/' css_class='nav-link--active' %}">
-                    {% trans "User Management" %}
-                  </a>
-                {% elif user.is_staff %}
-                  <a href="{% url 'admin:index' %}" class="nav-link {% active_nav '/admin/' css_class='nav-link--active' %}">
-                    {% trans "Admin Panel" %}
-                  </a>
-                {% endif %}
-              {% endblock %}
+                <div class="header-actions">
+                  {% block header_meta %}
+                    <div class="header-meta">
+                      <div class="header-meta__pill header-meta__pill--accent">
+                        <time datetime="{% now 'c' %}" class="body-sm font-semibold">{% now 'D, M j, Y' %}</time>
+                        {% if user.is_authenticated %}
+                          <span class="body-sm hidden sm:inline-flex font-semibold">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% endblock %}
+                  {% block topbar_right %}
+                    <a class="action-btn" href="{% url 'core:toggle_theme' %}" aria-label="{% if theme == 'dark' %}{% trans 'Switch to light mode' %}{% else %}{% trans 'Switch to dark mode' %}{% endif %}">
+                      {% if theme == 'dark' %}
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a1 1 0 0 1 1 1v2.07a5 5 0 0 1 4.93 4.93H20a1 1 0 0 1 0 2h-2.07A5 5 0 0 1 13 18.93V21a1 1 0 0 1-2 0v-2.07A5 5 0 0 1 6.07 14H4a1 1 0 0 1 0-2h2.07A5 5 0 0 1 11 7.07V5a1 1 0 0 1 1-1Z" fill="currentColor"/></svg>
+                        <span class="action-btn__label">{% trans "Light" %}</span>
+                      {% else %}
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 0 1 11.21 3 7.002 7.002 0 0 0 12 17a7 7 0 0 0 9-4.21Z" fill="currentColor"/></svg>
+                        <span class="action-btn__label">{% trans "Dark" %}</span>
+                      {% endif %}
+                    </a>
+                    {% if user.is_authenticated %}
+                      <form action="{% url 'logout' %}" method="post" class="header-actions__form">
+                        {% csrf_token %}
+                        <button type="submit" class="action-btn action-btn--outline" aria-label="{% trans 'Logout' %}">
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7v-2a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          <span class="action-btn__label">{% trans "Logout" %}</span>
+                        </button>
+                      </form>
+                    {% else %}
+                      <a class="btn btn-secondary" href="{% url 'login' %}">{% trans "Login" %}</a>
+                    {% endif %}
+                  {% endblock %}
+                </div>
+              </nav>
             </div>
-
-            <div class="header-actions">
-              {% block topbar_right %}
-                <a class="action-btn" href="{% url 'core:toggle_theme' %}" aria-label="{% if theme == 'dark' %}{% trans 'Switch to light mode' %}{% else %}{% trans 'Switch to dark mode' %}{% endif %}">
-                  {% if theme == 'dark' %}
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a1 1 0 0 1 1 1v2.07a5 5 0 0 1 4.93 4.93H20a1 1 0 0 1 0 2h-2.07A5 5 0 0 1 13 18.93V21a1 1 0 0 1-2 0v-2.07A5 5 0 0 1 6.07 14H4a1 1 0 0 1 0-2h2.07A5 5 0 0 1 11 7.07V5a1 1 0 0 1 1-1Z" fill="currentColor"/></svg>
-                    <span class="action-btn__label">{% trans "Light" %}</span>
-                  {% else %}
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 0 1 11.21 3 7.002 7.002 0 0 0 12 17a7 7 0 0 0 9-4.21Z" fill="currentColor"/></svg>
-                    <span class="action-btn__label">{% trans "Dark" %}</span>
-                  {% endif %}
-                </a>
-                {% if user.is_authenticated %}
-                  <form action="{% url 'logout' %}" method="post" class="header-actions__form">
-                    {% csrf_token %}
-                    <button type="submit" class="action-btn action-btn--outline" aria-label="{% trans 'Logout' %}">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7v-2a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      <span class="action-btn__label">{% trans "Logout" %}</span>
-                    </button>
-                  </form>
-                {% else %}
-                  <a class="btn btn-secondary" href="{% url 'login' %}">{% trans "Login" %}</a>
-                {% endif %}
-              {% endblock %}
-            </div>
-          </nav>
+          </div>
         </div>
 
         {% if messages %}
@@ -139,7 +140,7 @@
       </header>
 
       <main class="flex-1">
-        <div class="layout-shell mx-auto my-6 w-full max-w-[90rem] rounded-3xl border border-emerald-100/70 bg-white/95 px-4 py-8 shadow-card backdrop-blur sm:px-8 lg:px-14 dark:border-slate-800/70 dark:bg-slate-900/85">
+        <div class="layout-shell mx-auto mt-16 mb-6 w-full max-w-[90rem] rounded-3xl border border-emerald-100/70 bg-white/95 px-4 py-8 shadow-card backdrop-blur sm:px-8 lg:px-14 dark:border-slate-800/70 dark:bg-slate-900/85">
           {% block content %}{% endblock %}
         </div>
       </main>
@@ -185,19 +186,27 @@
           : mobileQuery.addListener(collapseForViewport);
       })();
       (() => {
-        document.addEventListener("click", (event) => {
-          const dismissButton = event.target.closest("[data-alert-close]");
-          if (!dismissButton) {
-            return;
-          }
-          const alert = dismissButton.closest("[data-alert]");
-          if (!alert) {
+        const closeAlert = (alert) => {
+          if (!alert || alert.getAttribute("data-dismissed") === "true") {
             return;
           }
           alert.setAttribute("data-dismissed", "true");
           const removeAlert = () => alert.remove();
           alert.addEventListener("transitionend", removeAlert, { once: true });
           window.setTimeout(removeAlert, 250);
+        };
+
+        document.querySelectorAll("[data-alert]").forEach((alert) => {
+          window.setTimeout(() => closeAlert(alert), 30000);
+        });
+
+        document.addEventListener("click", (event) => {
+          const dismissButton = event.target.closest("[data-alert-close]");
+          if (!dismissButton) {
+            return;
+          }
+          const alert = dismissButton.closest("[data-alert]");
+          closeAlert(alert);
         });
       })();
       (() => {

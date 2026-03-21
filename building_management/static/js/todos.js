@@ -15,7 +15,6 @@
     calendar: {
       current: config.today ? new Date(config.today) : new Date(),
       events: [],
-      pending: null,
     },
     pagination: {
       "this-week": { page: 1, per: defaultPageSize },
@@ -24,19 +23,35 @@
     pageSize: defaultPageSize,
     search: "",
     owner: config.ownerFilterDefault || "",
+    completedSelection: new Set(),
+    lastResults: [],
   };
 
   const els = {
     list: document.getElementById("todo-list"),
     empty: document.getElementById("todo-empty"),
-    completedDeleteBtn: document.getElementById("todo-completed-delete-all"),
+    emptyText: document.getElementById("todo-empty-text"),
+    filterReset: document.getElementById("todo-filter-reset"),
+    liveRegion: document.getElementById("todo-live-region"),
+    statsDueToday: document.getElementById("todo-stat-due-today"),
+    statsOverdue: document.getElementById("todo-stat-overdue"),
+    statsDueNextWeek: document.getElementById("todo-stat-due-next-week"),
+    statsCompleted: document.getElementById("todo-stat-completed"),
+    filterChips: document.getElementById("todo-filter-chips"),
+    filterForm: document.getElementById("todo-filter-form"),
+    bulkBar: document.getElementById("todo-bulk-bar"),
+    bulkCount: document.getElementById("todo-bulk-count"),
+    bulkMarkDone: document.getElementById("todo-bulk-mark-done"),
+    bulkDelete: document.getElementById("todo-bulk-delete"),
+    completedDeleteBtn: document.getElementById("todo-completed-delete-selected"),
+    completedSelectAll: document.getElementById("todo-completed-select-all"),
+    completedSelectAllWrap: document.getElementById("todo-completed-select-all-wrap"),
     calendarGrid: document.getElementById("todo-calendar-grid") || document.getElementById("todo-calendar"),
     calendarMonth: document.getElementById("todo-calendar-month"),
     calendarPrev: document.getElementById("todo-calendar-prev"),
     calendarNext: document.getElementById("todo-calendar-next"),
     calendarToday: document.getElementById("todo-calendar-today"),
     calendarStatus: document.getElementById("todo-calendar-status"),
-    calendarCancel: document.getElementById("todo-calendar-cancel"),
     undoBox: document.getElementById("todo-undo"),
     undoLabel: document.getElementById("todo-undo-label"),
     undoBtn: document.getElementById("todo-undo-btn"),
@@ -46,15 +61,23 @@
     searchInput: document.getElementById("todo-search"),
     ownerFilter: document.getElementById("todo-owner-filter"),
     pagination: document.getElementById("todo-pagination"),
+    paginationTop: document.getElementById("todo-pagination-top"),
     paginationLabel: document.getElementById("todo-pagination-label"),
     paginationPage: document.getElementById("todo-pagination-page"),
     paginationPrev: document.getElementById("todo-pagination-prev"),
     paginationNext: document.getElementById("todo-pagination-next"),
+    paginationBlocks: document.querySelectorAll("[data-todo-pagination]"),
   };
 
   const tabs = document.querySelectorAll(".todo-tab");
 
   const t = (msg) => (window.gettext ? gettext(msg) : msg);
+  const isoToday = config.today || new Date().toISOString().slice(0, 10);
+
+  function announce(message) {
+    if (!els.liveRegion) return;
+    els.liveRegion.textContent = message || "";
+  }
 
   function escapeHtml(value) {
     if (value === null || value === undefined) return "";
@@ -131,6 +154,52 @@
 
   const completedDeleteBtn = els.completedDeleteBtn;
 
+  function visibleTaskCheckboxes() {
+    if (!els.list) return [];
+    return Array.from(els.list.querySelectorAll("input[data-task-select]"));
+  }
+
+  function updateBulkControls() {
+    const count = state.completedSelection.size;
+    if (els.bulkBar) {
+      els.bulkBar.classList.toggle("hidden", count === 0);
+    }
+    if (els.bulkCount) {
+      const noun = count === 1 ? t("task selected") : t("tasks selected");
+      els.bulkCount.textContent = `${count} ${noun}`;
+    }
+    if (els.bulkMarkDone) {
+      els.bulkMarkDone.disabled = count === 0;
+    }
+    if (els.bulkDelete) {
+      els.bulkDelete.disabled = count === 0;
+    }
+    const onCompletedTab = state.currentTab === "completed";
+    if (completedDeleteBtn) {
+      completedDeleteBtn.classList.toggle("hidden", !onCompletedTab);
+      completedDeleteBtn.disabled = !onCompletedTab || count === 0;
+      completedDeleteBtn.textContent = count > 0 ? `${t("Delete selected")} (${count})` : t("Delete selected");
+    }
+    if (els.completedSelectAllWrap) {
+      els.completedSelectAllWrap.classList.toggle("hidden", !onCompletedTab);
+      els.completedSelectAllWrap.classList.toggle("inline-flex", onCompletedTab);
+    }
+    if (els.completedSelectAll) {
+      const visible = visibleTaskCheckboxes();
+      const totalVisible = visible.length;
+      const checkedVisible = visible.filter((el) => el.checked).length;
+      const isAll = totalVisible > 0 && checkedVisible === totalVisible;
+      els.completedSelectAll.checked = isAll;
+      els.completedSelectAll.indeterminate = checkedVisible > 0 && checkedVisible < totalVisible;
+      els.completedSelectAll.disabled = !onCompletedTab || totalVisible === 0;
+    }
+  }
+
+  function clearCompletedSelection() {
+    state.completedSelection.clear();
+    updateBulkControls();
+  }
+
   function detailUrl(id) {
     return config.detailUrl.replace("{id}", id);
   }
@@ -192,26 +261,19 @@
     return d;
   }
 
-  const ACTIVE_TAB_CLASSES = [
-    "border-orange-500",
-    "bg-orange-50",
-    "text-orange-600",
-    "shadow-sm",
-    "dark:border-orange-400",
-    "dark:bg-orange-500/10",
-    "dark:text-orange-200",
-  ];
-  const INACTIVE_TAB_CLASSES = ["border-transparent", "text-slate-500", "dark:text-slate-300"];
+  const ACTIVE_TAB_CLASSES = ["nav-link--active"];
+  const INACTIVE_TAB_CLASSES = [];
 
   function setTabActive(targetTab) {
     tabs.forEach((btn) => {
       const isActive = btn.dataset.tab === targetTab;
+      btn.classList.remove("btn", "btn-secondary", "active", "nav-link--active");
+      btn.classList.add("nav-link");
       ACTIVE_TAB_CLASSES.forEach((cls) => btn.classList.toggle(cls, isActive));
-      INACTIVE_TAB_CLASSES.forEach((cls) => btn.classList.toggle(cls, !isActive));
+      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
-    if (completedDeleteBtn) {
-      completedDeleteBtn.classList.toggle("hidden", targetTab !== "completed");
-    }
+    clearCompletedSelection();
+    updateBulkControls();
   }
 
   function showEmpty(show) {
@@ -219,64 +281,158 @@
     els.empty.classList.toggle("hidden", !show);
   }
 
+  function hasActiveFilters() {
+    const ownerDefault = config.ownerFilterDefault || "";
+    return Boolean(state.search) || state.pageSize !== defaultPageSize || (state.owner || "") !== ownerDefault;
+  }
+
+  function renderFilterChips() {
+    if (!els.filterChips) return;
+    const chips = [];
+    if (state.search) {
+      chips.push({ key: "search", label: `${t("Search")}: ${state.search}` });
+    }
+    if (state.owner && state.owner !== "all") {
+      const owner = (config.ownerOptions || []).find((opt) => String(opt.value) === String(state.owner));
+      const ownerLabel = owner ? owner.label : state.owner;
+      chips.push({ key: "owner", label: `${t("Owner")}: ${ownerLabel}` });
+    }
+    if (state.currentTab === "completed") {
+      chips.push({ key: "status", label: `${t("Status")}: ${t("Completed")}` });
+    } else if (state.currentTab === "this-week") {
+      chips.push({ key: "status", label: `${t("Status")}: ${t("Pending")}` });
+    }
+    if (state.pageSize !== defaultPageSize) {
+      chips.push({ key: "per", label: `${t("Page size")}: ${state.pageSize}` });
+    }
+    if (!chips.length) {
+      els.filterChips.innerHTML = "";
+      els.filterChips.classList.add("hidden");
+      return;
+    }
+    els.filterChips.classList.remove("hidden");
+    els.filterChips.innerHTML = chips
+      .map(
+        (chip) =>
+          `<span class="todo-chip">${escapeHtml(chip.label)} <button type="button" data-chip-remove="${chip.key}" aria-label="${t("Remove filter")}">×</button></span>`
+      )
+      .join("");
+  }
+
+  function renderStats(summary) {
+    const dueToday = Number(summary && summary.due_today) || 0;
+    const overdue = Number(summary && summary.overdue) || 0;
+    const dueNextWeek = Number(summary && summary.due_next_7_days) || 0;
+    const completed = Number(summary && summary.completed) || 0;
+    if (els.statsDueToday) els.statsDueToday.textContent = String(dueToday);
+    if (els.statsOverdue) els.statsOverdue.textContent = String(overdue);
+    if (els.statsDueNextWeek) els.statsDueNextWeek.textContent = String(dueNextWeek);
+    if (els.statsCompleted) els.statsCompleted.textContent = String(completed);
+  }
+
+  function fetchTaskSummary() {
+    if (!config.summaryUrl) return Promise.resolve();
+    return fetch(config.summaryUrl, {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error(t("Failed to load task summary"));
+        return response.json();
+      })
+      .then((summary) => {
+        renderStats(summary);
+      })
+      .catch(() => {
+        renderStats(null);
+      });
+  }
+
+  function renderEmptyState(totalCount) {
+    if (!els.emptyText) return;
+    if (hasActiveFilters()) {
+      els.emptyText.textContent = t("No tasks match your filters.");
+      return;
+    }
+    if (totalCount === 0) {
+      els.emptyText.textContent = t("No tasks yet. Create your first task to get started.");
+      return;
+    }
+    els.emptyText.textContent = t("No tasks in this view.");
+  }
+
+  function resetAllFiltersAndReload() {
+    state.search = "";
+    state.owner = config.ownerFilterDefault || "";
+    state.pageSize = defaultPageSize;
+    if (els.searchInput) els.searchInput.value = "";
+    if (els.ownerFilter) els.ownerFilter.value = state.owner || "all";
+    if (els.pageSizeSelect) els.pageSizeSelect.value = String(defaultPageSize);
+    resetPagination();
+    fetchTasks(state.currentTab);
+  }
+
   function renderTasks(tab, tasks) {
     const activeStatuses = ["pending", "in_progress"];
     const activeTasks = tab === "this-week" ? tasks.filter((t) => activeStatuses.includes(t.status)) : tasks;
+    state.lastResults = activeTasks;
     const cards = activeTasks.map(renderCard).join("");
     els.list.innerHTML = cards;
     showEmpty(activeTasks.length === 0);
+    updateBulkControls();
   }
 
   function renderPagination(tab, pagination, visibleCount, totalCount) {
-    if (!els.pagination) return;
+    if (!els.paginationBlocks || !els.paginationBlocks.length) return;
     if (!pagination) {
-      els.pagination.classList.add("hidden");
+      els.paginationBlocks.forEach((block) => block.classList.add("hidden"));
       return;
     }
     state.pagination[tab] = { page: pagination.page, per: pagination.per };
     if (pagination.pages <= 1 && totalCount <= pagination.per) {
-      els.pagination.classList.add("hidden");
+      els.paginationBlocks.forEach((block) => block.classList.add("hidden"));
       return;
     }
     const start = visibleCount ? (pagination.page - 1) * pagination.per + 1 : 0;
     const end = visibleCount ? (pagination.page - 1) * pagination.per + visibleCount : 0;
-    if (els.paginationLabel) {
-      if (visibleCount) {
-        els.paginationLabel.textContent = `${t("Showing")} ${start}–${end} ${t("of")} ${totalCount}`;
-      } else {
-        els.paginationLabel.textContent = t("No tasks to show.");
+    const summary = visibleCount ? `${t("Showing")} ${start}–${end} ${t("of")} ${totalCount}` : t("No tasks to show.");
+    els.paginationBlocks.forEach((block) => {
+      const label = block.querySelector("[data-pagination-label]");
+      const page = block.querySelector("[data-pagination-page]");
+      const prev = block.querySelector("[data-pagination-prev]");
+      const next = block.querySelector("[data-pagination-next]");
+      const jumpWrap = block.querySelector("[data-pagination-jump-wrap]");
+      const jumpInput = block.querySelector("[data-pagination-jump-input]");
+      if (label) label.textContent = summary;
+      if (page) page.textContent = `${t("Page")} ${pagination.page} / ${pagination.pages}`;
+      if (prev) prev.disabled = !pagination.has_previous;
+      if (next) next.disabled = !pagination.has_next;
+      if (jumpWrap) {
+        const showJump = pagination.pages > 7;
+        jumpWrap.classList.toggle("hidden", !showJump);
+        jumpWrap.classList.toggle("inline-flex", showJump);
       }
-    }
-    if (els.paginationPage) {
-      els.paginationPage.textContent = `${t("Page")} ${pagination.page} / ${pagination.pages}`;
-    }
-    if (els.paginationPrev) {
-      els.paginationPrev.disabled = !pagination.has_previous;
-    }
-    if (els.paginationNext) {
-      els.paginationNext.disabled = !pagination.has_next;
-    }
-    els.pagination.classList.remove("hidden");
-  }
-
-  function completedFilters() {
-    if (state.currentTab !== "completed") return null;
-    const builder = TAB_QUERIES[state.currentTab];
-    if (!builder) return null;
-    const params = { ...builder() };
-    delete params.history;
-    delete params.include_history;
-    params.status = "done";
-    return params;
+      if (jumpInput) {
+        jumpInput.value = String(pagination.page);
+        jumpInput.max = String(pagination.pages);
+      }
+      block.classList.remove("hidden");
+    });
+    announce(summary);
   }
 
   function deleteCompletedTasks() {
     if (!completedDeleteBtn) return;
-    const filters = completedFilters();
-    if (!filters) return;
+    if (state.currentTab !== "completed") return;
+    const selectedIds = Array.from(state.completedSelection);
+    if (!selectedIds.length) return;
     const confirmMessage = completedDeleteBtn.dataset.confirm || t("Delete completed tasks?");
     if (!window.confirm(confirmMessage)) return;
-    const params = new URLSearchParams(filters);
+    const params = new URLSearchParams();
+    params.set("ids", selectedIds.join(","));
+    if (state.owner) {
+      params.set("owner", state.owner);
+    }
     const url = params.toString() ? `${config.completedClearUrl}?${params.toString()}` : config.completedClearUrl;
     fetch(url, {
       method: "DELETE",
@@ -292,14 +448,89 @@
         return response.json();
       })
       .then(() => {
+        clearCompletedSelection();
         fetchTasks(state.currentTab === "completed" ? "completed" : "this-week");
         fetchCalendar();
       })
       .catch(showError);
   }
 
+  function selectedIds() {
+    return Array.from(state.completedSelection).filter(Boolean);
+  }
+
+  function runBulkPatch(payload) {
+    const ids = selectedIds();
+    if (!ids.length) return Promise.resolve();
+    return Promise.all(ids.map((id) => updateTask(id, payload)));
+  }
+
+  function runBulkDelete() {
+    const ids = selectedIds();
+    if (!ids.length) return Promise.resolve();
+    return Promise.all(
+      ids.map((id) =>
+        fetch(detailUrl(id), {
+          method: "DELETE",
+          headers: {
+            "X-CSRFToken": csrftoken(),
+          },
+          credentials: "same-origin",
+        }).then((response) => {
+          if (response.status === 204 || response.ok) return null;
+          return response.json().then((data) => {
+            throw new Error(data.error || t("Request failed"));
+          });
+        })
+      )
+    );
+  }
+
   function calendarLinks(item) {
     return "";
+  }
+
+  function todayDate() {
+    return new Date(`${isoToday}T00:00:00`);
+  }
+
+  function relativeDaysLabel(value) {
+    if (!value) return "";
+    const due = new Date(`${value}T00:00:00`);
+    const today = todayDate();
+    const diff = Math.round((due.getTime() - today.getTime()) / 86400000);
+    if (diff < 0) {
+      const days = Math.abs(diff);
+      return days === 1 ? t("1 day late") : `${days} ${t("days late")}`;
+    }
+    if (diff === 0) {
+      return t("Due today");
+    }
+    if (diff === 1) {
+      return t("Due tomorrow");
+    }
+    return `${diff} ${t("days left")}`;
+  }
+
+  function priorityFor(item) {
+    const due = item.due_date;
+    if (!due) return { level: "low", icon: "●", label: t("Low") };
+    const dueDate = new Date(`${due}T00:00:00`);
+    const today = todayDate();
+    const diff = Math.round((dueDate.getTime() - today.getTime()) / 86400000);
+    if (diff < 0) return { level: "high", icon: "!", label: t("High") };
+    if (diff <= 1) return { level: "medium", icon: "•", label: t("Medium") };
+    return { level: "low", icon: "●", label: t("Low") };
+  }
+
+  function statusOptions(selected) {
+    const allowed = Object.keys(config.statusLabels || {}).filter((code) => code !== "archived");
+    return allowed
+      .map((code) => {
+        const selectedAttr = code === selected ? " selected" : "";
+        return `<option value="${escapeHtml(code)}"${selectedAttr}>${escapeHtml(config.statusLabels[code] || code)}</option>`;
+      })
+      .join("");
   }
 
   function renderCard(item) {
@@ -329,10 +560,28 @@
     const ownerName = item.owner && item.owner.name ? escapeHtml(item.owner.name) : "";
     const showOwner = ownerName && item.owner.id !== config.currentUserId;
     const ownerBadge = showOwner ? `<span class="todo-card__owner">${ownerName}</span>` : "";
+    const isSelected = state.completedSelection.has(String(item.id));
+    const selectionControl = `<label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300"><input type="checkbox" data-task-select value="${item.id}" ${isSelected ? "checked" : ""} class="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 dark:border-slate-600 dark:bg-slate-900"/>${t("Select")}</label>`;
     const completedMeta = item.completed_at
       ? `<span class="inline-flex items-center gap-1"><span class="font-semibold">${t("Completed")}:</span> ${relativeTime(item.completed_at)}</span>`
       : "";
+    const dueRelative = item.due_date ? relativeDaysLabel(item.due_date) : "";
+    const isOverdue = dueRelative.includes(t("late"));
+    const dueMetaClass = isOverdue ? "todo-card__due--overdue" : "";
+    const priority = priorityFor(item);
+    const priorityBadge = `<span class="todo-card__priority todo-card__priority--${priority.level}" title="${t("Priority")}">${priority.icon} ${priority.label}</span>`;
     const cardClass = cardStatusClass(status);
+    const quickStatus = `
+      <label>${t("Status")}
+        <select class="input" data-inline-status>
+          ${statusOptions(status)}
+        </select>
+      </label>`;
+    const quickDue = `
+      <label>${t("Due date")}
+        <input type="date" class="input" data-inline-due min="${isoToday}" value="${item.due_date || ""}" />
+      </label>`;
+
     return `
       <article class="${cardClass}" data-todo-id="${item.id}" data-title="${safeTitle}" data-status="${status}" data-date="${item.due_date || item.week_start || ""}">
         <div class="todo-card__body">
@@ -340,16 +589,21 @@
             <div class="todo-card__title-wrap">
               <h3 class="todo-card__title">${safeTitle}</h3>
               <span class="todo-card__status ${badgeClass}" style="${badgeStyle}">${statusLabel}</span>
+              ${priorityBadge}
               ${ownerBadge}
             </div>
           </div>
           ${descriptionBlock}
           <div class="todo-card__meta">
-            <span><span class="font-semibold">${t("Due")}:</span> ${dueLabel || "–"}</span>
             ${completedMeta}
+          </div>
+          <div class="todo-card__quick-edit">
+            ${quickStatus}
+            ${quickDue}
           </div>
         </div>
         <div class="todo-card__actions">
+          ${selectionControl}
           <button class="btn btn-sm" data-action="complete" data-next-status="${action.next}">${action.label}</button>
           ${editUrl ? `<a class="btn btn-secondary btn-sm" href="${editUrl}">${t("Edit")}</a>` : ""}
           ${deleteTarget ? `<a class="btn btn-danger btn-sm" href="${deleteTarget}">${t("Delete")}</a>` : ""}
@@ -449,7 +703,6 @@
             const events = eventMap[dateKey] || [];
             const count = events.length;
             const isToday = isCurrentMonth && config.today && dateKey === config.today;
-            const isPending = isCurrentMonth && state.calendar.pending && state.calendar.pending.highlight === dateKey;
             const classes = [
               "h-20 align-top border border-emerald-50 px-2 py-1 text-slate-700 dark:text-slate-100 transition",
               isCurrentMonth
@@ -457,7 +710,6 @@
                   ? "bg-amber-100/90 dark:bg-amber-500/30"
                   : "bg-white/90 dark:bg-transparent"
                 : "bg-transparent text-transparent border-transparent pointer-events-none",
-              isPending ? "ring-2 ring-amber-400" : "",
               isActiveWeek ? "todo-calendar-week-cell--active" : "",
             ].join(" ");
             if (!isCurrentMonth) {
@@ -521,11 +773,6 @@
       .catch((error) => setCalendarStatus(error.message));
   }
 
-  function isoWeekStartFrom(dateStr) {
-    const d = startOfWeek(new Date(dateStr));
-    return calendarDateString(d);
-  }
-
   function renderDaySummary(dateStr) {
     const events = state.calendar.events.filter((event) => calendarDateString(event.date) === dateStr);
     if (!events.length) {
@@ -541,47 +788,18 @@
     const cell = event.target.closest("[data-date]");
     if (!cell) return;
     const dateStr = cell.dataset.date;
-    if (state.calendar.pending) {
-      updateTask(state.calendar.pending.id, { due_date: dateStr, week_start: isoWeekStartFrom(dateStr) })
-        .then(() => {
-          setCalendarStatus(`${t("Moved")} ${state.calendar.pending.title} ${t("to")} ${formatDate(dateStr)}`);
-          state.calendar.pending = null;
-          if (els.calendarCancel) els.calendarCancel.classList.add("hidden");
-          fetchTasks(state.currentTab);
-          fetchCalendar();
-        })
-        .catch(showError);
-    } else {
-      renderDaySummary(dateStr);
-      if (config.createUrl) {
-        const separator = config.createUrl.includes("?") ? "&" : "?";
-        window.location.href = `${config.createUrl}${separator}due=${dateStr}`;
-      }
+    renderDaySummary(dateStr);
+    if (config.createUrl) {
+      const separator = config.createUrl.includes("?") ? "&" : "?";
+      window.location.href = `${config.createUrl}${separator}due=${dateStr}`;
     }
-  }
-
-  function setPendingReschedule(card) {
-    state.calendar.pending = {
-      id: card.dataset.todoId,
-      title: card.dataset.title,
-      highlight: card.dataset.date || config.currentWeek,
-    };
-    setCalendarStatus(`${t("Select a new date for")} ${card.dataset.title}.`);
-    if (els.calendarCancel) els.calendarCancel.classList.remove("hidden");
-    renderCalendar();
-  }
-
-  function cancelReschedule() {
-    state.calendar.pending = null;
-    setCalendarStatus(t("Reschedule cancelled."));
-    if (els.calendarCancel) els.calendarCancel.classList.add("hidden");
-    renderCalendar();
   }
 
   function fetchTasks(tab) {
     state.currentTab = tab;
     setTabActive(tab);
     showEmpty(false);
+    announce(t("Calculating…"));
     els.list.innerHTML = `<div class="animate-pulse rounded-2xl border border-dashed border-emerald-200/70 bg-white/70 p-6 text-center text-sm text-slate-500">${t("Loading…")}</div>`;
     const params = new URLSearchParams(TAB_QUERIES[tab] ? TAB_QUERIES[tab]() : {});
     const pageState = getPaginationState(tab);
@@ -608,13 +826,15 @@
         state.cache[tab] = results;
         state.meta[tab] = { pagination, count: totalCount };
         renderTasks(tab, results);
-        renderPagination(tab, pagination, results.length, totalCount);
+        fetchTaskSummary();
+        renderFilterChips();
+        renderPagination(tab, pagination, state.lastResults.length, totalCount);
+        renderEmptyState(totalCount);
       })
       .catch((err) => {
         els.list.innerHTML = `<div class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">${err.message}</div>`;
-        if (els.pagination) {
-          els.pagination.classList.add("hidden");
-        }
+        if (els.paginationBlocks && els.paginationBlocks.length) els.paginationBlocks.forEach((block) => block.classList.add("hidden"));
+        announce(err.message || t("Failed to load to-dos"));
         delete state.meta[tab];
       });
   }
@@ -672,8 +892,47 @@
         .catch(showError);
       return;
     }
-    if (actionEl.dataset.action === "reschedule") {
-      setPendingReschedule(card);
+  }
+
+  function handleListChange(event) {
+    const checkbox = event.target.closest("input[data-task-select]");
+    if (checkbox) {
+      const id = String(checkbox.value || "").trim();
+      if (!id) return;
+      if (checkbox.checked) {
+        state.completedSelection.add(id);
+      } else {
+        state.completedSelection.delete(id);
+      }
+      updateBulkControls();
+      return;
+    }
+
+    const statusSelect = event.target.closest("select[data-inline-status]");
+    if (statusSelect) {
+      const card = statusSelect.closest("[data-todo-id]");
+      if (!card) return;
+      const id = card.dataset.todoId;
+      updateTask(id, { status: statusSelect.value })
+        .then(() => {
+          fetchTasks(state.currentTab);
+          fetchCalendar();
+        })
+        .catch(showError);
+      return;
+    }
+
+    const dueInput = event.target.closest("input[data-inline-due]");
+    if (dueInput) {
+      const card = dueInput.closest("[data-todo-id]");
+      if (!card) return;
+      const id = card.dataset.todoId;
+      updateTask(id, { due_date: dueInput.value || null })
+        .then(() => {
+          fetchTasks(state.currentTab);
+          fetchCalendar();
+        })
+        .catch(showError);
     }
   }
 
@@ -808,12 +1067,52 @@
         applyFilters();
       });
     }
-
-    if (els.paginationPrev) {
-      els.paginationPrev.addEventListener("click", () => changePage(-1));
+    if (els.filterChips) {
+      els.filterChips.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-chip-remove]");
+        if (!btn) return;
+        const key = btn.dataset.chipRemove;
+        if (key === "search") {
+          state.search = "";
+          if (els.searchInput) els.searchInput.value = "";
+        } else if (key === "owner") {
+          state.owner = config.ownerFilterDefault || "";
+          if (els.ownerFilter) els.ownerFilter.value = state.owner || "all";
+        } else if (key === "per") {
+          state.pageSize = defaultPageSize;
+          if (els.pageSizeSelect) els.pageSizeSelect.value = String(defaultPageSize);
+        }
+        resetPagination();
+        fetchTasks(state.currentTab);
+      });
     }
-    if (els.paginationNext) {
-      els.paginationNext.addEventListener("click", () => changePage(1));
+
+    if (els.filterReset) {
+      els.filterReset.addEventListener("click", () => {
+        resetAllFiltersAndReload();
+      });
+    }
+
+    if (els.paginationBlocks && els.paginationBlocks.length) {
+      els.paginationBlocks.forEach((block) => {
+        const prev = block.querySelector("[data-pagination-prev]");
+        const next = block.querySelector("[data-pagination-next]");
+        const jumpBtn = block.querySelector("[data-pagination-jump-btn]");
+        const jumpInput = block.querySelector("[data-pagination-jump-input]");
+        if (prev) prev.addEventListener("click", () => changePage(-1));
+        if (next) next.addEventListener("click", () => changePage(1));
+        if (jumpBtn && jumpInput) {
+          jumpBtn.addEventListener("click", () => {
+            const meta = state.meta[state.currentTab];
+            if (!meta || !meta.pagination) return;
+            const target = Number(jumpInput.value);
+            if (!Number.isFinite(target)) return;
+            const page = Math.max(1, Math.min(target, meta.pagination.pages || 1));
+            getPaginationState(state.currentTab).page = page;
+            fetchTasks(state.currentTab);
+          });
+        }
+      });
     }
 
     if (els.calendarPrev) {
@@ -846,31 +1145,68 @@
       });
     }
 
-    if (els.calendarCancel) {
-      els.calendarCancel.addEventListener("click", cancelReschedule);
-    }
-
     if (completedDeleteBtn) {
       completedDeleteBtn.addEventListener("click", deleteCompletedTasks);
     }
 
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && state.calendar.pending) {
-        cancelReschedule();
-      }
-    });
+    if (els.completedSelectAll) {
+      els.completedSelectAll.addEventListener("change", (event) => {
+        const checked = Boolean(event.target.checked);
+        visibleTaskCheckboxes().forEach((checkbox) => {
+          checkbox.checked = checked;
+          const id = String(checkbox.value || "").trim();
+          if (!id) return;
+          if (checked) {
+            state.completedSelection.add(id);
+          } else {
+            state.completedSelection.delete(id);
+          }
+        });
+        updateBulkControls();
+      });
+    }
+
+    if (els.bulkMarkDone) {
+      els.bulkMarkDone.addEventListener("click", () => {
+        runBulkPatch({ status: "done" })
+          .then(() => {
+            clearCompletedSelection();
+            fetchTasks(state.currentTab);
+            fetchCalendar();
+          })
+          .catch(showError);
+      });
+    }
+
+    if (els.bulkDelete) {
+      els.bulkDelete.addEventListener("click", () => {
+        if (!window.confirm(t("Delete selected tasks? This cannot be undone."))) return;
+        runBulkDelete()
+          .then(() => {
+            clearCompletedSelection();
+            fetchTasks(state.currentTab);
+            fetchCalendar();
+          })
+          .catch(showError);
+      });
+    }
+
   }
 
   tabs.forEach((btn) => {
     btn.addEventListener("click", () => {
       const tab = btn.dataset.tab;
-      if (tab === state.currentTab) return;
+      if (tab === state.currentTab) {
+        setTabActive(tab);
+        return;
+      }
       fetchTasks(tab);
     });
   });
 
   if (els.list) {
     els.list.addEventListener("click", handleListClick);
+    els.list.addEventListener("change", handleListChange);
   }
 
   function initialTab() {
@@ -880,6 +1216,7 @@
   }
 
   initForms();
+  fetchTaskSummary();
   fetchTasks(initialTab());
   fetchCalendar();
 })();

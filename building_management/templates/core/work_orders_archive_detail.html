@@ -24,7 +24,7 @@
           {% blocktrans count total=total_archived %}{{ total }} archived work order{% plural %}{{ total }} archived work orders{% endblocktrans %}
         </span>
         <span>
-          <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Отговорник" %}:</span>
+          <span class="font-semibold text-slate-600 dark:text-slate-200">{% trans "Owner" %}:</span>
           {% with owner=building.owner %}
             {% if owner %}
               {{ owner.get_full_name|default:owner.username }}
@@ -41,7 +41,7 @@
         <div class="filter-panel__grid">
           <div class="space-y-2">
             <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-200">{% trans "Page size" %}</label>
-            <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
               {% for option in detail_per_choices %}
                 <option value="{{ option }}" {% if detail_per == option %}selected{% endif %}>{{ option }}</option>
               {% endfor %}
@@ -54,7 +54,7 @@
           {% endif %}
         {% endfor %}
         <div class="filter-panel__actions">
-          <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
+          <button class="btn" type="submit">{% trans "Apply filters" %}</button>
         </div>
       </form>
 
@@ -68,7 +68,7 @@
               <th class="px-4 py-3">{% trans "Status" %}</th>
               <th class="px-4 py-3">{% trans "Created" %}</th>
               <th class="px-4 py-3">{% trans "Archived" %}</th>
-              <th class="px-4 py-3">{% trans "Отговорник" %}</th>
+              <th class="px-4 py-3">{% trans "Owner" %}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">

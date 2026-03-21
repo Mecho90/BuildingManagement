@@ -22,179 +22,319 @@
       {% endif %}
     </div>
 
-    <div>
-      <form method="get" class="filter-panel">
-        {% url 'core:buildings_list' as buildings_reset_url %}
-        <div class="filter-panel__grid md:grid-cols-2">
-          <div class="space-y-2 md:col-span-2">
-            <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search buildings" %}</label>
-            <input
-              id="id_q"
-              class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
-              type="text"
-              name="q"
-              value="{{ q }}"
-              placeholder="{% trans 'Name, address or Отговорник' %}"
-              autocomplete="off"
-            />
-          </div>
+    <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total buildings" %}</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100 num-tabular">{{ summary_total_buildings }}</p>
+      </article>
+      <article class="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-card dark:border-emerald-700/60 dark:bg-emerald-950/20">
+        <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">{% trans "Occupied units" %}</p>
+        <p class="mt-2 text-2xl font-semibold text-emerald-800 dark:text-emerald-200 num-tabular">{{ summary_occupied_units }}</p>
+      </article>
+      <article class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-card dark:border-amber-700/60 dark:bg-amber-950/20">
+        <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">{% trans "Open work orders" %}</p>
+        <p class="mt-2 text-2xl font-semibold text-amber-800 dark:text-amber-200 num-tabular">{{ summary_open_work_orders }}</p>
+      </article>
+      <article class="rounded-2xl border border-rose-200 bg-rose-50/60 p-4 shadow-card dark:border-rose-700/60 dark:bg-rose-950/20">
+        <p class="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">{% trans "Overdue items" %}</p>
+        <p class="mt-2 text-2xl font-semibold text-rose-800 dark:text-rose-200 num-tabular">{{ summary_overdue_items }}</p>
+      </article>
+    </section>
 
-          {% if owner_options %}
-            <div class="space-y-2">
-              <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Отговорник" %}</label>
-              <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-                <option value="" {% if not owner_filter %}selected{% endif %}>{% trans "All owners" %}</option>
-                {% for opt in owner_options %}
-                  <option value="{{ opt.value }}" {% if owner_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          {% endif %}
+    <form method="get" class="filter-panel buildings-filter-panel">
+      {% url 'core:buildings_list' as buildings_reset_url %}
+      <div class="space-y-2">
+        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search buildings" %}</label>
+        <input
+          id="id_q"
+          class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
+          type="text"
+          name="q"
+          value="{{ q }}"
+          placeholder="{% trans 'Name, address or owner' %}"
+          autocomplete="off"
+        />
+      </div>
 
+      <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {% if owner_options %}
           <div class="space-y-2">
-            <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-            <select id="id_per" name="per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-              <option value="25"  {% if per == 25  %}selected{% endif %}>25</option>
-              <option value="50"  {% if per == 50  %}selected{% endif %}>50</option>
-              <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
-              <option value="200" {% if per == 200 %}selected{% endif %}>200</option>
+            <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+            <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+              <option value="" {% if not owner_filter %}selected{% endif %}>{% trans "All owners" %}</option>
+              {% for opt in owner_options %}
+                <option value="{{ opt.value }}" {% if owner_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+              {% endfor %}
             </select>
           </div>
+        {% endif %}
+
+        <div class="space-y-2">
+          <label for="id_role" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Role" %}</label>
+          <select id="id_role" name="role" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            <option value="" {% if not role_filter %}selected{% endif %}>{% trans "All roles" %}</option>
+            {% for opt in role_options %}
+              <option value="{{ opt.value }}" {% if role_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+            {% endfor %}
+          </select>
         </div>
 
-        <div class="filter-panel__actions">
-          {% if q or owner_filter or sort != 'name' or per != 25 %}
-            <a class="btn btn-secondary" href="{{ buildings_reset_url }}">{% trans "Reset" %}</a>
-          {% endif %}
-          <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
+        <div class="space-y-2">
+          <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
+          <select id="id_sort" name="sort" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            <option value="name" {% if sort == 'name' %}selected{% endif %}>{% trans "Name (A → Z)" %}</option>
+            <option value="-name" {% if sort == '-name' %}selected{% endif %}>{% trans "Name (Z → A)" %}</option>
+            <option value="units_count" {% if sort == 'units_count' %}selected{% endif %}>{% trans "Units (Low → High)" %}</option>
+            <option value="-units_count" {% if sort == '-units_count' %}selected{% endif %}>{% trans "Units (High → Low)" %}</option>
+            <option value="work_orders_count" {% if sort == 'work_orders_count' %}selected{% endif %}>{% trans "Work orders (Low → High)" %}</option>
+            <option value="-work_orders_count" {% if sort == '-work_orders_count' %}selected{% endif %}>{% trans "Work orders (High → Low)" %}</option>
+            {% if show_owner_column %}
+              <option value="owner" {% if sort == 'owner' %}selected{% endif %}>{% trans "Owner (A → Z)" %}</option>
+              <option value="-owner" {% if sort == '-owner' %}selected{% endif %}>{% trans "Owner (Z → A)" %}</option>
+            {% endif %}
+          </select>
         </div>
-      </form>
-    </div>
+
+        <div class="space-y-2">
+          <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
+          <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+            <option value="25"  {% if per == 25  %}selected{% endif %}>25</option>
+            <option value="50"  {% if per == 50  %}selected{% endif %}>50</option>
+            <option value="100" {% if per == 100 %}selected{% endif %}>100</option>
+            <option value="200" {% if per == 200 %}selected{% endif %}>200</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-panel__actions flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {% if has_active_filters %}
+          <a class="btn btn-secondary" href="{{ buildings_reset_url }}">{% trans "Reset" %}</a>
+        {% endif %}
+        <button class="btn" type="submit">{% trans "Apply filters" %}</button>
+      </div>
+    </form>
+
+    {% if active_filter_chips %}
+      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex flex-wrap items-center gap-2">
+          {% for chip in active_filter_chips %}
+            <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+              {{ chip.label }}
+              <a href="{{ chip.remove_url }}" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-800/60" aria-label="{% trans 'Remove filter' %}">×</a>
+            </span>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
+    {% if is_paginated %}
+      <div class="space-y-3">
+        {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
+        {% if paginator.num_pages > 10 %}
+          <form method="get" class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            {% for key, value in request.GET.items %}
+              {% if key != "page" %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}" />
+              {% endif %}
+            {% endfor %}
+            <label for="id_building_page_jump_top" class="font-medium">{% trans "Jump to page" %}</label>
+            <input id="id_building_page_jump_top" type="number" name="page" min="1" max="{{ paginator.num_pages }}" value="{{ page_obj.number }}" class="input w-24 rounded-xl border border-slate-300 px-2 py-1 dark:border-slate-600" />
+            <button type="submit" class="btn btn-secondary btn-sm">{% trans "Go" %}</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
 
     <div class="grid gap-4 md:hidden">
       {% for b in buildings %}
         <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
-          <div class="flex flex-wrap items-start justify-between gap-2">
-            <div class="flex flex-col gap-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <a href="{% url 'core:building_detail' b.id %}" class="text-lg font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
-                {% include "components/lawyer_orders_indicator.html" with count=b.lawyer_orders_count %}
-                {% include "components/expense_amount_indicator.html" with amount=b.expense_total %}
-              </div>
-              <p class="text-sm text-slate-500 dark:text-slate-400">{{ b.get_role_display }}</p>
+          <div class="space-y-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <a href="{% url 'core:building_detail' b.id %}" class="text-lg font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
+              {% include "components/lawyer_orders_indicator.html" with count=b.lawyer_orders_count %}
+              {% include "components/expense_amount_indicator.html" with amount=b.expense_total %}
             </div>
+            <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
+              {% if b.units_count == 0 %}
+                <span class="status-chip status-chip--info">{% trans "No units" %}</span>
+              {% elif b.occupied_units_count == b.units_count %}
+                <span class="status-chip status-chip--success">{% trans "Fully occupied" %}</span>
+              {% elif b.occupied_units_count > 0 %}
+                <span class="status-chip status-chip--warning">{% trans "Partially occupied" %}</span>
+              {% else %}
+                <span class="status-chip status-chip--danger">{% trans "Vacant" %}</span>
+              {% endif %}
+              {% if b.work_orders_count > 0 %}
+                <span class="status-chip status-chip--warning">{% blocktrans with count=b.work_orders_count %}{{ count }} open{% endblocktrans %}</span>
+              {% else %}
+                <span class="status-chip status-chip--success">{% trans "No open work orders" %}</span>
+              {% endif %}
+              {% if b.overdue_items_count > 0 %}
+                <span class="status-chip status-chip--danger">{% blocktrans with count=b.overdue_items_count %}{{ count }} overdue{% endblocktrans %}</span>
+              {% endif %}
+            </div>
+            <p class="text-sm text-slate-500 dark:text-slate-400">{{ b.get_role_display }}</p>
+            {% if b.address %}
+              <p class="text-sm text-slate-500 dark:text-slate-400">{{ b.address }}</p>
+            {% endif %}
             {% if show_owner_column %}
               {% with owner=b.owner %}
-                <span class="meta-badge">
-                  <span class="meta-badge__label">{% trans "Отговорник" %}</span>
-                  <span class="meta-badge__value">
-                    {% if owner %}
-                      {{ owner.get_full_name|default:owner.username }}
-                    {% else %}
-                      &mdash;
-                    {% endif %}
-                  </span>
-                </span>
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                  <span class="font-semibold">{% trans "Owner" %}:</span>
+                  {% if owner %}{{ owner.get_full_name|default:owner.username }}{% else %}&mdash;{% endif %}
+                </p>
               {% endwith %}
             {% endif %}
           </div>
 
-          {% if b.address %}
-            <p class="text-sm text-slate-600 dark:text-slate-300">{{ b.address }}</p>
-          {% endif %}
-
-          <dl class="grid grid-cols-2 gap-3 text-sm text-slate-600 dark:text-slate-300">
+          <dl class="grid grid-cols-3 gap-3 text-sm text-slate-600 dark:text-slate-300 num-tabular">
             <div>
               <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Units" %}</dt>
               <dd>{{ b.units_count }}</dd>
             </div>
             <div>
-              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Work orders" %}</dt>
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Occupied" %}</dt>
+              <dd>{{ b.occupied_units_count }}</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Open WOs" %}</dt>
               <dd>{{ b.work_orders_count }}</dd>
             </div>
+            <div class="col-span-3">
+              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Budget" %}</dt>
+              <dd>{{ b.expense_total|default_if_none:"0"|floatformat:2 }}</dd>
+            </div>
           </dl>
+
+          <a href="{% url 'core:building_detail' b.id %}" class="btn w-full min-h-[44px]">{% trans "View" %}</a>
         </article>
       {% empty %}
-        <article class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">{% trans "No buildings found." %}</article>
+        <article class="rounded-2xl border border-dashed border-slate-200 bg-white p-5 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          {% if has_active_filters %}
+            <p>{% trans "No buildings match your filters." %}</p>
+            <a class="btn btn-secondary mt-3" href="{% url 'core:buildings_list' %}">{% trans "Reset filters" %}</a>
+          {% else %}
+            <p>{% trans "No buildings yet." %}</p>
+          {% endif %}
+        </article>
       {% endfor %}
     </div>
 
-    <div class="hidden overflow-x-auto md:block rounded-3xl border border-slate-200 bg-white shadow-card dark:border-slate-700 dark:bg-slate-900">
-      <table class="min-w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white text-sm shadow-sm dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900">
-        <thead class="bg-slate-50 dark:bg-slate-800">
-          <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-            {% sortable_heading 'Name' 'name' current_sort=sort as name_sort %}
-            <th class="px-4 py-3" {% if name_sort.aria_sort %}aria-sort="{{ name_sort.aria_sort }}"{% endif %}>
-              {{ name_sort.html }}
-            </th>
-            {% if show_owner_column %}
-              {% sortable_heading 'Отговорник' 'owner' current_sort=sort as owner_sort %}
-              <th class="px-4 py-3" {% if owner_sort.aria_sort %}aria-sort="{{ owner_sort.aria_sort }}"{% endif %}>
-                {{ owner_sort.html }}
+    <div class="hidden md:block">
+      <div class="overflow-x-auto overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-700">
+        <table class="min-w-full divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
+          <thead class="bg-slate-50 dark:bg-slate-800">
+            <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+              {% sortable_heading 'Name' 'name' current_sort=sort as name_sort %}
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800" {% if name_sort.aria_sort %}aria-sort="{{ name_sort.aria_sort }}"{% endif %}>
+                {{ name_sort.html }}
               </th>
-            {% endif %}
-            {% sortable_heading 'Role' 'role' current_sort=sort as role_sort %}
-            <th class="px-4 py-3" {% if role_sort.aria_sort %}aria-sort="{{ role_sort.aria_sort }}"{% endif %}>
-              {{ role_sort.html }}
-            </th>
-            {% sortable_heading 'Address' 'address' current_sort=sort as address_sort %}
-            <th class="px-4 py-3" {% if address_sort.aria_sort %}aria-sort="{{ address_sort.aria_sort }}"{% endif %}>
-              {{ address_sort.html }}
-            </th>
-            {% sortable_heading 'Units' 'units_count' current_sort=sort align='right' as units_sort %}
-            <th class="px-4 py-3 text-right" {% if units_sort.aria_sort %}aria-sort="{{ units_sort.aria_sort }}"{% endif %}>
-              {{ units_sort.html }}
-            </th>
-            {% sortable_heading 'Work Orders' 'work_orders_count' current_sort=sort align='right' as work_orders_sort %}
-            <th class="px-4 py-3 text-right" {% if work_orders_sort.aria_sort %}aria-sort="{{ work_orders_sort.aria_sort }}"{% endif %}>
-              {{ work_orders_sort.html }}
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-          {% for b in buildings %}
-            <tr class="text-sm text-slate-700 dark:text-slate-200">
-              <td class="px-4 py-3 font-medium">
-                <div class="flex flex-wrap items-center gap-2">
-                  <a href="{% url 'core:building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
-                  {% include "components/lawyer_orders_indicator.html" with count=b.lawyer_orders_count %}
-                  {% include "components/expense_amount_indicator.html" with amount=b.expense_total %}
-                </div>
-              </td>
               {% if show_owner_column %}
-                <td class="px-4 py-3">
-                  {% with owner=b.owner %}
-                    <span class="meta-badge">
-                      <span class="meta-badge__label">{% trans "Отговорник" %}</span>
-                      <span class="meta-badge__value">
-                        {% if owner %}
-                          {{ owner.get_full_name|default:owner.username }}
-                        {% else %}
-                          &mdash;
-                        {% endif %}
-                      </span>
-                    </span>
-                  {% endwith %}
-                </td>
+                {% sortable_heading 'Owner' 'owner' current_sort=sort as owner_sort %}
+                <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800" {% if owner_sort.aria_sort %}aria-sort="{{ owner_sort.aria_sort }}"{% endif %}>
+                  {{ owner_sort.html }}
+                </th>
               {% endif %}
-              <td class="px-4 py-3">{{ b.get_role_display }}</td>
-              <td class="px-4 py-3">{{ b.address }}</td>
-              <td class="px-4 py-3 text-right">{{ b.units_count }}</td>
-              <td class="px-4 py-3 text-right">{{ b.work_orders_count }}</td>
+              {% sortable_heading 'Role' 'role' current_sort=sort as role_sort %}
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800" {% if role_sort.aria_sort %}aria-sort="{{ role_sort.aria_sort }}"{% endif %}>
+                {{ role_sort.html }}
+              </th>
+              {% sortable_heading 'Address' 'address' current_sort=sort as address_sort %}
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800" {% if address_sort.aria_sort %}aria-sort="{{ address_sort.aria_sort }}"{% endif %}>
+                {{ address_sort.html }}
+              </th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Status" %}</th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800">{% trans "Lawyer orders" %}</th>
+              {% sortable_heading 'Units' 'units_count' current_sort=sort align='right' as units_sort %}
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800" {% if units_sort.aria_sort %}aria-sort="{{ units_sort.aria_sort }}"{% endif %}>{{ units_sort.html }}</th>
+              {% sortable_heading 'Work Orders' 'work_orders_count' current_sort=sort align='right' as work_orders_sort %}
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800" {% if work_orders_sort.aria_sort %}aria-sort="{{ work_orders_sort.aria_sort }}"{% endif %}>{{ work_orders_sort.html }}</th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800">{% trans "Budget" %}</th>
+              <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800">{% trans "Actions" %}</th>
             </tr>
-          {% empty %}
-            <tr>
-              <td colspan="{{ show_owner_column|yesno:'6,5' }}" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
-                {% trans "No buildings found." %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+            {% for b in buildings %}
+              <tr class="text-sm text-slate-700 hover:bg-slate-50/80 dark:text-slate-200 dark:hover:bg-slate-800/70">
+                <td class="px-4 py-3 font-medium">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <a href="{% url 'core:building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
+                  </div>
+                </td>
+                {% if show_owner_column %}
+                  <td class="px-4 py-3 text-slate-600 dark:text-slate-300">
+                    {% with owner=b.owner %}
+                      {% if owner %}{{ owner.get_full_name|default:owner.username }}{% else %}&mdash;{% endif %}
+                    {% endwith %}
+                  </td>
+                {% endif %}
+                <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ b.get_role_display }}</td>
+                <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ b.address|default:"—" }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap gap-1.5">
+                    {% if b.units_count == 0 %}
+                      <span class="status-chip status-chip--info">{% trans "No units" %}</span>
+                    {% elif b.occupied_units_count == b.units_count %}
+                      <span class="status-chip status-chip--success">{% trans "Fully occupied" %}</span>
+                    {% elif b.occupied_units_count > 0 %}
+                      <span class="status-chip status-chip--warning">{% trans "Partial" %}</span>
+                    {% else %}
+                      <span class="status-chip status-chip--danger">{% trans "Vacant" %}</span>
+                    {% endif %}
+                    {% if b.overdue_items_count > 0 %}
+                      <span class="status-chip status-chip--danger">{% blocktrans with count=b.overdue_items_count %}{{ count }} overdue{% endblocktrans %}</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-right num-tabular">
+                  {% if b.lawyer_orders_count > 0 %}
+                    {{ b.lawyer_orders_count }}
+                  {% else %}
+                    0
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right num-tabular">{{ b.units_count }}</td>
+                <td class="px-4 py-3 text-right num-tabular">{{ b.work_orders_count }}</td>
+                <td class="px-4 py-3 text-right num-tabular">{{ b.expense_total|default_if_none:"0"|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right">
+                  <a href="{% url 'core:building_detail' b.id %}" class="btn btn-sm">{% trans "View" %}</a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="{{ show_owner_column|yesno:'10,9' }}" class="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-300">
+                  {% if has_active_filters %}
+                    <div class="space-y-3">
+                      <p>{% trans "No buildings match your filters." %}</p>
+                      <a class="btn btn-secondary btn-sm" href="{% url 'core:buildings_list' %}">{% trans "Reset filters" %}</a>
+                    </div>
+                  {% else %}
+                    <p>{% trans "No buildings yet." %}</p>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     {% if is_paginated %}
-      {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
+      <div class="space-y-3">
+        {% include "core/includes/pagination.html" with page_obj=page_obj paginator=paginator query_string=pagination_query %}
+        {% if paginator.num_pages > 10 %}
+          <form method="get" class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+            {% for key, value in request.GET.items %}
+              {% if key != "page" %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}" />
+              {% endif %}
+            {% endfor %}
+            <label for="id_building_page_jump_bottom" class="font-medium">{% trans "Jump to page" %}</label>
+            <input id="id_building_page_jump_bottom" type="number" name="page" min="1" max="{{ paginator.num_pages }}" value="{{ page_obj.number }}" class="input w-24 rounded-xl border border-slate-300 px-2 py-1 dark:border-slate-600" />
+            <button type="submit" class="btn btn-secondary btn-sm">{% trans "Go" %}</button>
+          </form>
+        {% endif %}
+      </div>
     {% endif %}
   </section>
 {% endblock %}

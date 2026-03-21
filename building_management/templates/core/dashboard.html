@@ -11,10 +11,10 @@
     </div>
   </div>
 
-  {% with card_base="ui-card dashboard-card" section_shell="dashboard-panel space-y-4" %}
+  {% with card_base="ui-card dashboard-card h-full" section_shell="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-4" %}
     <section class="space-y-4">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Предупреждения за крайни срокове" %}</h2>
+        <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Deadline alerts" %}</h2>
         {% if deadline_alert_page and deadline_alert_page.paginator.count %}
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
             {% blocktrans count total=deadline_alert_page.paginator.count %}{{ total }} alert{% plural %}{{ total }} alerts{% endblocktrans %}
@@ -49,8 +49,13 @@
                   </span>
                 </div>
                 <div class="dashboard-card__actions">
-                  <a class="btn btn-xs" href="{% url 'core:work_order_detail' alert.id %}" aria-label="{% blocktrans with title=alert.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
-                  <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' alert.id %}" aria-label="{% blocktrans with title=alert.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
+                  <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' alert.id %}" aria-label="{% blocktrans with title=alert.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
+                  <details class="relative">
+                    <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
+                    <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-card dark:border-slate-700 dark:bg-slate-900">
+                      <a class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="{% url 'core:work_order_update' alert.id %}" aria-label="{% blocktrans with title=alert.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
+                    </div>
+                  </details>
                 </div>
               </article>
             {% endfor %}
@@ -101,9 +106,14 @@
                     </span>
                   </div>
                   <div class="dashboard-card__actions">
-                    <a class="btn btn-xs" href="{% url 'core:work_order_detail' job.id %}" aria-label="{% blocktrans with title=job.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
+                    <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' job.id %}" aria-label="{% blocktrans with title=job.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
                     {% if job.can_update %}
-                      <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' job.id %}" aria-label="{% blocktrans with title=job.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
+                      <details class="relative">
+                        <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
+                        <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-card dark:border-slate-700 dark:bg-slate-900">
+                          <a class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="{% url 'core:work_order_update' job.id %}" aria-label="{% blocktrans with title=job.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
+                        </div>
+                      </details>
                     {% endif %}
                   </div>
                 </article>
@@ -112,21 +122,21 @@
           {% else %}
             <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No work orders assigned for today." %}</p>
           {% endif %}
-          {% if technician_cards_page and technician_cards_page.paginator.count|default:0 > 4 %}
+          {% if technician_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=technician_cards_page paginator=technician_cards_page.paginator query_string=technician_page_query page_param="jobs_page" %}
+              {% include "core/includes/pagination.html" with page_obj=technician_cards_page paginator=technician_cards_page.paginator query_string=technician_page_query page_param="jobs_page" show_single_page=True %}
             </div>
           {% endif %}
         </div>
       </section>
     {% endif %}
 
-    {% if backoffice_cards %}
+    {% if backoffice_cards_page and backoffice_cards_page.paginator.count %}
       <section class="space-y-4">
         <div class="flex items-center justify-between gap-3">
-          <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Очаква одобрение от бекофиса" %}</h2>
+          <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Awaiting backoffice approval" %}</h2>
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-            {% blocktrans count total=backoffice_cards|length %}{{ total }} request{% plural %}{{ total }} requests{% endblocktrans %}
+            {% blocktrans count total=backoffice_cards_page.paginator.count %}{{ total }} request{% plural %}{{ total }} requests{% endblocktrans %}
           </span>
         </div>
         <div class="{{ section_shell }}">
@@ -143,7 +153,7 @@
                       {% endif %}
                     </div>
                     <div class="dashboard-card__badges">
-                      {% include "components/badge.html" with tone="warning" label=_("Очаква одобрение от бекофиса") size="sm" %}
+                      {% include "components/badge.html" with tone="warning" label=_("Awaiting backoffice approval") size="sm" %}
                       {% if card.awaiting_since %}
                         <span class="badge badge--muted badge--sm">{{ card.awaiting_since }}</span>
                       {% endif %}
@@ -162,8 +172,13 @@
                     {% endif %}
                   </div>
                   <div class="dashboard-card__actions">
-                    <a class="btn btn-xs" href="{% url 'core:work_order_detail' card.id %}" aria-label="{% blocktrans with title=card.title %}Review work order {{ title }}{% endblocktrans %}">{% trans "Review" %}</a>
-                    <a class="btn btn-secondary btn-xs" href="{% url 'core:work_order_update' card.id %}" aria-label="{% blocktrans with title=card.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
+                    <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' card.id %}" aria-label="{% blocktrans with title=card.title %}Review work order {{ title }}{% endblocktrans %}">{% trans "Review" %}</a>
+                    <details class="relative">
+                      <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
+                      <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-card dark:border-slate-700 dark:bg-slate-900">
+                        <a class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="{% url 'core:work_order_update' card.id %}" aria-label="{% blocktrans with title=card.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
+                      </div>
+                    </details>
                   </div>
                 </article>
               {% endfor %}
@@ -171,11 +186,61 @@
           {% else %}
             <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No work orders are awaiting approval." %}</p>
           {% endif %}
+          {% if backoffice_cards_page %}
+            <div class="mt-4">
+              {% include "core/includes/pagination.html" with page_obj=backoffice_cards_page paginator=backoffice_cards_page.paginator query_string=backoffice_page_query page_param="backoffice_page" show_single_page=True %}
+            </div>
+          {% endif %}
         </div>
       </section>
     {% endif %}
 
-    {% if todo_cards %}
+    {% if pending_budget_cards_page and pending_budget_cards_page.paginator.count %}
+      <section class="space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Pending Budget Approvals" %}</h2>
+          <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            {% blocktrans count total=pending_budget_cards_page.paginator.count %}{{ total }} budget{% plural %}{{ total }} budgets{% endblocktrans %}
+          </span>
+        </div>
+        <div class="{{ section_shell }}">
+          <div class="grid gap-4 md:grid-cols-2">
+            {% for budget in pending_budget_cards %}
+              <article class="{{ card_base }}">
+                <header class="dashboard-card__header">
+                  <div class="space-y-2">
+                    <p class="dashboard-card__eyebrow">{{ budget.building|default:_("No building") }}</p>
+                    <h3 class="dashboard-card__title">{{ budget.title }}</h3>
+                    <p class="dashboard-card__description">
+                      {% blocktrans with requester=budget.requester amount=budget.requested|floatformat:2 currency=budget.currency %}Requested by {{ requester }} · {{ amount }} {{ currency }}{% endblocktrans %}
+                    </p>
+                  </div>
+                  <div class="dashboard-card__badges">
+                    <span class="badge badge--warning badge--sm">{% trans "Pending" %}</span>
+                  </div>
+                </header>
+                <div class="dashboard-card__actions">
+                  <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:budget_review_decision' budget.id %}">{% trans "Review" %}</a>
+                  <details class="relative">
+                    <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
+                    <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-card dark:border-slate-700 dark:bg-slate-900">
+                      <a class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="{% url 'core:budget_detail' budget.id %}">{% trans "Open budget" %}</a>
+                    </div>
+                  </details>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+          {% if pending_budget_cards_page %}
+            <div class="mt-4">
+              {% include "core/includes/pagination.html" with page_obj=pending_budget_cards_page paginator=pending_budget_cards_page.paginator query_string=pending_budget_page_query page_param="budget_page" show_single_page=True %}
+            </div>
+          {% endif %}
+        </div>
+      </section>
+    {% endif %}
+
+    {% if todo_cards_page and todo_cards_page.paginator.count %}
       <section class="space-y-4">
         <div class="flex items-center justify-between gap-3">
           <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "My Tasks" %}</h2>
@@ -203,13 +268,18 @@
                   </div>
                 </header>
                 <div class="dashboard-card__actions">
-                  <a class="btn btn-xs" href="{{ task.url }}" aria-label="{% blocktrans with title=task.title %}Edit task {{ title }}{% endblocktrans %}">{% trans "Edit" %}</a>
-                  <a class="btn btn-danger btn-xs" href="{{ task.delete_url }}" aria-label="{% blocktrans with title=task.title %}Delete task {{ title }}{% endblocktrans %}">{% trans "Delete" %}</a>
+                  <a class="btn btn-xs w-full sm:w-auto" href="{{ task.url }}" aria-label="{% blocktrans with title=task.title %}Edit task {{ title }}{% endblocktrans %}">{% trans "Edit" %}</a>
+                  <details class="relative">
+                    <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
+                    <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-rose-200 bg-white p-2 shadow-card dark:border-rose-800 dark:bg-slate-900">
+                      <a class="block rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-900/40 dark:text-rose-200 dark:hover:bg-rose-900/60" href="{{ task.delete_url }}" aria-label="{% blocktrans with title=task.title %}Delete task {{ title }}{% endblocktrans %}">{% trans "Delete" %}</a>
+                    </div>
+                  </details>
                 </div>
               </article>
             {% endfor %}
           </div>
-          {% if todo_cards_page and todo_cards_page.paginator.num_pages > 1 %}
+          {% if todo_cards_page %}
             <div class="mt-4">
               {% include "core/includes/pagination.html" with page_obj=todo_cards_page paginator=todo_cards_page.paginator query_string=todo_page_query page_param="todo_page" show_single_page=True %}
             </div>
@@ -221,11 +291,16 @@
     <section class="space-y-4">
       <div class="flex items-center justify-between gap-2">
         <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Notifications" %}</h2>
-        {% if notifications_page and notifications_page.paginator.count %}
-          <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-            {% blocktrans count total=notifications_page.paginator.count %}{{ total }} notifications{% plural %}{{ total }} notifications{% endblocktrans %}
-          </span>
-        {% endif %}
+        <div class="flex items-center gap-2">
+          {% if notifications_page and notifications_page.paginator.count %}
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              {% blocktrans count total=notifications_page.paginator.count %}{{ total }} notifications{% plural %}{{ total }} notifications{% endblocktrans %}
+            </span>
+          {% endif %}
+          {% if notifications_page and notifications_page.object_list %}
+            <button type="button" id="mark-all-notes-page" class="btn btn-secondary btn-xs">{% trans "Mark all on page read" %}</button>
+          {% endif %}
+        </div>
       </div>
       <div class="{{ section_shell }}">
         {% if notifications_page and notifications_page.object_list %}
@@ -235,7 +310,12 @@
                 <article class="{{ card_base }}" data-notification-key="{{ note.id }}" data-is-new="{{ note.is_new|yesno:'true,false' }}">
                   <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div class="flex-1 space-y-2">
-                      <span class="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100">{% trans "Информация" %}</span>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide {{ note.badge_classes }}" style="{{ note.badge_style }}">{{ note.level_label|default:_("Info") }}</span>
+                        {% if note.is_new %}
+                          <span class="badge badge--info badge--sm">{% trans "New" %}</span>
+                        {% endif %}
+                      </div>
                       <p class="leading-snug">{{ note.message }}</p>
                     </div>
                     <form method="post"
@@ -243,9 +323,9 @@
                           hx-post="{% url 'core:notification_snooze' note.id %}"
                           hx-target="closest article"
                           hx-swap="delete"
-                          class="mt-2 inline-flex sm:mt-0">
+                          class="mt-2 inline-flex note-read-form sm:mt-0">
                       {% csrf_token %}
-                      <button type="submit" class="btn btn-secondary btn-xs" aria-label="{% blocktrans with message=note.message|striptags %}Mark notification {{ message }} as read{% endblocktrans %}">{% trans "Read" %}</button>
+                      <button type="submit" class="btn btn-secondary btn-xs w-full sm:w-auto" aria-label="{% blocktrans with message=note.message|striptags %}Mark notification {{ message }} as read{% endblocktrans %}">{% trans "Read" %}</button>
                     </form>
                 </div>
                 </article>
@@ -254,7 +334,7 @@
           </ul>
           {% if notifications_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=notifications_page paginator=notifications_page.paginator query_string=note_page_query page_param="note_page" %}
+              {% include "core/includes/pagination.html" with page_obj=notifications_page paginator=notifications_page.paginator query_string=note_page_query page_param="note_page" show_single_page=True %}
             </div>
           {% endif %}
         {% else %}
@@ -264,8 +344,22 @@
     </section>
   {% endwith %}
 
-  {% if not technician_cards and not backoffice_cards and not notifications %}
-    <p class="text-sm text-slate-500 dark:text-slate-400">{% trans "No dashboard data available for your role yet." %}</p>
-  {% endif %}
 </section>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script>
+    (function () {
+      const trigger = document.getElementById("mark-all-notes-page");
+      if (!trigger) return;
+      const forms = Array.from(document.querySelectorAll(".note-read-form"));
+      trigger.addEventListener("click", function () {
+        forms.forEach((form) => {
+          const button = form.querySelector("button[type='submit']");
+          if (button) button.click();
+        });
+      });
+    })();
+  </script>
 {% endblock %}

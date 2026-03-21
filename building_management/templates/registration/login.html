@@ -15,60 +15,109 @@
       box-shadow: none !important;
       outline: none !important;
       backdrop-filter: none;
-      padding: 3rem 1rem 4rem;
+      padding: 2rem 1rem 3rem;
     }
     @media (min-width: 640px) {
       .login-page .layout-shell {
-        padding: 4rem 0 5rem;
-      }
-    }
-    .login-logo-glass {
-      position: relative;
-      padding: 2rem 2.5rem;
-      border-radius: 2.25rem;
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 236, 210, 0.85));
-      box-shadow:
-        0 25px 45px -30px rgba(15, 23, 42, 0.6),
-        inset 0 0 25px rgba(255, 255, 255, 0.4);
-      border: 0;
-      backdrop-filter: blur(18px);
-    }
-    .dark .login-logo-glass {
-      background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(76, 29, 149, 0.65));
-      border-color: rgba(148, 163, 184, 0.5);
-    }
-    @media (min-width: 640px) {
-      .login-logo-glass {
-        padding: 2.5rem 3.25rem;
-      }
-    }
-    @media (min-width: 1024px) {
-      .login-logo-glass {
-        padding: 3rem 4.5rem;
+        padding: 3.5rem 0 4.5rem;
       }
     }
     .login-auth-layout {
-      display: flex;
-      min-height: 72vh;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1.5rem;
+      min-height: calc(100vh - 5rem);
+      display: grid;
+      place-items: center;
     }
-    @media (min-width: 1024px) {
-      .login-auth-layout {
-        flex-direction: row;
-        align-items: center;
-        justify-content: center;
-        gap: 2rem;
+
+    .login-shell {
+      width: 100%;
+      max-width: 30rem;
+      border-radius: 1.5rem;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 24px 55px -32px rgba(15, 23, 42, 0.55);
+      padding: 1.5rem;
+    }
+    .dark .login-shell {
+      border-color: rgba(71, 85, 105, 0.75);
+      background: rgba(15, 23, 42, 0.95);
+      box-shadow: 0 28px 64px -36px rgba(2, 6, 23, 0.9);
+    }
+    @media (min-width: 640px) {
+      .login-shell {
+        padding: 2rem;
       }
     }
-    .login-logo-shell {
-      width: 100%;
-      max-width: 40rem;
+
+    .login-brand {
       display: flex;
       justify-content: center;
-      flex-shrink: 0;
+    }
+    .login-brand img {
+      height: 3.25rem;
+      width: auto;
+      filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.18));
+    }
+    .login-shell .input:focus,
+    .login-shell input:focus,
+    .login-shell select:focus {
+      outline: 2px solid transparent;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+      border-color: rgba(16, 185, 129, 0.75);
+    }
+    .login-inline-error {
+      margin-top: 0.35rem;
+      border-radius: 0.65rem;
+      border: 1px solid rgba(252, 165, 165, 0.8);
+      background: rgba(254, 242, 242, 0.85);
+      color: #991b1b;
+      padding: 0.45rem 0.6rem;
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+    .dark .login-inline-error {
+      border-color: rgba(190, 24, 93, 0.65);
+      background: rgba(136, 19, 55, 0.35);
+      color: #fecdd3;
+    }
+    .login-password-toggle {
+      position: absolute;
+      inset-inline-end: 0.6rem;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 0;
+      background: transparent;
+      color: #475569;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 0.35rem 0.5rem;
+      border-radius: 0.45rem;
+    }
+    #id_password {
+      padding-inline-end: 5.5rem;
+    }
+    #id_password::-ms-reveal,
+    #id_password::-ms-clear {
+      display: none;
+    }
+    #id_password::-webkit-credentials-auto-fill-button {
+      visibility: hidden;
+      display: none !important;
+      pointer-events: none;
+    }
+    .login-password-toggle:hover {
+      background: rgba(241, 245, 249, 0.95);
+    }
+    .dark .login-password-toggle {
+      color: #cbd5e1;
+    }
+    .dark .login-password-toggle:hover {
+      background: rgba(30, 41, 59, 0.8);
+    }
+    .login-submit[disabled] {
+      opacity: 0.75;
+      cursor: wait;
     }
   </style>
 {% endblock %}
@@ -81,57 +130,141 @@
 {% block content %}
   {% get_current_language as LANGUAGE_CODE %}
   {% get_available_languages as AVAILABLE_LANGUAGES %}
+  {% url 'password_reset' as password_reset_url %}
   <div class="login-auth-layout">
-    <div class="login-logo-shell">
-      <div class="login-logo-glass">
-        <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" class="h-28 w-auto drop-shadow-md sm:h-36 lg:h-44"/>
-      </div>
-    </div>
-    <div class="w-full max-w-md space-y-6 rounded-2xl bg-white p-6 shadow-card dark:bg-slate-900">
+    <div class="login-shell space-y-5">
       <header class="space-y-4 text-center">
-        <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Sign in" %}</h1>
-        <div class="space-y-4 rounded-2xl border border-transparent bg-amber-50/60 p-4 text-left shadow-inner dark:border-transparent dark:bg-slate-900/60">
-          <div class="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-muted">{% trans "Today" %}</p>
-              <time datetime="{% now 'c' %}" class="text-base font-semibold text-brand-foreground">{% now 'l, F j, Y' %}</time>
-            </div>
-          </div>
-          <form action="{% url 'set_language' %}" method="post" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="{% trans 'Change language' %}">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}"/>
-            <label for="id_language_login" class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
-              <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-amber-500 shadow-sm" aria-hidden="true">
-                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none">
-                  <path d="M12 3a9 9 0 1 0 9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                  <path d="M3 12h18M12 3c2.5 2.5 3.75 5.5 3.75 9S14.5 21.5 12 24" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </span>
-              <span>{% trans "Language" %}</span>
-            </label>
-            <select id="id_language_login" name="language" class="w-full rounded-full border border-emerald-100 bg-white/95 px-4 py-2 text-sm font-semibold text-brand-foreground shadow-inner focus:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 sm:max-w-xs" onchange="this.form.submit()">
-              {% for code, name in AVAILABLE_LANGUAGES %}
-                <option value="{{ code }}" {% if code == LANGUAGE_CODE %}selected{% endif %}>{{ name }}</option>
-              {% endfor %}
-            </select>
-          </form>
+        <div class="login-brand">
+          <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" />
         </div>
+        <div class="space-y-2">
+          <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Building Management" %}</h1>
+        </div>
+        <form action="{% url 'set_language' %}" method="post" class="mx-auto flex max-w-xs items-center gap-2 text-left" aria-label="{% trans 'Change language' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}"/>
+          <label for="id_language_login" class="sr-only">{% trans "Language" %}</label>
+          <select id="id_language_login" name="language" class="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-brand-foreground shadow-sm focus:border-emerald-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" onchange="this.form.submit()">
+            {% for code, name in AVAILABLE_LANGUAGES %}
+              <option value="{{ code }}" {% if code == LANGUAGE_CODE %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+        </form>
       </header>
 
-      {% if form.non_field_errors %}
-        {% include "components/alert.html" with variant="danger" items=form.non_field_errors aria_live="assertive" %}
+      {% if form.errors %}
+        <div class="alert alert--danger" role="alert" aria-live="assertive">
+          <span class="alert__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.12"></circle>
+              <path d="M9 9l6 6m0-6l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            </svg>
+          </span>
+          <div class="alert__body">
+            <p class="alert__title">{% trans "Invalid credentials" %}</p>
+            <ul class="alert__list">
+              {% for err in form.non_field_errors %}
+                <li>{{ err }}</li>
+              {% endfor %}
+              {% for field in form %}
+                {% for err in field.errors %}
+                  <li>{{ err }}</li>
+                {% endfor %}
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
       {% endif %}
 
-      <form method="post" action="{% url 'login' %}" class="space-y-5" novalidate>
+      <form method="post" action="{% url 'login' %}" class="space-y-5" novalidate id="login-form">
         {% csrf_token %}
+        <div class="form-field">
+          <label class="form-field__label" for="{{ form.username.id_for_label }}">
+            {% trans "Username" %}
+            <span class="form-field__required" aria-hidden="true">*</span>
+          </label>
+          <div class="form-field__control form-field__control--with-icon">
+            {{ form.username }}
+            <span class="form-field__icon" aria-hidden="true">
+              {% include "components/icons/user.svg" %}
+            </span>
+          </div>
+          {% for err in form.username.errors %}
+            <p class="login-inline-error">{{ err }}</p>
+          {% endfor %}
+        </div>
 
-        {% trans "Username" as username_label %}
-        {% trans "Password" as password_label %}
-        {% include "components/form_field.html" with field=form.username label=username_label icon="user" %}
-        {% include "components/form_field.html" with field=form.password label=password_label icon="lock" %}
+        <div class="form-field">
+          <label class="form-field__label" for="{{ form.password.id_for_label }}">
+            {% trans "Password" %}
+            <span class="form-field__required" aria-hidden="true">*</span>
+          </label>
+          <div class="form-field__control form-field__control--with-icon">
+            {{ form.password }}
+            <span class="form-field__icon" aria-hidden="true">
+              {% include "components/icons/lock.svg" %}
+            </span>
+            <button type="button" id="toggle-password" class="login-password-toggle" aria-controls="{{ form.password.id_for_label }}" aria-label="{% trans 'Show password' %}">{% trans "Show" %}</button>
+          </div>
+          <p id="caps-warning" class="form-field__support hidden text-amber-700 dark:text-amber-300">{% trans "Caps Lock is on." %}</p>
+          {% for err in form.password.errors %}
+            <p class="login-inline-error">{{ err }}</p>
+          {% endfor %}
+        </div>
 
-        <button class="btn w-full justify-center" type="submit">{% trans "Sign in" %}</button>
+        <button class="btn login-submit w-full justify-center py-3 text-base font-semibold" type="submit" id="login-submit" data-default-label="{% trans 'Sign in' %}" data-loading-label="{% trans 'Signing in…' %}">
+          {% trans "Sign in" %}
+        </button>
       </form>
+
+      <footer class="space-y-2 text-center">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          {% if password_reset_url %}
+            <a class="text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100" href="{{ password_reset_url }}">{% trans "Forgot password?" %}</a>
+            <span class="mx-1 text-slate-400">·</span>
+          {% endif %}
+          {% trans "Need help? Contact your administrator." %}
+        </p>
+      </footer>
     </div>
   </div>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script>
+    (function () {
+      const form = document.getElementById("login-form");
+      const submit = document.getElementById("login-submit");
+      const passwordInput = document.getElementById("id_password");
+      const toggle = document.getElementById("toggle-password");
+      const capsWarning = document.getElementById("caps-warning");
+      if (!form || !submit || !passwordInput || !toggle) return;
+
+      toggle.addEventListener("click", function () {
+        const isPassword = passwordInput.type === "password";
+        passwordInput.type = isPassword ? "text" : "password";
+        toggle.textContent = isPassword ? "{% trans 'Hide' %}" : "{% trans 'Show' %}";
+        toggle.setAttribute("aria-label", isPassword ? "{% trans 'Hide password' %}" : "{% trans 'Show password' %}");
+      });
+
+      function updateCapsState(event) {
+        if (!capsWarning || !event.getModifierState) return;
+        const on = event.getModifierState("CapsLock");
+        capsWarning.classList.toggle("hidden", !on);
+      }
+
+      passwordInput.addEventListener("keydown", updateCapsState);
+      passwordInput.addEventListener("keyup", updateCapsState);
+      passwordInput.addEventListener("focus", updateCapsState);
+      passwordInput.addEventListener("blur", function () {
+        if (capsWarning) capsWarning.classList.add("hidden");
+      });
+
+      form.addEventListener("submit", function () {
+        submit.disabled = true;
+        submit.textContent = submit.dataset.loadingLabel || "Signing in…";
+      });
+    })();
+  </script>
 {% endblock %}

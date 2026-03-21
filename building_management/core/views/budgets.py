@@ -12,6 +12,7 @@ from django.db.models import Prefetch
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
+from django.utils import timezone
 from django.utils.translation import gettext as _, ngettext
 from django.utils.dateparse import parse_date
 from django.views.generic import DetailView, FormView, ListView, TemplateView, CreateView, UpdateView, View
@@ -204,8 +205,28 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
         )
         budget_qs = base_budget_qs
         filter_form = BudgetFilterForm(self.request.GET or None, user=self.request.user)
+        per_value = 25
+        active_filter_chips: list[dict[str, str]] = []
+
+        def _chip_remove_url(*keys: str) -> str:
+            params = self.request.GET.copy()
+            for key in keys:
+                if key in params:
+                    del params[key]
+            if "page" in params:
+                del params["page"]
+            encoded = params.urlencode()
+            return f"{self.request.path}?{encoded}" if encoded else self.request.path
+
         if filter_form.is_valid():
             data = filter_form.cleaned_data
+            has_active_filters = bool(
+                data.get("q")
+                or data.get("status")
+                or data.get("technician")
+                or data.get("date_from")
+                or data.get("date_to")
+            )
             if data.get("status"):
                 budget_qs = budget_qs.filter(status=data["status"])
             if data.get("technician"):
@@ -217,6 +238,60 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                     | models.Q(project_code__icontains=query)
                     | models.Q(title__icontains=query)
                 )
+            from_date = data.get("date_from")
+            to_date = data.get("date_to")
+            if from_date and to_date and to_date < from_date:
+                from_date, to_date = to_date, from_date
+            if from_date:
+                budget_qs = budget_qs.filter(created_at__date__gte=from_date)
+            if to_date:
+                budget_qs = budget_qs.filter(created_at__date__lte=to_date)
+            per_value = data.get("per") or 25
+
+            if data.get("q"):
+                active_filter_chips.append(
+                    {
+                        "label": _("Search: %(value)s") % {"value": data["q"].strip()},
+                        "remove_url": _chip_remove_url("q"),
+                    }
+                )
+            if data.get("technician"):
+                owner = data["technician"].get_full_name() or data["technician"].get_username()
+                active_filter_chips.append(
+                    {
+                        "label": _("Owner: %(value)s") % {"value": owner},
+                        "remove_url": _chip_remove_url("technician"),
+                    }
+                )
+            if data.get("status"):
+                status_label_map = {value: str(label) for value, label in filter_form.fields["status"].choices}
+                active_filter_chips.append(
+                    {
+                        "label": _("Status: %(value)s")
+                        % {"value": status_label_map.get(data["status"], data["status"])},
+                        "remove_url": _chip_remove_url("status"),
+                    }
+                )
+            if from_date or to_date:
+                if from_date and to_date:
+                    date_label = f"{from_date.isoformat()} \u2192 {to_date.isoformat()}"
+                else:
+                    date_label = from_date.isoformat() if from_date else to_date.isoformat()
+                active_filter_chips.append(
+                    {
+                        "label": _("Date range: %(value)s") % {"value": date_label},
+                        "remove_url": _chip_remove_url("date_from", "date_to"),
+                    }
+                )
+            if per_value != 25:
+                active_filter_chips.append(
+                    {
+                        "label": _("Page size: %(value)s") % {"value": per_value},
+                        "remove_url": _chip_remove_url("per"),
+                    }
+                )
+        else:
+            has_active_filters = False
         totals_expr = models.Case(
             models.When(approved_amount__isnull=False, then=models.F("approved_amount")),
             default=models.F("requested_amount"),
@@ -271,9 +346,13 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                         "remaining_total": row.get("remaining_total") or Decimal("0.00"),
                     }
                 )
+        summary_by_requester_paginator = Paginator(summary_by_requester, 4)
+        summary_by_requester_page = summary_by_requester_paginator.get_page(
+            self.request.GET.get("r_page") or 1
+        )
         # `with_totals()` adds aggregation; keep a deterministic order before paginating.
         budget_qs = budget_qs.order_by("-created_at", "-id")
-        paginator = Paginator(budget_qs, 20)
+        paginator = Paginator(budget_qs, per_value)
         page_number = self.request.GET.get("page") or 1
         page_obj = paginator.get_page(page_number)
         reviewable_budget_ids = {
@@ -293,6 +372,12 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
             for budget in page_obj.object_list
             if _user_can_delete_budget(budget, self.request.user)
         ]
+        budget_edit_ids = [
+            budget.pk
+            for budget in page_obj.object_list
+            if budget.requester_id == getattr(self.request.user, "pk", None)
+            and budget.status == BudgetRequest.Status.DRAFT
+        ]
         ctx.update(
             {
                 "budget_list": page_obj.object_list,
@@ -303,6 +388,7 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                 "technician_summary_url": reverse_lazy("core:budget_technicians"),
                 "summary_total_remaining": totals.get("remaining_total") or Decimal("0.00"),
                 "summary_total_spent": totals.get("spent_total") or Decimal("0.00"),
+                "summary_total_budget": totals.get("approved_total") or Decimal("0.00"),
                 "archived_budgets_url": reverse_lazy("core:budget_archived_list")
                 if resolver.has(Capability.APPROVE_BUDGETS)
                 else "",
@@ -311,9 +397,14 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                 "can_mass_assign_budgets": _user_can_mass_assign_budgets(self.request.user),
                 "budget_archive_ids": archiveable_ids,
                 "budget_delete_ids": budget_delete_ids,
+                "budget_edit_ids": budget_edit_ids,
                 "reviewable_budget_ids": reviewable_budget_ids,
                 "is_budget_admin": is_budget_admin,
                 "summary_by_requester": summary_by_requester,
+                "summary_by_requester_page": summary_by_requester_page,
+                "summary_by_requester_query": _querystring_without(self.request, "r_page"),
+                "active_filter_chips": active_filter_chips,
+                "has_active_filters": has_active_filters,
             }
         )
         return ctx
@@ -348,8 +439,149 @@ class BudgetMassAssignView(LoginRequiredMixin, BudgetFeatureRequiredMixin, FormV
         return (
             User.objects.filter(pk__in=assignee_ids, is_active=True)
             .exclude(pk__in=administrator_ids)
+            .prefetch_related(
+                Prefetch(
+                    "building_memberships",
+                    queryset=BuildingMembership.objects.filter(
+                        role__in=[MembershipRole.TECHNICIAN, MembershipRole.BACKOFFICE]
+                    ).select_related("building"),
+                )
+            )
             .order_by("username")
         )
+
+    def _remove_filter_url(self, *keys: str) -> str:
+        params = self.request.GET.copy()
+        for key in keys:
+            params.pop(key, None)
+        params.pop("page", None)
+        encoded = params.urlencode()
+        base = reverse("core:budget_mass_assign")
+        return f"{base}?{encoded}" if encoded else base
+
+    def _build_assignee_listing(self):
+        request = self.request
+        queryset = self.get_assignee_queryset()
+        total_available = queryset.count()
+
+        search = (request.GET.get("q") or "").strip()
+        role = (request.GET.get("role") or "").strip().upper()
+        sort = (request.GET.get("sort") or "username").strip().lower()
+        per_raw = (request.GET.get("per") or "25").strip()
+        per_choices = (10, 25, 50, 100)
+        try:
+            per_page = int(per_raw)
+        except (TypeError, ValueError):
+            per_page = 25
+        if per_page not in per_choices:
+            per_page = 25
+
+        if search:
+            queryset = queryset.filter(
+                models.Q(username__icontains=search)
+                | models.Q(first_name__icontains=search)
+                | models.Q(last_name__icontains=search)
+                | models.Q(email__icontains=search)
+            )
+
+        role_choices = [
+            ("", _("All roles")),
+            (MembershipRole.TECHNICIAN, _("Technician")),
+            (MembershipRole.BACKOFFICE, _("Backoffice")),
+        ]
+        if role in {MembershipRole.TECHNICIAN, MembershipRole.BACKOFFICE}:
+            queryset = queryset.filter(building_memberships__role=role).distinct()
+        else:
+            role = ""
+
+        sort_choices = [
+            ("username", _("Username (A → Z)")),
+            ("username_desc", _("Username (Z → A)")),
+            ("name", _("Name (A → Z)")),
+            ("name_desc", _("Name (Z → A)")),
+            ("recent", _("Recently active")),
+        ]
+        sort_map = {
+            "username": ("username",),
+            "username_desc": ("-username",),
+            "name": ("first_name", "last_name", "username"),
+            "name_desc": ("-first_name", "-last_name", "-username"),
+            "recent": ("-last_login", "username"),
+        }
+        if sort not in sort_map:
+            sort = "username"
+        queryset = queryset.order_by(*sort_map[sort])
+
+        paginator = Paginator(queryset, per_page)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        visible_assignees = list(page_obj.object_list)
+        for assignee in visible_assignees:
+            memberships_rel = getattr(assignee, "building_memberships", None)
+            memberships = list(memberships_rel.all()) if memberships_rel is not None else []
+            if any(m.role == MembershipRole.TECHNICIAN for m in memberships):
+                role_display = _("Technician")
+            elif any(m.role == MembershipRole.BACKOFFICE for m in memberships):
+                role_display = _("Backoffice")
+            else:
+                role_display = "—"
+            assignee.mass_assign_role_display = role_display
+
+        role_lookup = dict(role_choices)
+        active_filter_chips: list[dict[str, str]] = []
+        if search:
+            active_filter_chips.append(
+                {"label": _("Search: %(value)s") % {"value": search}, "remove_url": self._remove_filter_url("q")}
+            )
+        if role:
+            active_filter_chips.append(
+                {
+                    "label": _("Role: %(value)s") % {"value": role_lookup.get(role, role)},
+                    "remove_url": self._remove_filter_url("role"),
+                }
+            )
+        if sort != "username":
+            sort_lookup = dict(sort_choices)
+            active_filter_chips.append(
+                {
+                    "label": _("Sort: %(value)s") % {"value": sort_lookup.get(sort, sort)},
+                    "remove_url": self._remove_filter_url("sort"),
+                }
+            )
+        if per_page != 25:
+            active_filter_chips.append(
+                {
+                    "label": _("Page size: %(value)s") % {"value": per_page},
+                    "remove_url": self._remove_filter_url("per"),
+                }
+            )
+
+        has_active_filters = bool(active_filter_chips)
+        filtered_total = paginator.count
+        showing_start = page_obj.start_index() if filtered_total else 0
+        showing_end = page_obj.end_index() if filtered_total else 0
+        no_results_with_filters = has_active_filters and filtered_total == 0
+        no_users_available = total_available == 0
+
+        return {
+            "assignee_page": page_obj,
+            "assignee_list": visible_assignees,
+            "assignee_filtered_total": filtered_total,
+            "assignee_total_count": total_available,
+            "assignee_showing_start": showing_start,
+            "assignee_showing_end": showing_end,
+            "assignee_pagination_query": _querystring_without(request, "page"),
+            "assignee_per_choices": per_choices,
+            "assignee_filter_q": search,
+            "assignee_filter_role": role,
+            "assignee_filter_sort": sort,
+            "assignee_filter_per": per_page,
+            "assignee_role_choices": role_choices,
+            "assignee_sort_choices": sort_choices,
+            "active_filter_chips": active_filter_chips,
+            "has_active_filters": has_active_filters,
+            "no_results_with_filters": no_results_with_filters,
+            "no_users_available": no_users_available,
+        }
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -389,12 +621,12 @@ class BudgetMassAssignView(LoginRequiredMixin, BudgetFeatureRequiredMixin, FormV
         if created:
             messages.success(
                 self.request,
-                ngettext(
-                    "Created %(count)s budget request.",
-                    "Created %(count)s budget requests.",
-                    created,
-                )
-                % {"count": created},
+                _("Assigned %(budgets)s budget template to %(users)s users (%(assignments)s total assignments).")
+                % {
+                    "budgets": 1,
+                    "users": len(selected_users),
+                    "assignments": created,
+                },
             )
         else:
             messages.info(self.request, _("No users were selected."))
@@ -402,10 +634,35 @@ class BudgetMassAssignView(LoginRequiredMixin, BudgetFeatureRequiredMixin, FormV
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        queryset = self.get_assignee_queryset()
+        listing = self._build_assignee_listing()
+        form = ctx.get("form")
+        selected_user_values = set()
+        if form is not None:
+            raw_values = form["users"].value() or []
+            selected_user_values = {str(value) for value in raw_values}
+        selected_on_page = sum(
+            1 for user in listing["assignee_list"] if str(user.pk) in selected_user_values
+        )
+        template_selected_budget = 0
+        if form is not None and form.is_bound:
+            title_val = (form.data.get("title") or "").strip()
+            amount_val = (form.data.get("requested_amount") or "").strip()
+            template_selected_budget = 1 if title_val and amount_val else 0
+        submit_disabled = not (
+            template_selected_budget and selected_user_values
+        )
+
         ctx.update(
             {
-                "assignee_count": queryset.count(),
+                **listing,
+                "assignee_count": listing["assignee_total_count"],
+                "selected_user_values": selected_user_values,
+                "selected_on_page": selected_on_page,
+                "summary_selected_budgets": template_selected_budget,
+                "summary_selected_users": len(selected_user_values),
+                "summary_total_assignments": template_selected_budget * len(selected_user_values),
+                "submit_disabled": submit_disabled,
+                "today_iso": timezone.localdate().isoformat(),
             }
         )
         return ctx
@@ -936,6 +1193,61 @@ class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Tem
         ctx["per"] = per_value
         ctx["per_choices"] = self.PER_CHOICES
         ctx["per_default"] = self.PER_DEFAULT
+
+        def _chip_remove_url(*keys):
+            params = request.GET.copy()
+            for key in keys:
+                if key in params:
+                    del params[key]
+            if "page" in params:
+                del params["page"]
+            encoded = params.urlencode()
+            return f"{request.path}?{encoded}" if encoded else request.path
+
+        active_filter_chips: list[dict[str, str]] = []
+        if search:
+            active_filter_chips.append(
+                {
+                    "label": _("Search: %(value)s") % {"value": search},
+                    "remove_url": _chip_remove_url("q"),
+                }
+            )
+        if owner_param:
+            owner_label = owner_label_map.get(int(owner_param), owner_param) if owner_param.isdigit() else owner_param
+            active_filter_chips.append(
+                {
+                    "label": _("Owner: %(value)s") % {"value": owner_label},
+                    "remove_url": _chip_remove_url("owner"),
+                }
+            )
+        if sort_param != "archived_desc":
+            sort_label_map = {value: str(label) for value, label in self.SORT_CHOICES}
+            active_filter_chips.append(
+                {
+                    "label": _("Sort: %(value)s") % {"value": sort_label_map.get(sort_param, sort_param)},
+                    "remove_url": _chip_remove_url("sort"),
+                }
+            )
+        if per_value != self.PER_DEFAULT:
+            active_filter_chips.append(
+                {
+                    "label": _("Page size: %(value)s") % {"value": per_value},
+                    "remove_url": _chip_remove_url("per"),
+                }
+            )
+        if archived_from_raw or archived_to_raw:
+            if archived_from_raw and archived_to_raw:
+                range_label = f"{archived_from_raw} \u2192 {archived_to_raw}"
+            else:
+                range_label = archived_from_raw or archived_to_raw
+            active_filter_chips.append(
+                {
+                    "label": _("Range: %(value)s") % {"value": range_label},
+                    "remove_url": _chip_remove_url("archived_from", "archived_to"),
+                }
+            )
+        ctx["active_filter_chips"] = active_filter_chips
+
         can_purge = user_is_admin_or_backoffice(self.request.user)
         ctx["can_purge_archives"] = can_purge
         if can_purge:

@@ -35,6 +35,7 @@ from ..forms import (
     AdminUserPasswordForm,
     AdminUserUpdateForm,
     BuildingBulkDeleteForm,
+    WorkOrderBulkArchiveForm,
     WorkOrderBulkDeleteForm,
     UserBulkDeleteForm,
 )
@@ -52,9 +53,28 @@ __all__ = [
     "AdminUserDeleteView",
     "AdminBuildingBulkDeleteView",
     "AdminWorkOrderBulkDeleteView",
+    "AdminWorkOrderBulkArchiveView",
     "AdminLawyerWorkOrderBulkDeleteView",
     "AdminUserBulkDeleteView",
 ]
+
+
+def _inject_form_error_summary(ctx: dict) -> dict:
+    form = ctx.get("form")
+    invalid_field_items: list[dict[str, str]] = []
+    if form is not None and getattr(form, "is_bound", False):
+        for bound_field in form:
+            if bound_field.errors:
+                invalid_field_items.append(
+                    {
+                        "id": bound_field.id_for_label or "",
+                        "label": str(bound_field.label or bound_field.name),
+                    }
+                )
+    ctx["invalid_field_items"] = invalid_field_items
+    ctx["invalid_field_count"] = len(invalid_field_items)
+    return ctx
+
 
 class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
     model = User
@@ -103,6 +123,47 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         ctx["per"] = getattr(self, "_per", self.paginate_by)
         ctx["owner_options"] = self._get_owner_options()
         ctx["owner_filter"] = getattr(self, "_owner_filter", "")
+        def _chip_remove_url(*keys):
+            params = self.request.GET.copy()
+            for key in keys:
+                if key in params:
+                    del params[key]
+            if "page" in params:
+                del params["page"]
+            encoded = params.urlencode()
+            return f"{self.request.path}?{encoded}" if encoded else self.request.path
+
+        active_filter_chips: list[dict[str, str]] = []
+        search_value = (ctx["q"] or "").strip()
+        if search_value:
+            active_filter_chips.append(
+                {
+                    "label": _("Search: %(value)s") % {"value": search_value},
+                    "remove_url": _chip_remove_url("q"),
+                }
+            )
+        owner_value = (ctx["owner_filter"] or "").strip()
+        if owner_value:
+            owner_label = ""
+            for option in ctx["owner_options"]:
+                if option.get("value") == owner_value:
+                    owner_label = option.get("label") or owner_value
+                    break
+            active_filter_chips.append(
+                {
+                    "label": _("Owner: %(value)s") % {"value": owner_label or owner_value},
+                    "remove_url": _chip_remove_url("owner"),
+                }
+            )
+        per_value = int(ctx["per"] or self.paginate_by)
+        if per_value != self.paginate_by:
+            active_filter_chips.append(
+                {
+                    "label": _("Page size: %(value)s") % {"value": per_value},
+                    "remove_url": _chip_remove_url("per"),
+                }
+            )
+        ctx["active_filter_chips"] = active_filter_chips
         object_list = list(ctx.get("object_list") or [])
         self._attach_roles(object_list)
         overview_data = self._build_overview(object_list)
@@ -295,6 +356,10 @@ class AdminUserCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
     def get_success_url(self):
         return reverse("core:users_list")
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        return _inject_form_error_summary(ctx)
+
 
 class AdminUserUpdateView(LoginRequiredMixin, AdminRequiredMixin, UpdateView):
     model = User
@@ -309,6 +374,22 @@ class AdminUserUpdateView(LoginRequiredMixin, AdminRequiredMixin, UpdateView):
 
     def get_success_url(self):
         return reverse("core:users_list")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        role_labels = dict(MembershipRole.choices)
+        current_roles = list(
+            BuildingMembership.objects.filter(
+                user=self.object,
+                building__isnull=True,
+            )
+            .values_list("role", flat=True)
+            .distinct()
+        )
+        if not current_roles and getattr(self.object, "is_superuser", False):
+            current_roles = [MembershipRole.ADMINISTRATOR]
+        ctx["current_global_roles"] = [role_labels.get(role, role) for role in current_roles]
+        return _inject_form_error_summary(ctx)
 
 
 class AdminUserPasswordView(LoginRequiredMixin, AdminRequiredMixin, FormView):
@@ -364,6 +445,7 @@ class BulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, FormView):
     empty_text = ""
     submit_label = ""
     success_url_name = ""
+    warning_text = _("Deletion is permanent and cannot be undone.")
     paginate_choices = (25, 50, 100, 200)
     default_paginate_by = 25
 
@@ -465,6 +547,7 @@ class BulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, FormView):
                 "per": self.get_page_size(),
                 "per_choices": self.paginate_choices,
                 "page_query": _querystring_without(self.request, "page"),
+                "warning_text": self.warning_text,
             }
         )
         return ctx
@@ -532,6 +615,48 @@ class AdminWorkOrderBulkDeleteView(BulkDeleteView):
             .select_related("building")
             .order_by("-created_at")
         )
+
+
+class AdminWorkOrderBulkArchiveView(BulkDeleteView):
+    form_class = WorkOrderBulkArchiveForm
+    page_title = _("Mass archive work orders")
+    intro_text = ""
+    empty_text = _("There are no completed work orders available to archive.")
+    submit_label = _("Archive work orders")
+    success_url_name = "core:mass_archive_work_orders"
+    warning_text = _("Archiving moves selected work orders to the archive list.")
+
+    def get_queryset(self):
+        return (
+            WorkOrder.objects.visible_to(self.request.user)
+            .filter(archived_at__isnull=True, status=WorkOrder.Status.DONE)
+            .select_related("building")
+            .order_by("-created_at")
+        )
+
+    def form_valid(self, form):
+        queryset = form.cleaned_data["items"]
+        archived_count = 0
+        if queryset.exists():
+            with transaction.atomic():
+                for order in queryset.select_related("building", "forwarded_to_building"):
+                    if order.archived_at is not None or order.status != WorkOrder.Status.DONE:
+                        continue
+                    order.archive()
+                    archived_count += 1
+        if archived_count:
+            messages.success(
+                self.request,
+                ngettext(
+                    "Archived %(count)s work order.",
+                    "Archived %(count)s work orders.",
+                    archived_count,
+                )
+                % {"count": archived_count},
+            )
+        else:
+            messages.info(self.request, _("No eligible work orders were selected."))
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class AdminLawyerWorkOrderBulkDeleteView(BulkDeleteView):

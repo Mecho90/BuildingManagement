@@ -22,7 +22,7 @@ def _user_can_filter_owner(user):
     if getattr(user, "is_superuser", False):
         return True
     roles = set(BuildingMembership.objects.filter(user=user).values_list("role", flat=True))
-    return bool(roles & {MembershipRole.ADMINISTRATOR, MembershipRole.BACKOFFICE})
+    return bool(roles & {MembershipRole.ADMINISTRATOR})
 
 
 class TodoListPageView(LoginRequiredMixin, TemplateView):
@@ -56,6 +56,7 @@ class TodoListPageView(LoginRequiredMixin, TemplateView):
             "icsUrl": reverse("core:todo_ics_feed"),
             "calendarUrl": reverse("core:api_todo_calendar"),
             "completedClearUrl": reverse("core:api_todo_completed_clear"),
+            "summaryUrl": reverse("core:api_todo_summary"),
             "currentWeek": week_start.isoformat(),
             "nextWeek": next_week.isoformat(),
             "today": today.isoformat(),
@@ -67,6 +68,8 @@ class TodoListPageView(LoginRequiredMixin, TemplateView):
             "currentUserId": self.request.user.pk,
             "hideCompletedTab": False,
             "ownerFilterDefault": owner_filter_default,
+            "ownerOptions": owner_filter_options,
+            "canAssignOwner": owner_filter_enabled,
         }
         personal_only = owner_filter_enabled
         task_qs = TodoItem.objects.visible_to(self.request.user)

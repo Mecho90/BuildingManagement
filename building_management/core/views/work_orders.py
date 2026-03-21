@@ -80,6 +80,7 @@ __all__ = [
     "WorkOrderAttachmentDeleteView",
     "WorkOrderApprovalDecisionView",
     "WorkOrderBudgetChargeView",
+    "WorkOrderQuickStatusView",
     "ArchivedWorkOrderPurgeView",
 ]
 
@@ -189,16 +190,22 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
         search = (request.GET.get("q") or "").strip()
         status = (request.GET.get("status") or "").strip().upper()
         priority = (request.GET.get("priority") or "").strip().upper()
+        deadline_from_raw = (request.GET.get("deadline_from") or "").strip()
+        deadline_to_raw = (request.GET.get("deadline_to") or "").strip()
         deadline_range_raw = (request.GET.get("deadline_range") or "").strip()
-        deadline_from = None
-        deadline_to = None
-        if deadline_range_raw:
+        deadline_from = parse_date(deadline_from_raw) if deadline_from_raw else None
+        deadline_to = parse_date(deadline_to_raw) if deadline_to_raw else None
+        if not (deadline_from or deadline_to) and deadline_range_raw:
             normalized = deadline_range_raw.replace(" to ", "/").replace("–", "/").replace("—", "/")
             parts = [part.strip() for part in normalized.split("/") if part.strip()]
             if parts:
                 deadline_from = parse_date(parts[0])
                 if len(parts) > 1:
                     deadline_to = parse_date(parts[1])
+            if deadline_from and not deadline_from_raw:
+                deadline_from_raw = deadline_from.isoformat()
+            if deadline_to and not deadline_to_raw:
+                deadline_to_raw = deadline_to.isoformat()
 
         valid_status = {choice[0] for choice in WorkOrder.Status.choices}
         valid_priority = {choice[0] for choice in WorkOrder.Priority.choices}
@@ -289,6 +296,8 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
         self._owner = owner_param
         self._sort = sort_param
         self._deadline_range = deadline_range_raw
+        self._deadline_from = deadline_from_raw
+        self._deadline_to = deadline_to_raw
 
         return qs
 
@@ -306,6 +315,97 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
             ctx["lawyer_orders_total"] = paginator.count
         else:
             ctx["lawyer_orders_total"] = len(ctx.get("work_orders") or [])
+        page_obj = ctx.get("page_obj")
+        total_orders = ctx.get("lawyer_orders_total", 0)
+        result_start = page_obj.start_index() if page_obj and total_orders else 0
+        result_end = page_obj.end_index() if page_obj and total_orders else 0
+        today = timezone.localdate()
+
+        def _remove_url(*keys: str) -> str:
+            params = self.request.GET.copy()
+            for key in keys:
+                params.pop(key, None)
+            params.pop("page", None)
+            encoded = params.urlencode()
+            base = reverse("core:lawyer_work_orders")
+            return f"{base}?{encoded}" if encoded else base
+
+        active_filter_chips: list[dict[str, str]] = []
+        search_value = getattr(self, "_search", "")
+        if search_value:
+            active_filter_chips.append(
+                {"label": _("Search: %(value)s") % {"value": search_value}, "remove_url": _remove_url("q")}
+            )
+        status_value = getattr(self, "_status", "")
+        if status_value:
+            status_label_map = dict(WorkOrder.Status.choices)
+            active_filter_chips.append(
+                {
+                    "label": _("Status: %(value)s") % {"value": status_label_map.get(status_value, status_value)},
+                    "remove_url": _remove_url("status"),
+                }
+            )
+        priority_value = getattr(self, "_priority", "")
+        if priority_value:
+            priority_label_map = dict(WorkOrder.Priority.choices)
+            active_filter_chips.append(
+                {
+                    "label": _("Priority: %(value)s") % {"value": priority_label_map.get(priority_value, priority_value)},
+                    "remove_url": _remove_url("priority"),
+                }
+            )
+        owner_value = getattr(self, "_owner", "")
+        if owner_value:
+            owner_label = owner_value
+            for item in getattr(self, "_owner_choices", []):
+                if str(item.get("id")) == str(owner_value):
+                    owner_label = item.get("label") or owner_label
+                    break
+            active_filter_chips.append(
+                {"label": _("Owner: %(value)s") % {"value": owner_label}, "remove_url": _remove_url("owner")}
+            )
+        deadline_from = getattr(self, "_deadline_from", "")
+        deadline_to = getattr(self, "_deadline_to", "")
+        if deadline_from or deadline_to:
+            range_label = _("%(from)s → %(to)s") % {"from": deadline_from or "—", "to": deadline_to or "—"}
+            active_filter_chips.append(
+                {
+                    "label": _("Date range: %(value)s") % {"value": range_label},
+                    "remove_url": _remove_url("deadline_from", "deadline_to", "deadline_range"),
+                }
+            )
+        page_size = self.get_paginate_by(self.object_list)
+        if page_size != self.paginate_by:
+            active_filter_chips.append(
+                {"label": _("Page size: %(value)s") % {"value": page_size}, "remove_url": _remove_url("per")}
+            )
+        has_active_filters = bool(active_filter_chips or getattr(self, "_sort", "priority") != "priority")
+
+        for order in ctx.get("work_orders") or []:
+            deadline_hint = ""
+            is_overdue = False
+            if order.deadline:
+                delta = (today - order.deadline).days
+                if delta > 0:
+                    is_overdue = True
+                    deadline_hint = ngettext(
+                        "%(count)s day late",
+                        "%(count)s days late",
+                        delta,
+                    ) % {"count": delta}
+                elif delta == 0:
+                    deadline_hint = _("Due today")
+                else:
+                    days_left = abs(delta)
+                    deadline_hint = ngettext(
+                        "Due in %(count)s day",
+                        "Due in %(count)s days",
+                        days_left,
+                    ) % {"count": days_left}
+            order.deadline_hint = deadline_hint
+            order.is_overdue = is_overdue
+
+        ctx["orders"] = ctx.get("work_orders") or []
         ctx.update(
             {
                 "q": getattr(self, "_search", ""),
@@ -330,11 +430,16 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
                     ("created_asc", _("Created (Oldest first)")),
                     ("building", _("Building (A → Z)")),
                     ("building_desc", _("Building (Z → A)")),
-                    ("owner", _("Отговорник (A → Z)")),
-                    ("owner_desc", _("Отговорник (Z → A)")),
+                    ("owner", _("Owner (A → Z)")),
+                    ("owner_desc", _("Owner (Z → A)")),
                 ],
                 "pagination_query": _querystring_without(self.request, "page"),
                 "show_owner_info": True,
+                "result_start": result_start,
+                "result_end": result_end,
+                "total_orders": total_orders,
+                "active_filter_chips": active_filter_chips,
+                "has_active_filters": has_active_filters,
                 "can_mass_delete_lawyer_orders": bool(getattr(self.request.user, "is_superuser", False)),
                 "mass_delete_lawyer_orders_url": reverse("core:mass_delete_lawyer_work_orders"),
                 "can_add_lawyer_order": not (
@@ -812,12 +917,131 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
         else:
             object_list = getattr(self, "object_list", None)
             total_orders = len(object_list) if object_list is not None else 0
+        page_obj = ctx.get("page_obj")
+        result_start = page_obj.start_index() if page_obj and total_orders else 0
+        result_end = page_obj.end_index() if page_obj and total_orders else 0
+        today = timezone.localdate()
+        active_statuses = [
+            WorkOrder.Status.OPEN,
+            WorkOrder.Status.IN_PROGRESS,
+            WorkOrder.Status.AWAITING_APPROVAL,
+        ]
+        filtered_qs = self.object_list if self.object_list is not None else WorkOrder.objects.none()
+        due_today_count = filtered_qs.filter(
+            status__in=active_statuses,
+            deadline=today,
+        ).count()
+        overdue_count = filtered_qs.filter(
+            status__in=active_statuses,
+            deadline__lt=today,
+        ).count()
+        awaiting_count = filtered_qs.filter(status=WorkOrder.Status.AWAITING_APPROVAL).count()
+        urgent_preview_qs = (
+            filtered_qs.filter(status__in=active_statuses)
+            .filter(
+                Q(deadline__lt=today)
+                | Q(deadline=today)
+                | Q(priority=WorkOrder.Priority.HIGH)
+            )
+            .order_by("deadline", "priority_order", "-pk")[:4]
+        )
+        has_active_filters = bool(
+            getattr(self, "_search", "")
+            or getattr(self, "_status", "")
+            or getattr(self, "_priority", "")
+            or getattr(self, "_owner", "")
+            or getattr(self, "_deadline_from", "")
+            or getattr(self, "_deadline_to", "")
+            or getattr(self, "_sort", "priority") != "priority"
+            or self.get_paginate_by(self.object_list) != self.paginate_by
+        )
+
+        def _remove_url(*keys: str) -> str:
+            params = self.request.GET.copy()
+            for key in keys:
+                params.pop(key, None)
+            params.pop("page", None)
+            encoded = params.urlencode()
+            base = reverse("core:work_orders_list")
+            return f"{base}?{encoded}" if encoded else base
+
+        active_filter_chips: list[dict[str, str]] = []
+        search_value = getattr(self, "_search", "")
+        if search_value:
+            active_filter_chips.append(
+                {"label": _("Search: %(value)s") % {"value": search_value}, "remove_url": _remove_url("q")}
+            )
+        status_value = getattr(self, "_status", "")
+        if status_value:
+            status_label_map = dict(WorkOrder.Status.choices)
+            active_filter_chips.append(
+                {
+                    "label": _("Status: %(value)s") % {"value": status_label_map.get(status_value, status_value)},
+                    "remove_url": _remove_url("status"),
+                }
+            )
+        priority_value = getattr(self, "_priority", "")
+        if priority_value:
+            priority_label_map = dict(WorkOrder.Priority.choices)
+            active_filter_chips.append(
+                {
+                    "label": _("Priority: %(value)s") % {"value": priority_label_map.get(priority_value, priority_value)},
+                    "remove_url": _remove_url("priority"),
+                }
+            )
+        owner_value = getattr(self, "_owner", "")
+        if owner_value:
+            owner_label = owner_value
+            for item in getattr(self, "_owner_choices", []):
+                if str(item.get("id")) == str(owner_value):
+                    owner_label = item.get("label") or owner_label
+                    break
+            active_filter_chips.append(
+                {"label": _("Owner: %(value)s") % {"value": owner_label}, "remove_url": _remove_url("owner")}
+            )
+        deadline_from = getattr(self, "_deadline_from", "")
+        deadline_to = getattr(self, "_deadline_to", "")
+        if deadline_from or deadline_to:
+            range_label = _("%(from)s → %(to)s") % {"from": deadline_from or "—", "to": deadline_to or "—"}
+            active_filter_chips.append(
+                {"label": _("Date range: %(value)s") % {"value": range_label}, "remove_url": _remove_url("deadline_from", "deadline_to", "deadline_range")}
+            )
+        page_size = self.get_paginate_by(self.object_list)
+        if page_size != self.paginate_by:
+            active_filter_chips.append(
+                {"label": _("Page size: %(value)s") % {"value": page_size}, "remove_url": _remove_url("per")}
+            )
+        for order in ctx.get("orders") or []:
+            deadline_hint = ""
+            is_overdue = False
+            if order.deadline:
+                delta = (today - order.deadline).days
+                if delta > 0:
+                    is_overdue = True
+                    deadline_hint = ngettext(
+                        "%(count)s day late",
+                        "%(count)s days late",
+                        delta,
+                    ) % {"count": delta}
+                elif delta == 0:
+                    deadline_hint = _("Due today")
+                else:
+                    days_left = abs(delta)
+                    deadline_hint = ngettext(
+                        "Due in %(count)s day",
+                        "Due in %(count)s days",
+                        days_left,
+                    ) % {"count": days_left}
+            order.deadline_hint = deadline_hint
+            order.is_overdue = is_overdue
         ctx.update(
             {
                 "q": getattr(self, "_search", ""),
                 "status": getattr(self, "_status", ""),
                 "priority": getattr(self, "_priority", ""),
                 "deadline_range": getattr(self, "_deadline_range", ""),
+                "deadline_from": getattr(self, "_deadline_from", ""),
+                "deadline_to": getattr(self, "_deadline_to", ""),
                 "status_choices": WorkOrder.Status.choices,
                 "per": self.get_paginate_by(self.object_list),
                 "per_choices": self._per_choices,
@@ -833,12 +1057,21 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                     ("created_asc", _("Created (Oldest first)")),
                     ("building", _("Building (A → Z)")),
                     ("building_desc", _("Building (Z → A)")),
-                    ("owner", _("Отговорник (A → Z)")),
-                    ("owner_desc", _("Отговорник (Z → A)")),
+                    ("owner", _("Owner (A → Z)")),
+                    ("owner_desc", _("Owner (Z → A)")),
                 ],
                 "show_owner_info": getattr(self, "_can_filter_owner", False),
                 "pagination_query": _querystring_without(self.request, "page"),
                 "total_orders": total_orders,
+                "result_start": result_start,
+                "result_end": result_end,
+                "today_date": today,
+                "due_today_count": due_today_count,
+                "overdue_count": overdue_count,
+                "awaiting_count": awaiting_count,
+                "urgent_preview_orders": list(urgent_preview_qs),
+                "has_active_filters": has_active_filters,
+                "active_filter_chips": active_filter_chips,
             }
         )
         if not getattr(self, "_can_filter_owner", False):
@@ -847,6 +1080,67 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
                 if not choice[0].startswith("owner")
             ]
         return ctx
+
+
+class WorkOrderQuickStatusView(LoginRequiredMixin, View):
+    allowed_statuses = {
+        WorkOrder.Status.OPEN,
+        WorkOrder.Status.IN_PROGRESS,
+        WorkOrder.Status.DONE,
+    }
+
+    def post(self, request, pk: int):
+        order = get_object_or_404(
+            WorkOrder.objects.visible_to(request.user).select_related("building", "forwarded_to_building"),
+            pk=pk,
+            archived_at__isnull=True,
+        )
+        if _technician_readonly_for_forwarded_office_order(request.user, order):
+            messages.error(request, _("You cannot change status for this work order."))
+            return redirect(_safe_next_url(request) or reverse("core:work_orders_list"))
+
+        can_manage_origin = _user_has_building_capability(
+            request.user,
+            order.building,
+            Capability.MANAGE_BUILDINGS,
+            Capability.CREATE_WORK_ORDERS,
+        )
+        destination = getattr(order, "forwarded_to_building", None)
+        can_manage_destination = bool(
+            destination
+            and _user_has_building_capability(
+                request.user,
+                destination,
+                Capability.MANAGE_BUILDINGS,
+                Capability.CREATE_WORK_ORDERS,
+            )
+        )
+        if not (can_manage_origin or can_manage_destination):
+            messages.error(request, _("You cannot change status for this work order."))
+            return redirect(_safe_next_url(request) or reverse("core:work_orders_list"))
+
+        target = (request.POST.get("status") or "").strip().upper()
+        if target not in self.allowed_statuses:
+            messages.error(request, _("Invalid status update request."))
+            return redirect(_safe_next_url(request) or reverse("core:work_orders_list"))
+
+        if order.status == WorkOrder.Status.AWAITING_APPROVAL and target != WorkOrder.Status.AWAITING_APPROVAL:
+            messages.error(request, _("Status cannot be changed directly while awaiting approval."))
+            return redirect(_safe_next_url(request) or reverse("core:work_orders_list"))
+
+        if order.status != target:
+            previous_status = order.status
+            order.status = target
+            order.save(update_fields=["status", "updated_at"])
+            log_workorder_action(
+                actor=request.user,
+                work_order=order,
+                action=WorkOrderAuditLog.Action.STATUS_CHANGED,
+                payload={"from": previous_status, "to": target},
+            )
+            messages.success(request, _("Work order status updated."))
+
+        return redirect(_safe_next_url(request) or reverse("core:work_orders_list"))
 
 class WorkOrderDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMixin, DetailView):
     model = WorkOrder
@@ -1961,6 +2255,86 @@ class ArchivedWorkOrderFilterMixin:
             ctx["archive_purge_action"] = reverse("core:work_orders_archive_purge")
             ctx["archive_purge_preview_url"] = reverse("core:work_orders_archive_purge_preview")
             ctx["archive_building_delete_action"] = reverse("core:work_orders_archive_building_delete")
+
+        def _chip_remove_url(*keys):
+            params = self.request.GET.copy()
+            for key in keys:
+                if key in params:
+                    del params[key]
+            for paging_key in ("page", "b_page"):
+                if paging_key in params:
+                    del params[paging_key]
+            encoded = params.urlencode()
+            return f"{self.request.path}?{encoded}" if encoded else self.request.path
+
+        active_filter_chips: list[dict[str, str]] = []
+        search_value = (ctx.get("q") or "").strip()
+        if search_value:
+            active_filter_chips.append(
+                {
+                    "label": _("Search: %(value)s") % {"value": search_value},
+                    "remove_url": _chip_remove_url("q"),
+                }
+            )
+
+        owner_value = (ctx.get("owner") or "").strip()
+        if owner_value:
+            owner_label = ""
+            for choice in ctx.get("owner_choices") or []:
+                if str(choice.get("id")) == owner_value:
+                    owner_label = choice.get("label") or ""
+                    break
+            if owner_label:
+                active_filter_chips.append(
+                    {
+                        "label": _("Owner: %(value)s") % {"value": owner_label},
+                        "remove_url": _chip_remove_url("owner"),
+                    }
+                )
+
+        sort_value = (ctx.get("sort") or "archived_desc").strip()
+        sort_map = {value: str(label) for value, label in self._sort_choices}
+        if sort_value and sort_value != "archived_desc":
+            sort_label = sort_map.get(sort_value, sort_value)
+            active_filter_chips.append(
+                {
+                    "label": _("Sort: %(value)s") % {"value": sort_label},
+                    "remove_url": _chip_remove_url("sort"),
+                }
+            )
+
+        summary_per = ctx.get("building_summary_per")
+        if summary_per and summary_per != self.SUMMARY_PER_DEFAULT:
+            active_filter_chips.append(
+                {
+                    "label": _("Page size: %(value)s") % {"value": summary_per},
+                    "remove_url": _chip_remove_url("b_per"),
+                }
+            )
+
+        archived_from = (ctx.get("archived_from") or "").strip()
+        archived_to = (ctx.get("archived_to") or "").strip()
+        archived_range = (ctx.get("archived_range") or "").strip()
+        if archived_from or archived_to:
+            if archived_from and archived_to:
+                range_label = f"{archived_from} \u2192 {archived_to}"
+            else:
+                range_label = archived_from or archived_to
+            active_filter_chips.append(
+                {
+                    "label": _("Range: %(value)s") % {"value": range_label},
+                    "remove_url": _chip_remove_url("archived_from", "archived_to", "archived_range"),
+                }
+            )
+        elif archived_range:
+            active_filter_chips.append(
+                {
+                    "label": _("Range: %(value)s") % {"value": archived_range},
+                    "remove_url": _chip_remove_url("archived_from", "archived_to", "archived_range"),
+                }
+            )
+
+        ctx["active_filter_chips"] = active_filter_chips
         return ctx
 
 

@@ -12,7 +12,7 @@
     {% endif %}
     <div class="rounded-xl border border-red-200 bg-red-50/90 p-3 text-sm font-semibold text-red-700 dark:border-red-500/60 dark:bg-red-500/20 dark:text-red-100 flex items-center gap-2">
       <span aria-hidden="true" class="text-lg leading-none">⚠️</span>
-      <span>{% trans "Deletion is permanent and cannot be undone." %}</span>
+      <span>{{ warning_text }}</span>
     </div>
   </div>
 

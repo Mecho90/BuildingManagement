@@ -401,3 +401,67 @@ class TodoApiTests(TestCase):
         self.assertFalse(
             TodoItem.objects.filter(user=other, status=TodoItem.Status.DONE).exists()
         )
+
+    def test_completed_clear_with_ids_deletes_only_selected_completed_tasks(self):
+        today = timezone.localdate()
+        week = start_of_week(today)
+        keep_item = TodoItem.objects.create(
+            user=self.user,
+            title="Keep me",
+            status=TodoItem.Status.DONE,
+            due_date=today,
+            week_start=week,
+        )
+        remove_item = TodoItem.objects.create(
+            user=self.user,
+            title="Remove me",
+            status=TodoItem.Status.DONE,
+            due_date=today,
+            week_start=week,
+        )
+        open_item = TodoItem.objects.create(
+            user=self.user,
+            title="Open task",
+            status=TodoItem.Status.PENDING,
+            due_date=today,
+            week_start=week,
+        )
+
+        response = self._delete_completed(f"ids={remove_item.pk},{open_item.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["deleted"], 1)
+        self.assertTrue(TodoItem.objects.filter(pk=keep_item.pk).exists())
+        self.assertFalse(TodoItem.objects.filter(pk=remove_item.pk).exists())
+        self.assertTrue(TodoItem.objects.filter(pk=open_item.pk).exists())
+
+    def test_completed_clear_rejects_invalid_ids_filter(self):
+        response = self._delete_completed("ids=abc")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Invalid ids filter.", response.json()["error"])
+
+    def test_admin_can_clear_selected_ids_for_all_owners(self):
+        admin = self._make_admin("admin-clear-all")
+        other = self.User.objects.create_user(username="other-clear-all", password="pass1234")
+        today = timezone.localdate()
+        week = start_of_week(today)
+        admin_done = TodoItem.objects.create(
+            user=admin,
+            title="Admin done",
+            status=TodoItem.Status.DONE,
+            due_date=today,
+            week_start=week,
+        )
+        other_done = TodoItem.objects.create(
+            user=other,
+            title="Other done",
+            status=TodoItem.Status.DONE,
+            due_date=today,
+            week_start=week,
+        )
+        self.client.force_login(admin)
+
+        response = self._delete_completed(f"owner=all&ids={admin_done.pk},{other_done.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["deleted"], 2)
+        self.assertFalse(TodoItem.objects.filter(pk=admin_done.pk).exists())
+        self.assertFalse(TodoItem.objects.filter(pk=other_done.pk).exists())

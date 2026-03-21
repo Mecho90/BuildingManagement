@@ -47,13 +47,20 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         ctx.setdefault("dashboard_label", self._label_for(resolver))
         ctx["budget_summary"] = self._budget_summary(user, resolver)
+        ctx["today_summary"] = self._today_summary(user, resolver, ctx.get("budget_summary"))
         tech_page, tech_query = self._technician_cards(user, resolver)
         ctx["technician_cards_page"] = tech_page
         ctx["technician_cards"] = tech_page.object_list if tech_page else []
         ctx["technician_page_query"] = tech_query
         ctx["technician_section_title"] = self._technician_section_title(user)
-        ctx["backoffice_cards"] = self._backoffice_cards(user, resolver)
-        ctx["pending_budget_cards"] = self._pending_budget_cards(user, resolver)
+        backoffice_page, backoffice_query = self._backoffice_cards(user, resolver)
+        ctx["backoffice_cards_page"] = backoffice_page
+        ctx["backoffice_cards"] = backoffice_page.object_list if backoffice_page else []
+        ctx["backoffice_page_query"] = backoffice_query
+        budget_page, budget_query = self._pending_budget_cards(user, resolver)
+        ctx["pending_budget_cards_page"] = budget_page
+        ctx["pending_budget_cards"] = budget_page.object_list if budget_page else []
+        ctx["pending_budget_page_query"] = budget_query
         deadline_page, deadline_query = self._deadline_alert_cards(user)
         ctx["deadline_alert_page"] = deadline_page
         ctx["deadline_alert_cards"] = deadline_page.object_list if deadline_page else []
@@ -64,6 +71,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["todo_cards_page"] = todo_page
         ctx["todo_cards"] = todo_page.object_list if todo_page else []
         ctx["todo_page_query"] = _querystring_without(self.request, "todo_page")
+        ctx["dashboard_scope_chips"] = self._dashboard_scope_chips(user)
+        ctx["critical_summary"] = self._critical_summary(ctx)
         return ctx
 
     # ------------------------------------------------------------------ helpers
@@ -142,8 +151,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return list({*membership_ids, *owned_ids})
 
     def _backoffice_cards(self, user, resolver):
+        query = _querystring_without(self.request, "backoffice_page")
         if not user or not user.is_authenticated:
-            return []
+            empty_page = Paginator([], 1).get_page(1)
+            return empty_page, query
         qs = (
             WorkOrder.objects.visible_to(user)
             .filter(
@@ -153,7 +164,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             .select_related("building", "awaiting_approval_by")
             .order_by("-updated_at")
         )
-        qs = self._restrict_queryset_to_lawyer(qs, user)[:8]
+        qs = self._restrict_queryset_to_lawyer(qs, user)
         cards = []
         for wo in qs:
             requester = None
@@ -173,21 +184,30 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 }
             )
 
-        return cards
+        paginator = Paginator(cards, 4)
+        try:
+            page_number = int(self.request.GET.get("backoffice_page", 1))
+        except (TypeError, ValueError):
+            page_number = 1
+        return paginator.get_page(page_number), query
 
     def _pending_budget_cards(self, user, resolver):
+        query = _querystring_without(self.request, "budget_page")
         if not user or not user.is_authenticated:
-            return []
+            empty_page = Paginator([], 1).get_page(1)
+            return empty_page, query
         if not BudgetFeatureFlag.is_enabled_for(user):
-            return []
+            empty_page = Paginator([], 1).get_page(1)
+            return empty_page, query
         if not resolver.has(Capability.APPROVE_BUDGETS):
-            return []
+            empty_page = Paginator([], 1).get_page(1)
+            return empty_page, query
 
         qs = (
             BudgetRequest.objects.pending_review()
             .visible_to(user)
             .select_related("building", "requester")
-            .order_by("-updated_at")[:6]
+            .order_by("-updated_at")
         )
         cards = []
         for budget in qs:
@@ -204,7 +224,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     "updated": budget.updated_at,
                 }
             )
-        return cards
+        paginator = Paginator(cards, 4)
+        try:
+            page_number = int(self.request.GET.get("budget_page", 1))
+        except (TypeError, ValueError):
+            page_number = 1
+        return paginator.get_page(page_number), query
 
     def _todo_cards(self, user):
         if not user or not user.is_authenticated:
@@ -316,30 +341,30 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             if is_overdue:
                 overdue_days = abs(days_delta)
                 if overdue_days == 1:
-                    timing_text = _("просрочено с 1 ден")
+                    timing_text = _("overdue by 1 day")
                 else:
                     timing_text = ngettext(
-                        "просрочено с %(count)s ден",
-                        "просрочено с %(count)s дни",
+                        "overdue by %(count)s day",
+                        "overdue by %(count)s days",
                         overdue_days,
                     ) % {"count": overdue_days}
-                reason = _("Пропуснат краен срок")
+                reason = _("Missed deadline")
             else:
                 if days_delta == 0:
                     timing_text = _("Deadline is today")
                     reason = _("Deadline is today")
                 elif days_delta == 1:
-                    timing_text = _("срокът е утре")
+                    timing_text = _("deadline is tomorrow")
                     priority_label = wo.get_priority_display()
-                    reason = _("%(priority)s задача с наближаващ срок") % {"priority": priority_label}
+                    reason = _("%(priority)s task with an upcoming deadline") % {"priority": priority_label}
                 else:
                     timing_text = ngettext(
-                        "срок след %(count)s ден",
-                        "срок след %(count)s дни",
+                        "deadline in %(count)s day",
+                        "deadline in %(count)s days",
                         days_delta,
                     ) % {"count": days_delta}
                     priority_label = wo.get_priority_display()
-                    reason = _("%(priority)s задача с наближаващ срок") % {"priority": priority_label}
+                    reason = _("%(priority)s task with an upcoming deadline") % {"priority": priority_label}
 
             cards.append(
                 {
@@ -389,9 +414,72 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             return 0
         return qs.filter(building_id__in=building_ids).count()
 
+    def _today_summary(self, user, resolver, budget_summary=None):
+        if not user or not user.is_authenticated:
+            return {}
+        today = timezone.localdate()
+        active_statuses = [
+            WorkOrder.Status.OPEN,
+            WorkOrder.Status.IN_PROGRESS,
+            WorkOrder.Status.AWAITING_APPROVAL,
+        ]
+        work_orders_qs = WorkOrder.objects.visible_to(user).filter(
+            archived_at__isnull=True,
+            status__in=active_statuses,
+        )
+        work_orders_qs = self._restrict_queryset_to_lawyer(work_orders_qs, user)
+        open_work_orders = work_orders_qs.filter(
+            status__in=[WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS]
+        ).count()
+        pending_approvals = work_orders_qs.filter(status=WorkOrder.Status.AWAITING_APPROVAL).count()
+        overdue_tasks = work_orders_qs.filter(deadline__lt=today).count()
+        pending_budget_approvals = 0
+        if BudgetFeatureFlag.is_enabled_for(user) and resolver.has(Capability.APPROVE_BUDGETS):
+            pending_budget_approvals = (
+                BudgetRequest.objects.pending_review().visible_to(user).count()
+            )
+        total_pending = pending_approvals + pending_budget_approvals
+        budget_remaining = (budget_summary or {}).get("total_remaining")
+        return {
+            "open_work_orders": open_work_orders,
+            "pending_approvals": total_pending,
+            "overdue_tasks": overdue_tasks,
+            "budget_remaining": budget_remaining,
+            "pending_work_order_approvals": pending_approvals,
+            "pending_budget_approvals": pending_budget_approvals,
+        }
+
+    def _dashboard_scope_chips(self, user):
+        chips = [
+            {"label": _("Period: Today"), "remove_url": self.request.path},
+        ]
+        if getattr(self, "_lawyer_scope_only", False):
+            chips.append({"label": _("Scope: Lawyer work orders"), "remove_url": self.request.path})
+        elif self._has_global_staff_role(user):
+            chips.append({"label": _("Scope: All visible buildings"), "remove_url": self.request.path})
+        else:
+            chips.append({"label": _("Scope: Assigned buildings"), "remove_url": self.request.path})
+        dashboard_label = self._label_for(CapabilityResolver(user))
+        if dashboard_label:
+            chips.append({"label": dashboard_label, "remove_url": self.request.path})
+        return chips
+
+    def _critical_summary(self, ctx):
+        today_summary = ctx.get("today_summary") or {}
+        overdue = today_summary.get("overdue_tasks") or 0
+        pending = today_summary.get("pending_approvals") or 0
+        notes_page = ctx.get("notifications_page")
+        notes_total = notes_page.paginator.count if notes_page else 0
+        return {
+            "overdue": overdue,
+            "pending": pending,
+            "notifications": notes_total,
+            "has_critical": bool(overdue or pending),
+        }
+
     def _notifications_context(self):
         notifications_list = self._build_notifications()
-        note_paginator = Paginator(notifications_list, 5)
+        note_paginator = Paginator(notifications_list, 4)
         try:
             note_page_number = int(self.request.GET.get("note_page", 1))
         except (TypeError, ValueError):
@@ -421,8 +509,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     def _technician_section_title(self, user):
         if self._has_global_staff_role(user):
-            return _("Днешните отворени задачи")
-        return _("Днешните ми задачи")
+            return _("Today's open tasks")
+        return _("Today's tasks")
 
     def _statuses_for_today(self, user):
         return [
@@ -564,7 +652,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 {
                     "id": f"wo-activity-{log.pk}",
                     "level": level,
-                    "level_label": _("Информация"),
+                    "level_label": _("Info"),
                     "message": message,
                     "category": "activity",
                     "is_new": log.created_at >= recent_threshold,
@@ -594,7 +682,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         level = Notification.Level.INFO.value
         message = None
         if log.action == WorkOrderAuditLog.Action.CREATED:
-            message = _('%(actor)s създаде "%(title)s" за %(building)s.') % {
+            message = _('%(actor)s created "%(title)s" for %(building)s.') % {
                 "actor": actor_name,
                 "title": title,
                 "building": building_name,
@@ -603,7 +691,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             status_labels = dict(WorkOrder.Status.choices)
             from_label = status_labels.get(payload.get("from"), payload.get("from"))
             to_label = status_labels.get(payload.get("to"), payload.get("to"))
-            message = _('%(actor)s промени статуса на "%(title)s" от %(from)s на %(to)s.') % {
+            message = _('%(actor)s changed the status of "%(title)s" from %(from)s to %(to)s.') % {
                 "actor": actor_name,
                 "title": title,
                 "from": from_label,
@@ -613,7 +701,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         elif log.action == WorkOrderAuditLog.Action.APPROVAL:
             status_labels = dict(WorkOrder.Status.choices)
             to_label = status_labels.get(payload.get("to"), payload.get("to"))
-            message = _('%(actor)s записа решение за одобрение за "%(title)s" (%(status)s).') % {
+            message = _('%(actor)s recorded an approval decision for "%(title)s" (%(status)s).') % {
                 "actor": actor_name,
                 "title": title,
                 "status": to_label or _("updated status"),
@@ -622,35 +710,35 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         elif log.action == WorkOrderAuditLog.Action.UPDATED:
             fields = payload.get("fields", {})
             field_label_map = {
-                "deadline": _("краен срок"),
-                "description": _("описание"),
-                "priority": _("приоритет"),
-                "replacement_request_note": _("бележка за замяна"),
-                "title": _("заглавие"),
-                "unit": _("апартамент"),
+                "deadline": _("deadline"),
+                "description": _("description"),
+                "priority": _("priority"),
+                "replacement_request_note": _("replacement note"),
+                "title": _("title"),
+                "unit": _("unit"),
             }
             translated_fields = []
             for field in sorted(fields.keys()):
                 translated_fields.append(field_label_map.get(field, field))
-            field_names = ", ".join(translated_fields) or _("детайли")
-            message = _('%(actor)s актуализира %(fields)s за "%(title)s".') % {
+            field_names = ", ".join(translated_fields) or _("details")
+            message = _('%(actor)s updated %(fields)s for "%(title)s".') % {
                 "actor": actor_name,
                 "fields": field_names,
                 "title": title,
             }
         elif log.action == WorkOrderAuditLog.Action.ATTACHMENTS:
-            message = _('%(actor)s актуализира файловете към "%(title)s".') % {
+            message = _('%(actor)s updated attachments for "%(title)s".') % {
                 "actor": actor_name,
                 "title": title,
             }
         elif log.action == WorkOrderAuditLog.Action.REASSIGNED:
-            message = _('%(actor)s пренасочи "%(title)s".') % {
+            message = _('%(actor)s reassigned "%(title)s".') % {
                 "actor": actor_name,
                 "title": title,
             }
             level = Notification.Level.WARNING.value
         elif log.action == WorkOrderAuditLog.Action.ARCHIVED:
-            message = _('%(actor)s архивира "%(title)s".') % {
+            message = _('%(actor)s archived "%(title)s".') % {
                 "actor": actor_name,
                 "title": title,
             }
