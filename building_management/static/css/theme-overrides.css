@@ -632,6 +632,29 @@ a:hover {
   color: var(--ui-text-muted);
 }
 
+.dark .confirm-panel__message {
+  color: rgba(241, 245, 249, 0.92);
+}
+
+html.dark .confirm-panel .confirm-panel__message {
+  color: #f8fafc !important;
+  opacity: 1 !important;
+  font-weight: 500;
+}
+
+.confirm-panel__message strong {
+  color: inherit;
+  font-weight: 700;
+}
+
+.dark .confirm-panel__message strong {
+  color: #ffffff;
+}
+
+html.dark .confirm-panel .confirm-panel__message strong {
+  color: #ffffff !important;
+}
+
 .confirm-panel__actions {
   display: flex;
   flex-direction: column;
@@ -674,6 +697,37 @@ a:hover {
 
 .dark .dashboard-card {
   color: #f1f5f9;
+}
+
+/* ------------------------------------------------------------------
+   Unified layout mode: keep desktop content blocks on mobile too.
+   This hides mobile-only sections and forces desktop-only sections
+   to render on small screens for consistent cross-device structure.
+   ------------------------------------------------------------------ */
+@media (max-width: 767px) {
+  .md\:hidden {
+    display: none !important;
+  }
+
+  .hidden.md\:block {
+    display: block !important;
+  }
+
+  .hidden.md\:flex {
+    display: flex !important;
+  }
+
+  .hidden.md\:grid {
+    display: grid !important;
+  }
+
+  .hidden.md\:inline-flex {
+    display: inline-flex !important;
+  }
+
+  .hidden.md\:table {
+    display: table !important;
+  }
 }
 
 .dashboard-card__header {
@@ -755,6 +809,17 @@ a:hover {
 
 .dashboard-card__meta-item span {
   line-height: 1.4;
+}
+
+/* Dashboard clean wrappers: remove outer frame borders */
+.dashboard-header-shell,
+.dashboard-section-shell {
+  border: 0 !important;
+}
+
+.dark .dashboard-header-shell,
+.dark .dashboard-section-shell {
+  border: 0 !important;
 }
 
 /* Badges */
@@ -2084,4 +2149,33 @@ html.dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-radius: 3.2rem !important;
   border-width: 1.5px;
   box-shadow: inset 0 0 15px rgba(15, 23, 42, 0.05);
+}
+
+/* Budgets: improve By requester row readability in dark mode */
+.dark .budget-requester-row {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+  border-color: rgba(148, 163, 184, 0.55) !important;
+}
+
+.dark .budget-requester-row__name {
+  color: rgba(241, 245, 249, 0.95) !important;
+}
+
+.dark .budget-requester-row__amount {
+  color: #ffffff !important;
+}
+
+html.dark .budget-by-requester .budget-requester-row {
+  background: #1e293b !important;
+  border-color: #64748b !important;
+}
+
+html.dark .budget-by-requester .budget-requester-row__name {
+  color: #f8fafc !important;
+  opacity: 1 !important;
+}
+
+html.dark .budget-by-requester .budget-requester-row__amount {
+  color: #ffffff !important;
+  opacity: 1 !important;
 }

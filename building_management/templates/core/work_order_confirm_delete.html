@@ -9,7 +9,7 @@
       {% include "components/icons/warning.svg" %}
     </span>
     <h1 class="confirm-panel__title">{% trans "Delete work order" %}</h1>
-    <p class="confirm-panel__message">
+    <p class="confirm-panel__message text-slate-700 dark:text-slate-100">
       {% blocktrans with title=object.title building=object.building.name %}Are you sure you want to delete <strong>{{ title }}</strong> for <strong>{{ building }}</strong>?{% endblocktrans %}
       {% trans "This cannot be undone." %}
     </p>

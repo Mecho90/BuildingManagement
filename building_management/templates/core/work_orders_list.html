@@ -60,7 +60,7 @@
       </div>
 
       {% if owner_choices %}
-        <div class="space-y-1">
+        <div class="space-y-1 md:col-span-2 lg:col-span-4">
           <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
           <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
@@ -71,7 +71,7 @@
         </div>
       {% endif %}
 
-      <div class="space-y-1">
+      <div class="space-y-1 md:col-span-2 lg:col-span-4">
         <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
         <select id="id_sort" name="sort" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           <option value="" {% if not sort or sort == 'priority' %}selected{% endif %}>{% trans "All" %}</option>
@@ -160,7 +160,7 @@
         <div class="space-y-2">
           <div class="flex flex-wrap items-center gap-2">
             <h2 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
-              <a href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200">{{ w.title }}</a>
+              <a href="{% url 'core:work_order_update' w.id %}?next=/work-orders/" class="hover:text-sky-700 dark:hover:text-sky-200">{{ w.title }}</a>
             </h2>
             {% include "components/expense_amount_indicator.html" with amount=w.expense_total %}
           </div>
@@ -251,7 +251,7 @@
         {% for w in orders %}
           <tr class="text-sm text-slate-700 dark:text-slate-200">
             <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
-              <a class="break-words hyphens-auto" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
+              <a class="break-words hyphens-auto" href="{% url 'core:work_order_update' w.id %}?next=/work-orders/">{{ w.title }}</a>
             </td>
             <td class="px-4 py-3"><a class="text-sky-600 hover:text-sky-700 dark:text-sky-300" href="{% url 'core:building_detail' w.building_id %}">{{ w.building.name }}</a></td>
             {% if show_owner_info %}

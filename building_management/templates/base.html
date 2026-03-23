@@ -44,7 +44,7 @@
                         {% trans "To-Dos" %}
                       </a>
                     {% endif %}
-                    <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/$' css_class='nav-link--active' %}">
+                    <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/' css_class='nav-link--active' %} {% active_nav_next_prefix '/buildings/' css_class='nav-link--active' %}">
                       {% trans "Buildings" %}
                     </a>
                     {% if work_orders_enabled and work_orders_url %}

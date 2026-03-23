@@ -663,11 +663,25 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return notifications
 
     def _dismissed_activity_ids(self):
+        dismissed_ids: set[int] = set()
         store = self.request.session.get("dismissed_activity_logs", [])
         try:
-            return {int(val) for val in store}
+            dismissed_ids.update(int(val) for val in store)
         except (TypeError, ValueError):
-            return set()
+            pass
+
+        acknowledged_activity_keys = Notification.objects.filter(
+            user=self.request.user,
+            category="activity",
+            acknowledged_at__isnull=False,
+            key__startswith="wo-activity-",
+        ).values_list("key", flat=True)
+        for key in acknowledged_activity_keys:
+            try:
+                dismissed_ids.add(int(str(key).rsplit("-", 1)[-1]))
+            except (TypeError, ValueError):
+                continue
+        return dismissed_ids
 
     def _format_activity_message(self, log):
         order = getattr(log, "work_order", None)

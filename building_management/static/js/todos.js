@@ -67,6 +67,11 @@
     paginationPrev: document.getElementById("todo-pagination-prev"),
     paginationNext: document.getElementById("todo-pagination-next"),
     paginationBlocks: document.querySelectorAll("[data-todo-pagination]"),
+    confirmModal: document.getElementById("todo-confirm-modal"),
+    confirmTitle: document.getElementById("todo-confirm-title"),
+    confirmMessage: document.getElementById("todo-confirm-message"),
+    confirmCancel: document.getElementById("todo-confirm-cancel"),
+    confirmAccept: document.getElementById("todo-confirm-accept"),
   };
 
   const tabs = document.querySelectorAll(".todo-tab");
@@ -77,6 +82,60 @@
   function announce(message) {
     if (!els.liveRegion) return;
     els.liveRegion.textContent = message || "";
+  }
+
+  function confirmAction({ title, message, confirmLabel } = {}) {
+    const modal = els.confirmModal;
+    const titleEl = els.confirmTitle;
+    const messageEl = els.confirmMessage;
+    const cancelBtn = els.confirmCancel;
+    const acceptBtn = els.confirmAccept;
+
+    if (!modal || !cancelBtn || !acceptBtn) {
+      return Promise.resolve(window.confirm(message || t("Delete selected tasks? This cannot be undone.")));
+    }
+
+    return new Promise((resolve) => {
+      const prevOverflow = document.body.style.overflow;
+      let resolved = false;
+
+      if (titleEl) titleEl.textContent = title || t("Delete task");
+      if (messageEl) messageEl.textContent = message || t("Delete selected tasks? This cannot be undone.");
+      if (confirmLabel) acceptBtn.textContent = confirmLabel;
+
+      const cleanup = () => {
+        modal.classList.add("hidden");
+        document.body.style.overflow = prevOverflow;
+        cancelBtn.removeEventListener("click", onCancel);
+        acceptBtn.removeEventListener("click", onAccept);
+        modal.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onKeydown);
+      };
+
+      const finish = (result) => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resolve(result);
+      };
+
+      const onCancel = () => finish(false);
+      const onAccept = () => finish(true);
+      const onBackdrop = (event) => {
+        if (event.target === modal) finish(false);
+      };
+      const onKeydown = (event) => {
+        if (event.key === "Escape") finish(false);
+      };
+
+      modal.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+      cancelBtn.addEventListener("click", onCancel);
+      acceptBtn.addEventListener("click", onAccept);
+      modal.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onKeydown);
+      acceptBtn.focus();
+    });
   }
 
   function escapeHtml(value) {
@@ -134,7 +193,7 @@
     upcoming: () => ({ include_history: 1, upcoming: 1, status: "pending,in_progress" }),
     all: () => ({ include_history: 1, created_only: 1, status: "pending,in_progress" }),
     created: () => ({ include_history: 1, created_only: 1, status: "pending,in_progress" }),
-    completed: () => ({ week_start: config.currentWeek, status: "done", history: 1 }),
+    completed: () => ({ include_history: 1, status: "done", history: 1 }),
     history: () => ({ status: "done", history: 1 }),
   };
 
@@ -161,6 +220,15 @@
 
   function updateBulkControls() {
     const count = state.completedSelection.size;
+    const onCompletedTab = state.currentTab === "completed";
+    const selectedStatuses = Array.from(state.completedSelection)
+      .map((id) => {
+        if (!els.list) return "";
+        const card = els.list.querySelector(`[data-todo-id="${id}"]`);
+        return card ? String(card.dataset.status || "").toLowerCase() : "";
+      })
+      .filter(Boolean);
+    const allSelectedAreDone = selectedStatuses.length > 0 && selectedStatuses.every((status) => status === "done");
     if (els.bulkBar) {
       els.bulkBar.classList.toggle("hidden", count === 0);
     }
@@ -169,12 +237,14 @@
       els.bulkCount.textContent = `${count} ${noun}`;
     }
     if (els.bulkMarkDone) {
+      const hideMarkDone = onCompletedTab || allSelectedAreDone;
+      els.bulkMarkDone.classList.toggle("hidden", hideMarkDone);
+      els.bulkMarkDone.style.display = hideMarkDone ? "none" : "";
       els.bulkMarkDone.disabled = count === 0;
     }
     if (els.bulkDelete) {
       els.bulkDelete.disabled = count === 0;
     }
-    const onCompletedTab = state.currentTab === "completed";
     if (completedDeleteBtn) {
       completedDeleteBtn.classList.toggle("hidden", !onCompletedTab);
       completedDeleteBtn.disabled = !onCompletedTab || count === 0;
@@ -202,6 +272,13 @@
 
   function detailUrl(id) {
     return config.detailUrl.replace("{id}", id);
+  }
+
+  function deletePageUrl(id) {
+    if (!config.deleteUrl) return null;
+    const deleteUrl = config.deleteUrl.replace("{id}", id);
+    const nextTarget = listUrlWithCurrentTab();
+    return `${deleteUrl}?next=${encodeURIComponent(nextTarget)}`;
   }
 
   function listUrlWithCurrentTab() {
@@ -426,33 +503,46 @@
     if (state.currentTab !== "completed") return;
     const selectedIds = Array.from(state.completedSelection);
     if (!selectedIds.length) return;
-    const confirmMessage = completedDeleteBtn.dataset.confirm || t("Delete completed tasks?");
-    if (!window.confirm(confirmMessage)) return;
-    const params = new URLSearchParams();
-    params.set("ids", selectedIds.join(","));
-    if (state.owner) {
-      params.set("owner", state.owner);
+    if (selectedIds.length === 1) {
+      const target = deletePageUrl(selectedIds[0]);
+      if (target) {
+        window.location.href = target;
+        return;
+      }
     }
-    const url = params.toString() ? `${config.completedClearUrl}?${params.toString()}` : config.completedClearUrl;
-    fetch(url, {
-      method: "DELETE",
-      headers: {
-        "X-CSRFToken": csrftoken(),
-      },
-      credentials: "same-origin",
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(t("Failed to delete tasks"));
-        }
-        return response.json();
+    const confirmMessage = completedDeleteBtn.dataset.confirm || t("Delete completed tasks? This cannot be undone.");
+    confirmAction({
+      title: t("Delete task"),
+      message: confirmMessage,
+      confirmLabel: t("Yes, delete"),
+    }).then((confirmed) => {
+      if (!confirmed) return;
+      const params = new URLSearchParams();
+      params.set("ids", selectedIds.join(","));
+      if (state.owner) {
+        params.set("owner", state.owner);
+      }
+      const url = params.toString() ? `${config.completedClearUrl}?${params.toString()}` : config.completedClearUrl;
+      fetch(url, {
+        method: "DELETE",
+        headers: {
+          "X-CSRFToken": csrftoken(),
+        },
+        credentials: "same-origin",
       })
-      .then(() => {
-        clearCompletedSelection();
-        fetchTasks(state.currentTab === "completed" ? "completed" : "this-week");
-        fetchCalendar();
-      })
-      .catch(showError);
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(t("Failed to delete tasks"));
+          }
+          return response.json();
+        })
+        .then(() => {
+          clearCompletedSelection();
+          fetchTasks(state.currentTab === "completed" ? "completed" : "this-week");
+          fetchCalendar();
+        })
+        .catch(showError);
+    });
   }
 
   function selectedIds() {
@@ -512,17 +602,6 @@
     return `${diff} ${t("days left")}`;
   }
 
-  function priorityFor(item) {
-    const due = item.due_date;
-    if (!due) return { level: "low", icon: "●", label: t("Low") };
-    const dueDate = new Date(`${due}T00:00:00`);
-    const today = todayDate();
-    const diff = Math.round((dueDate.getTime() - today.getTime()) / 86400000);
-    if (diff < 0) return { level: "high", icon: "!", label: t("High") };
-    if (diff <= 1) return { level: "medium", icon: "•", label: t("Medium") };
-    return { level: "low", icon: "●", label: t("Low") };
-  }
-
   function statusOptions(selected) {
     const allowed = Object.keys(config.statusLabels || {}).filter((code) => code !== "archived");
     return allowed
@@ -568,8 +647,6 @@
     const dueRelative = item.due_date ? relativeDaysLabel(item.due_date) : "";
     const isOverdue = dueRelative.includes(t("late"));
     const dueMetaClass = isOverdue ? "todo-card__due--overdue" : "";
-    const priority = priorityFor(item);
-    const priorityBadge = `<span class="todo-card__priority todo-card__priority--${priority.level}" title="${t("Priority")}">${priority.icon} ${priority.label}</span>`;
     const cardClass = cardStatusClass(status);
     const quickStatus = `
       <label>${t("Status")}
@@ -589,7 +666,6 @@
             <div class="todo-card__title-wrap">
               <h3 class="todo-card__title">${safeTitle}</h3>
               <span class="todo-card__status ${badgeClass}" style="${badgeStyle}">${statusLabel}</span>
-              ${priorityBadge}
               ${ownerBadge}
             </div>
           </div>
@@ -1180,14 +1256,28 @@
 
     if (els.bulkDelete) {
       els.bulkDelete.addEventListener("click", () => {
-        if (!window.confirm(t("Delete selected tasks? This cannot be undone."))) return;
-        runBulkDelete()
-          .then(() => {
-            clearCompletedSelection();
-            fetchTasks(state.currentTab);
-            fetchCalendar();
-          })
-          .catch(showError);
+        const ids = selectedIds();
+        if (ids.length === 1) {
+          const target = deletePageUrl(ids[0]);
+          if (target) {
+            window.location.href = target;
+            return;
+          }
+        }
+        confirmAction({
+          title: t("Delete task"),
+          message: t("Delete selected tasks? This cannot be undone."),
+          confirmLabel: t("Yes, delete"),
+        }).then((confirmed) => {
+          if (!confirmed) return;
+          runBulkDelete()
+            .then(() => {
+              clearCompletedSelection();
+              fetchTasks(state.currentTab);
+              fetchCalendar();
+            })
+            .catch(showError);
+        });
       });
     }
 

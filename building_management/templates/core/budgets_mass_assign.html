@@ -7,23 +7,12 @@
   <section class="space-y-6" data-budget-mass-assign>
     <header class="rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
       <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{% trans "Mass assign budgets" %}</h1>
-      <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-        {% trans "Create one budget template and assign it to selected users." %}
-      </p>
     </header>
 
-    <section class="grid grid-cols-1 gap-3 md:grid-cols-3" aria-live="polite" aria-atomic="true" data-assignment-summary>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Selected budgets" %}</p>
-        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100" data-summary-budgets>{{ summary_selected_budgets|default:0 }}</p>
-      </article>
+    <section class="grid grid-cols-1 gap-3 md:grid-cols-1" aria-live="polite" aria-atomic="true" data-assignment-summary>
       <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Selected users" %}</p>
         <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100" data-summary-users>{{ summary_selected_users|default:0 }}</p>
-      </article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total assignments" %}</p>
-        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100" data-summary-assignments>{{ summary_total_assignments|default:0 }}</p>
       </article>
     </section>
 
@@ -43,64 +32,11 @@
       </div>
     {% endif %}
 
-    <form method="get" class="filter-panel" aria-label="{% trans 'Filter assignees' %}">
-      <div class="space-y-2 md:col-span-6">
-        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_q">{% trans "Search users" %}</label>
-        <input id="id_q" name="q" type="text" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" value="{{ assignee_filter_q }}" placeholder="{% trans 'Username, name, or email' %}" autocomplete="off" />
-      </div>
-      <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_role">{% trans "Role" %}</label>
-          <select id="id_role" name="role" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-            {% for value, label in assignee_role_choices %}
-              <option value="{{ value }}" {% if assignee_filter_role == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_sort">{% trans "Sort" %}</label>
-          <select id="id_sort" name="sort" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-            {% for value, label in assignee_sort_choices %}
-              <option value="{{ value }}" {% if assignee_filter_sort == value %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="id_per">{% trans "Page size" %}</label>
-          <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-            {% for option in assignee_per_choices %}
-              <option value="{{ option }}" {% if assignee_filter_per == option %}selected{% endif %}>{{ option }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div class="filter-panel__actions">
-        {% if has_active_filters %}
-          <a class="btn btn-secondary" href="{% url 'core:budget_mass_assign' %}">{% trans "Reset" %}</a>
-        {% endif %}
-        <button type="submit" class="btn">{% trans "Apply filters" %}</button>
-      </div>
-    </form>
-
-    {% if active_filter_chips %}
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
-        <div class="flex flex-wrap items-center gap-2">
-          {% for chip in active_filter_chips %}
-            <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
-              {{ chip.label }}
-              <a href="{{ chip.remove_url }}" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-800/60" aria-label="{% trans 'Remove filter' %}">×</a>
-            </span>
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
-
     <form method="post" class="space-y-6" id="budget-mass-assign-form" novalidate>
       {% csrf_token %}
 
-      <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-900" aria-labelledby="mass-step-1">
-        <h2 id="mass-step-1" class="text-lg font-semibold text-slate-900 dark:text-slate-100">1. {% trans "Select budgets" %}</h2>
-        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{% trans "Define the budget template that will be created per selected user." %}</p>
+      <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900" aria-labelledby="mass-step-1">
+        <h2 id="mass-step-1" class="text-xl font-semibold text-brand-foreground dark:text-white" style="margin:0;">{% trans "Create budget" %}</h2>
         <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div class="md:col-span-2">
             <label class="form-label" for="{{ form.title.id_for_label }}">{% trans "Budget title" %}</label>
@@ -129,17 +65,11 @@
         </div>
       </section>
 
-      <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-card dark:border-slate-700 dark:bg-slate-900" aria-labelledby="mass-step-2">
-        <h2 id="mass-step-2" class="text-lg font-semibold text-slate-900 dark:text-slate-100">2. {% trans "Select users" %}</h2>
-        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300" aria-live="polite" data-selected-live>
-          {% blocktrans with count=selected_on_page %}{{ count }} users selected on this page.{% endblocktrans %}
-        </p>
+      <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900" aria-labelledby="mass-step-2">
+        <h2 id="mass-step-2" class="text-xl font-semibold text-brand-foreground dark:text-white" style="margin:0;">{% trans "Select users" %}</h2>
 
         {% if assignee_filtered_total %}
-          <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-800/40">
-            <div class="font-medium text-slate-700 dark:text-slate-200">
-              {% blocktrans with start=assignee_showing_start end=assignee_showing_end total=assignee_filtered_total %}Showing {{ start }}–{{ end }} of {{ total }} users{% endblocktrans %}
-            </div>
+          <div class="mt-2 flex flex-wrap items-center justify-end gap-3 text-sm">
             <div class="flex flex-wrap items-center gap-2">
               <button type="button" class="btn btn-secondary btn-sm" data-select-all>{% trans "Select all on page" %}</button>
               <button type="button" class="btn btn-secondary btn-sm" data-clear-selection>{% trans "Clear selection" %}</button>
@@ -217,19 +147,16 @@
         {% endif %}
       </section>
 
-      <section class="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900 dark:bg-amber-950/20" aria-labelledby="mass-step-3">
-        <h2 id="mass-step-3" class="text-lg font-semibold text-slate-900 dark:text-slate-100">3. {% trans "Confirm & assign" %}</h2>
-        <p class="mt-1 text-sm text-slate-700 dark:text-slate-300" data-confirm-summary>
-          {% blocktrans with budgets=summary_selected_budgets users=summary_selected_users assignments=summary_total_assignments %}You are assigning {{ budgets }} budget template to {{ users }} users ({{ assignments }} total assignments).{% endblocktrans %}
-        </p>
+      <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900" aria-labelledby="mass-step-3">
+        <h2 id="mass-step-3" class="text-xl font-semibold text-brand-foreground dark:text-white" style="margin:0;">{% trans "Confirm & assign" %}</h2>
         <label class="mt-4 inline-flex items-start gap-3 text-sm text-slate-700 dark:text-slate-200">
           <input id="id_confirm_assignment" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500" data-confirm-assignment />
           <span>{% trans "I confirm the selected users will immediately receive approved budget requests." %}</span>
         </label>
 
         <div class="mt-5 flex flex-wrap gap-3">
-          <button type="submit" class="btn btn-primary min-h-[44px]" data-assign-submit {% if submit_disabled %}disabled{% endif %}>{% trans "Assign selected" %}</button>
-          <a href="{% url 'core:budget_list' %}" class="btn btn-ghost min-h-[44px]">{% trans "Back to budgets" %}</a>
+          <a href="{% url 'core:budget_list' %}" class="btn btn-secondary min-h-[44px]">{% trans "Cancel" %}</a>
+          <button type="submit" class="btn btn-primary min-h-[44px]" data-assign-submit {% if submit_disabled %}disabled{% endif %}>{% trans "Save" %}</button>
         </div>
       </section>
     </form>
@@ -244,15 +171,11 @@
       var selectAllBtn = root.querySelector('[data-select-all]');
       var clearBtn = root.querySelector('[data-clear-selection]');
       var selectedCountLabel = root.querySelector('[data-selected-count-label]');
-      var selectedLive = root.querySelector('[data-selected-live]');
       var submitBtn = root.querySelector('[data-assign-submit]');
       var confirmBox = root.querySelector('[data-confirm-assignment]');
       var titleField = root.querySelector('#{{ form.title.id_for_label }}');
       var amountField = root.querySelector('#{{ form.requested_amount.id_for_label }}');
-      var budgetsSummary = root.querySelector('[data-summary-budgets]');
       var usersSummary = root.querySelector('[data-summary-users]');
-      var assignmentsSummary = root.querySelector('[data-summary-assignments]');
-      var confirmSummary = root.querySelector('[data-confirm-summary]');
 
       function selectedCount() {
         return checkboxes.filter(function (input) { return input.checked; }).length;
@@ -267,16 +190,9 @@
       function updateState() {
         var users = selectedCount();
         var budgets = templateSelectedCount();
-        var assignments = users * budgets;
 
         if (selectedCountLabel) selectedCountLabel.textContent = users + ' selected';
-        if (selectedLive) selectedLive.textContent = users + ' users selected on this page.';
-        if (budgetsSummary) budgetsSummary.textContent = String(budgets);
         if (usersSummary) usersSummary.textContent = String(users);
-        if (assignmentsSummary) assignmentsSummary.textContent = String(assignments);
-        if (confirmSummary) {
-          confirmSummary.textContent = 'You are assigning ' + budgets + ' budget template to ' + users + ' users (' + assignments + ' total assignments).';
-        }
 
         if (submitBtn) {
           submitBtn.disabled = !(budgets > 0 && users > 0 && confirmBox && confirmBox.checked);

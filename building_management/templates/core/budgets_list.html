@@ -31,15 +31,15 @@
         </div>
       </div>
       {% if is_budget_admin and summary_by_requester %}
-        <div class="mt-4 rounded-2xl border border-amber-200 bg-white/85 p-4 dark:border-amber-600/50 dark:bg-slate-900/60">
+        <div class="budget-by-requester mt-4 rounded-2xl border border-amber-200 bg-white/85 p-4 dark:border-amber-600/50 dark:bg-slate-900/60">
           <div class="flex items-center justify-between gap-2">
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "By requester" %}</p>
           </div>
           <div class="mt-2 grid gap-2 grid-cols-1">
             {% for row in summary_by_requester_page %}
-              <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/80">
-                <span class="truncate pr-3 text-slate-600 dark:text-slate-300">{{ row.requester_label }}</span>
-                <span class="num-tabular font-semibold text-slate-900 dark:text-slate-100">{{ row.remaining_total|floatformat:2 }}</span>
+              <div class="budget-requester-row flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-300 dark:bg-slate-50">
+                <span class="budget-requester-row__name truncate pr-3 font-medium text-slate-900 dark:text-slate-900" style="color:#0f172a !important; opacity:1 !important;">{{ row.requester_label }}</span>
+                <span class="budget-requester-row__amount num-tabular font-semibold text-slate-900 dark:text-slate-900" style="color:#0f172a !important; opacity:1 !important;">{{ row.remaining_total|floatformat:2 }}</span>
               </div>
             {% endfor %}
           </div>
@@ -82,11 +82,13 @@
               {% if filter_form.fields.technician.empty_label %}
                 <option value="">{{ filter_form.fields.technician.empty_label }}</option>
               {% endif %}
+              {% with selected_requester=filter_form.technician.value|default_if_none:filter_form.fields.technician.initial %}
               {% for requester in filter_form.fields.technician.queryset %}
-                <option value="{{ requester.pk }}" {% if filter_form.technician.value|default_if_none:'' == requester.pk|stringformat:'s' %}selected{% endif %}>
+                <option value="{{ requester.pk }}" {% if selected_requester|stringformat:'s' == requester.pk|stringformat:'s' %}selected{% endif %}>
                   {{ requester.get_full_name|default:requester.username }}
                 </option>
               {% endfor %}
+              {% endwith %}
             </select>
           </div>
         {% endif %}

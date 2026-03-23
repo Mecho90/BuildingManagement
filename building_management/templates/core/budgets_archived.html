@@ -111,15 +111,15 @@
         {% csrf_token %}
         {% if can_purge_archives %}
           <div class="flex flex-wrap items-center justify-between gap-2 px-1 py-1">
-            <div class="flex items-center gap-2">
-              <button type="button" class="btn btn-secondary btn-sm" id="archive-select-all-requesters">{% trans "Select all on page" %}</button>
-            </div>
             <span class="text-sm font-medium text-slate-600 dark:text-slate-300"
                   id="archive-requester-selection-count"
                   data-label-singular="{% trans 'requester selected' %}"
                   data-label-plural="{% trans 'requesters selected' %}">
               0 {% trans "requesters selected" %}
             </span>
+            <div class="flex items-center gap-2">
+              <button type="button" class="btn" id="archive-select-all-requesters">{% trans "Select all on page" %}</button>
+            </div>
           </div>
         {% endif %}
 
@@ -141,16 +141,8 @@
                   {% endif %}
                   <div>
                     <span class="archive-building-name block text-base font-semibold text-slate-700 dark:text-slate-100 break-words leading-snug">{{ group.owner_name }}</span>
-                    <span class="archive-building-owner block text-xs font-medium text-slate-700 dark:text-slate-300">
-                      {% blocktrans with requested=group.total_requested|floatformat:2 spent=group.total_spent|floatformat:2 %}
-                        Requested {{ requested }} · Spent {{ spent }}
-                      {% endblocktrans %}
-                    </span>
                   </div>
                 </div>
-                <span class="inline-flex flex-shrink-0 items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none tracking-wide text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-200">
-                  {% blocktrans with total=group.budgets|length %}{{ total }} archived{% endblocktrans %}
-                </span>
               </div>
 
               <div class="space-y-2">
@@ -159,8 +151,8 @@
                     <div>
                       <p class="font-semibold text-slate-900 dark:text-slate-100">{{ budget.title|default:_("Untitled budget") }}</p>
                       <p class="text-xs text-brand-foreground dark:text-white">
-                        {% blocktrans with approved=budget.approved_total|floatformat:2 spent=budget.spent_total|floatformat:2 currency=budget.currency archived=budget.archived_at|date:"Y-m-d" %}
-                          Approved {{ approved }} {{ currency }} · Spent {{ spent }} {{ currency }} · Archived {{ archived }}
+                        {% blocktrans with approved=budget.approved_total|floatformat:2 currency=budget.currency archived=budget.archived_at|date:"Y-m-d" %}
+                          Approved {{ approved }} {{ currency }} · Archived {{ archived }}
                         {% endblocktrans %}
                       </p>
                     </div>

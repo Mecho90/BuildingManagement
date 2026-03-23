@@ -77,7 +77,7 @@
       </div>
       {% if order.building.owner %}
         <div>
-          <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Отговорник" %}</dt>
+          <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
           <dd>{{ order.building.owner.get_full_name|default:order.building.owner.username }}</dd>
         </div>
       {% endif %}
@@ -105,11 +105,14 @@
       {% if deadline_status %}
         <div>
           <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Deadline status" %}</dt>
-          <dd>
+          <dd
+            class="font-semibold {% if deadline_status.state == 'missed' %}text-rose-600 dark:text-rose-300{% else %}text-emerald-700 dark:text-emerald-300{% endif %}"
+            style="color:{% if deadline_status.state == 'missed' %}#dc2626{% else %}#16a34a{% endif %} !important;"
+          >
             {% if deadline_status.state == "missed" %}
-              <span class="text-rose-600 dark:text-rose-300">{{ deadline_status.label }}</span>
+              {{ deadline_status.label }}
             {% else %}
-              <span class="text-emerald-600 dark:text-emerald-300">{{ deadline_status.label }}</span>
+              {{ deadline_status.label }}
             {% endif %}
           </dd>
         </div>

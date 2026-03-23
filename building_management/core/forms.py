@@ -144,6 +144,12 @@ class BuildingForm(forms.ModelForm):
             else False
         )
         self._can_assign_owner = self._user_can_assign_owner(user)
+        self.fields["name"].label = "Name"
+        self.fields["address"].label = "Address"
+        self.fields["description"].label = "Description"
+        self.fields["role"].label = "Role"
+        if "owner" in self.fields:
+            self.fields["owner"].label = "Owner"
 
         if self._can_assign_owner:
             owner_queryset = (
@@ -168,6 +174,7 @@ class BuildingForm(forms.ModelForm):
                 str(pk) for pk in sorted(technician_ids)
             )
             self.fields["owner"].label_from_instance = lambda obj: obj.get_full_name() or obj.get_username()
+            self.fields["owner"].label = "Owner"
         else:
             self.fields.pop("owner", None)
 
@@ -192,14 +199,10 @@ class BuildingForm(forms.ModelForm):
             role_field.help_text = ""
         elif is_editing_existing and not self._is_admin:
             role_field.disabled = True
-            role_field.help_text = _(
-                "Only administrators can change the building role once it has been set."
-            )
+            role_field.help_text = "Only administrators can change the building role once it has been set."
         elif not owner_is_technician:
             role_field.disabled = True
-            role_field.help_text = _(
-                "Role is editable only when the assigned user has the Technician role."
-            )
+            role_field.help_text = "Role is editable only when the assigned user has the Technician role."
 
     def save(self, commit: bool = True):
         obj: Building = super().save(commit=False)
@@ -597,7 +600,7 @@ class WorkOrderForm(forms.ModelForm):
                     self.fields["status"].widget.attrs.get("class", "") + " cursor-not-allowed opacity-70"
                 ).strip()
                 self.fields["status"].help_text = _(
-                    "Очаква одобрение от бекофиса. Само бекофис потребители могат да променят този статус."
+                    "Awaiting backoffice approval. Only backoffice users can change this status."
                 )
         self.fields["replacement_request_note"].label = ""
         self.fields["replacement_request_note"].widget = forms.HiddenInput()
@@ -1055,11 +1058,19 @@ class WorkOrderForm(forms.ModelForm):
 
 def _workorder_allowed_statuses(form, building_id, *, current_status=None, can_user_approve: bool = False):
     current = current_status or (form.instance.status if form.instance.pk else WorkOrder.Status.OPEN)
+    resolver = getattr(form, "_resolver", None)
     if building_id is None:
+        can_manage_any = bool(resolver and resolver.has(Capability.MANAGE_BUILDINGS))
+        can_create_any = bool(resolver and resolver.has(Capability.CREATE_WORK_ORDERS))
+        if can_manage_any or can_create_any or can_user_approve:
+            return {
+                WorkOrder.Status.OPEN,
+                WorkOrder.Status.IN_PROGRESS,
+                WorkOrder.Status.DONE,
+            }
         return {WorkOrder.Status.OPEN}
     can_manage = False
     can_create = False
-    resolver = getattr(form, "_resolver", None)
     if resolver:
         can_manage = resolver.has(Capability.MANAGE_BUILDINGS, building_id=building_id)
         can_create = resolver.has(Capability.CREATE_WORK_ORDERS, building_id=building_id)

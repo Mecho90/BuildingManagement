@@ -4,92 +4,127 @@
 {% block title %}{{ building.name }} · {% trans "Buildings" %}{% endblock %}
 
 {% block content %}
-<section class="space-y-10">
-  <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-4">
+<section class="space-y-6">
+  <header class="sticky top-3 z-20 rounded-2xl bg-white/95 p-6 shadow-card backdrop-blur dark:bg-slate-900/95 space-y-4">
     <nav aria-label="{% trans 'Breadcrumb' %}">
       <ol class="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <li class="text-slate-700 dark:text-slate-200 font-medium">
-          {% trans "Детайли" %}
+          {% trans "Details" %}
         </li>
       </ol>
     </nav>
 
-    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div class="space-y-2">
-        <div class="flex flex-wrap items-center gap-3">
-          <h1 class="page-heading break-words hyphens-auto">
+    <div class="space-y-4">
+      <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div class="space-y-1">
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{% trans "Building name" %}</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <h1 class="page-heading break-words hyphens-auto">{{ building_display_name }}</h1>
             {% if building.is_system_default %}
-              {% trans "Офис" %}
-            {% else %}
-              {{ building.name }}
+              <span class="inline-flex items-center rounded-full border border-orange-300/80 bg-orange-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-700 dark:border-orange-500/60 dark:bg-orange-500/10 dark:text-orange-200">
+                {% trans "Office (system default)" %}
+              </span>
             {% endif %}
-          </h1>
-          {% include "components/lawyer_orders_indicator.html" with count=building.lawyer_orders_count %}
-          {% include "components/expense_amount_indicator.html" with amount=building.expense_total %}
-          {% if building.is_system_default %}
-            <span class="inline-flex items-center rounded-full border border-orange-300/80 bg-orange-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-orange-700 dark:border-orange-500/60 dark:bg-orange-500/10 dark:text-orange-200">
-              {% trans "Офис (системен по подразбиране)" %}
-            </span>
+          </div>
+        </div>
+        <div class="flex min-w-[220px] flex-col items-stretch gap-2 sm:items-end">
+          {% if can_manage_building %}
+            <div class="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+              {% if not building.is_system_default %}
+                <a class="btn" href="{% url 'core:building_update' building.id %}">{% trans "Edit building" %}</a>
+              {% endif %}
+              {% if can_delete_building %}
+                <a class="btn btn-danger" href="{% url 'core:building_delete' building.id %}">{% trans "Delete" %}</a>
+              {% endif %}
+            </div>
           {% endif %}
         </div>
-        <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300 sm:grid-cols-2">
-          {% if building.address %}
-            <div class="space-y-1">
-              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Address" %}</dt>
-              <dd>{{ building.address }}</dd>
-            </div>
-          {% endif %}
-          {% if building.owner %}
-            <div class="space-y-1">
-              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Отговорник" %}</dt>
-              <dd>{{ building.owner.username }}</dd>
-            </div>
-          {% endif %}
-          {% if technician_subrole_label %}
-            <div class="space-y-1">
-              <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Моята технишка роля" %}</dt>
-              <dd>{{ technician_subrole_label }}</dd>
-            </div>
-          {% endif %}
-          <div class="space-y-1">
-            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Role" %}</dt>
-            <dd>{{ building.get_role_display }}</dd>
-          </div>
-          <div class="space-y-1">
-            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Created" %}</dt>
-            <dd>{{ building.created_at|date:"Y-m-d" }}</dd>
-          </div>
-          <div class="space-y-1 sm:col-span-2">
-            <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Description" %}</dt>
-            <dd class="whitespace-pre-line">
-              {% if building.description %}
-                {{ building.description }}
+      </div>
+
+      <div class="grid gap-3 md:grid-cols-2">
+          <article class="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-500/40 dark:bg-emerald-500/10">
+            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-200">{% trans "Budget expenses on work orders" %}</p>
+            <p class="mt-2 text-2xl font-semibold num-tabular text-emerald-800 dark:text-emerald-100">
+              {{ total_expense_amount|floatformat:2 }}
+            </p>
+            <p class="mt-1 text-xs font-medium text-emerald-700/80 dark:text-emerald-200/90">
+              {% if has_total_expense_amount %}
+                {% trans "Expenses are recorded for this building." %}
               {% else %}
-                <em>{% trans "No description provided." %}</em>
+                {% trans "No expenses recorded yet." %}
               {% endif %}
+            </p>
+          </article>
+          <article class="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-500/40 dark:bg-amber-500/10">
+            <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">{% trans "Lawyer orders" %}</p>
+            <p class="mt-2 text-2xl font-semibold text-amber-800 dark:text-amber-100 num-tabular">{{ lawyer_orders_count }}</p>
+            <p class="mt-1 text-xs font-medium text-amber-700/80 dark:text-amber-200/90">
+              {% if has_lawyer_orders %}
+                {% blocktrans with value=lawyer_orders_total_expense|floatformat:2 %}Total expense amount: {{ value }}{% endblocktrans %}
+              {% else %}
+                {% trans "No active lawyer orders for this building." %}
+              {% endif %}
+            </p>
+          </article>
+      </div>
+
+      <dl class="grid gap-3 text-sm text-slate-700 dark:text-slate-200 md:grid-cols-2">
+          <div class="space-y-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/80">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Owner and role" %}</dt>
+            <dd class="space-y-1">
+              <p class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ owner_display_name }}</p>
+              <p class="text-sm text-slate-600 dark:text-slate-300">{% blocktrans with value=owner_role_label %}Role: {{ value }}{% endblocktrans %}</p>
             </dd>
           </div>
-        </dl>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        {% if can_manage_building %}
-          {% if not building.is_system_default %}
-            <a class="btn" href="{% url 'core:building_update' building.id %}">{% trans "Edit building" %}</a>
+          <div class="space-y-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/80">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Address and created" %}</dt>
+            <dd class="space-y-1">
+              <p class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ building.address|default:"—" }}</p>
+              <p class="text-sm text-slate-600 dark:text-slate-300">{% blocktrans with value=building.created_at|date:"Y-m-d" %}Created: {{ value }}{% endblocktrans %}</p>
+            </dd>
+          </div>
+          {% if technician_subrole_label %}
+            <div class="space-y-2 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/80 md:col-span-2">
+              <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "My technician role" %}</dt>
+              <dd class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ technician_subrole_label }}</dd>
+            </div>
           {% endif %}
-          <a class="btn btn-danger" href="{% url 'core:building_delete' building.id %}">{% trans "Delete" %}</a>
+      </dl>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/80">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Description" %}</p>
+      <div class="mt-2 whitespace-pre-line min-h-[2.25rem] text-slate-700 dark:text-slate-200">
+        {% if building.description %}
+          {{ building.description }}
+        {% else %}
+          <em>{% trans "No description provided." %}</em>
         {% endif %}
       </div>
     </div>
   </header>
 
-  <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+  <section class="grid gap-3" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+    <article class="rounded-2xl bg-white p-4 shadow-card dark:bg-slate-900">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total units" %}</p>
+      <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100 num-tabular">{{ summary_total_units }}</p>
+    </article>
+    <article class="rounded-2xl bg-white p-4 shadow-card dark:bg-slate-900">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Open work orders" %}</p>
+      <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100 num-tabular">{{ summary_open_work_orders }}</p>
+    </article>
+    <article class="rounded-2xl bg-white p-4 shadow-card dark:bg-slate-900">
+      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Overdue" %}</p>
+      <p class="mt-2 text-2xl font-semibold {% if summary_overdue_work_orders %}text-rose-700 dark:text-rose-300{% else %}text-slate-900 dark:text-slate-100{% endif %} num-tabular">{{ summary_overdue_work_orders }}</p>
+    </article>
+  </section>
+
+  <div class="rounded-2xl bg-white shadow-sm dark:bg-slate-900">
     <nav class="planner-tabs building-tabs flex items-center gap-2 border-b border-slate-200 px-4 pt-4 dark:border-slate-700" aria-label="{% trans 'Building sections' %}">
-      <a href="{{ tab_urls.work_orders }}" class="rounded-t-2xl px-6 py-3 text-base font-semibold uppercase tracking-wide border-b-4 transition-all duration-200 relative {% if active_tab == 'work_orders' %}border-orange-500 bg-orange-50 text-orange-600 shadow-sm dark:border-orange-400 dark:bg-orange-500/10 dark:text-orange-200{% else %}border-transparent text-slate-500 hover:text-orange-600 hover:border-orange-300 dark:text-slate-300 dark:hover:text-orange-200{% endif %}">
+      <a href="{{ tab_urls.work_orders }}" class="nav-link px-6 py-3 text-sm font-semibold uppercase tracking-wide {% if active_tab == 'work_orders' %}nav-link--active{% endif %}">
         {% trans "Work Orders" %}
       </a>
       {% if show_units_tab %}
-        <span class="h-10 w-px rounded-full bg-gradient-to-b from-transparent via-slate-200 to-transparent dark:via-slate-700" aria-hidden="true"></span>
-        <a href="{{ tab_urls.units }}" class="rounded-t-2xl px-6 py-3 text-base font-semibold uppercase tracking-wide border-b-4 transition-all duration-200 relative {% if active_tab == 'units' %}border-orange-500 bg-orange-50 text-orange-600 shadow-sm dark:border-orange-400 dark:bg-orange-500/10 dark:text-orange-200{% else %}border-transparent text-slate-500 hover:text-orange-600 hover:border-orange-300 dark:text-slate-300 dark:hover:text-orange-200{% endif %}">
+        <a href="{{ tab_urls.units }}" class="nav-link px-6 py-3 text-sm font-semibold uppercase tracking-wide {% if active_tab == 'units' %}nav-link--active{% endif %}">
           {% trans "Units" %}
         </a>
       {% endif %}
@@ -98,23 +133,17 @@
     <div class="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       {% if show_units_tab and active_tab == 'units' %}
         <section class="space-y-5">
-          <div class="flex flex-wrap items-center justify-end gap-3">
-            {% if can_manage_units %}
-              <a class="btn" href="{% url 'core:unit_create' building_pk=building.id %}">{% trans "Add unit" %}</a>
-            {% endif %}
-          </div>
-
           <form method="get" class="filter-panel">
             <input type="hidden" name="tab" value="units"/>
             <input type="hidden" name="u_sort" value="{{ u_sort }}"/>
-            <div class="filter-panel__grid md:grid-cols-2">
-              <div class="space-y-2 md:col-span-2">
-                <label for="id_u_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">Търсене на апартаменти</label>
+            <div class="space-y-2">
+                <label for="id_u_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search units" %}</label>
                 <input id="id_u_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="u_q" value="{{ u_q }}" placeholder="{% trans "Number, floor, owner or contact" %}"/>
-              </div>
-              <div class="space-y-2">
+            </div>
+            <div class="filter-panel__grid md:grid-cols-2 mt-3">
+              <div class="space-y-2 md:col-span-2">
                 <label for="id_u_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-                <select id="id_u_per" name="u_per" onchange="this.form.submit()" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+                <select id="id_u_per" name="u_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
                   <option value="25"  {% if u_per == 25  %}selected{% endif %}>25</option>
                   <option value="50"  {% if u_per == 50  %}selected{% endif %}>50</option>
                   <option value="100" {% if u_per == 100 %}selected{% endif %}>100</option>
@@ -123,18 +152,48 @@
               </div>
             </div>
             <div class="filter-panel__actions">
-              {% if u_q or u_per != 25 or u_sort != 'number' %}
+              {% if units_has_active_filters %}
                 <a class="btn btn-secondary" href="{{ tab_urls.units }}">{% trans "Reset" %}</a>
               {% endif %}
-              <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
+              <button class="btn" type="submit">{% trans "Apply filters" %}</button>
             </div>
           </form>
+          {% if units_active_filter_chips %}
+            <section class="rounded-2xl bg-white p-4 shadow-card dark:bg-slate-900">
+              <div class="flex flex-wrap gap-2">
+                {% for chip in units_active_filter_chips %}
+                  <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+                    {{ chip.label }}
+                    <a href="{{ chip.remove_url }}" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-800/60" aria-label="{% trans 'Remove filter' %}">×</a>
+                  </span>
+                {% endfor %}
+              </div>
+            </section>
+          {% endif %}
+          {% if units_page and units_page.paginator.num_pages > 1 %}
+            <div class="space-y-3">
+              {% include "core/includes/pagination.html" with page_obj=units_page paginator=units_page.paginator query_string=units_pagination_query page_param="u_page" %}
+              {% if units_page.paginator.num_pages > 10 %}
+                <form method="get" class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <input type="hidden" name="tab" value="units"/>
+                  {% for key, value in request.GET.items %}
+                    {% if key != "u_page" and key != "tab" %}
+                      <input type="hidden" name="{{ key }}" value="{{ value }}" />
+                    {% endif %}
+                  {% endfor %}
+                  <label for="id_units_page_jump_top" class="font-medium">{% trans "Jump to page" %}</label>
+                  <input id="id_units_page_jump_top" type="number" name="u_page" min="1" max="{{ units_page.paginator.num_pages }}" value="{{ units_page.number }}" class="input w-24 rounded-xl border border-slate-300 px-2 py-1 dark:border-slate-600" />
+                  <button type="submit" class="btn btn-secondary btn-sm">{% trans "Go" %}</button>
+                </form>
+              {% endif %}
+            </div>
+          {% endif %}
           {% if building.is_system_default and awaiting_queue_badges %}
             <div class="flex flex-wrap gap-3 rounded-2xl border border-dashed border-emerald-200/70 bg-emerald-50/60 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/5">
               {% for badge in awaiting_queue_badges %}
                 <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700 shadow-sm dark:border-emerald-400/40 dark:bg-slate-900 dark:text-emerald-200">
                   <span>
-                    {% blocktrans with origin=badge.origin %}Очаква одобрение от бекофиса · {{ origin }}{% endblocktrans %}
+                    {% blocktrans with origin=badge.origin %}Awaiting backoffice approval · {{ origin }}{% endblocktrans %}
                   </span>
                   <span class="inline-flex min-w-[1.75rem] items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white dark:bg-emerald-400 dark:text-emerald-950">
                     {{ badge.count }}
@@ -144,6 +203,12 @@
             </div>
           {% endif %}
 
+          <div class="flex flex-wrap items-center justify-end gap-3">
+            {% if can_manage_units %}
+              <a class="btn" href="{% url 'core:unit_create' building_pk=building.id %}">{% trans "Add unit" %}</a>
+            {% endif %}
+          </div>
+
           <div class="grid gap-4 md:hidden">
             {% for u in units_page %}
               <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
@@ -151,19 +216,19 @@
                   <div class="space-y-1">
                     <div class="flex flex-wrap items-center gap-2">
                       <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">{{ u.number }}</h3>
-                      {% include "components/lawyer_orders_indicator.html" with count=u.lawyer_orders_count %}
                     </div>
                     {% with floor_val=u.floor|default:"—" %}
                       <p class="text-sm text-slate-500 dark:text-slate-400">{% blocktrans with value=floor_val %}Floor {{ value }}{% endblocktrans %}</p>
                     {% endwith %}
                   </div>
                   <div class="flex gap-2">
+                    <a class="btn btn-secondary btn-sm" href="{% url 'core:unit_update' building_pk=building.id unit_pk=u.id %}">{% trans "Edit" %}</a>
                     <a class="btn btn-danger btn-sm" href="{% url 'core:unit_delete' building_pk=building.id unit_pk=u.id %}">{% trans "Delete" %}</a>
                   </div>
                 </div>
                 <dl class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
                   <div>
-                    <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Отговорник" %}</dt>
+                    <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
                     <dd>{{ u.owner_name|default:"—" }}</dd>
                   </div>
                   <div>
@@ -173,7 +238,14 @@
                 </dl>
               </article>
             {% empty %}
-              <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">{% trans "No units." %}</p>
+              <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                {% if units_has_active_filters %}
+                  <p>{% trans "No units match your filters." %}</p>
+                  <a class="btn btn-secondary btn-sm mt-3" href="{{ tab_urls.units }}">{% trans "Reset filters" %}</a>
+                {% else %}
+                  <p>{% trans "No units yet." %}</p>
+                {% endif %}
+              </div>
             {% endfor %}
           </div>
 
@@ -183,38 +255,44 @@
               <thead class="bg-slate-50 dark:bg-slate-800">
                 <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
                   {% sortable_heading 'Number' 'number' current_sort=u_sort param='u_sort' page_param='u_page' as unit_number_sort %}
-                  <th class="px-4 py-3" {% if unit_number_sort.aria_sort %}aria-sort="{{ unit_number_sort.aria_sort }}"{% endif %}>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800" {% if unit_number_sort.aria_sort %}aria-sort="{{ unit_number_sort.aria_sort }}"{% endif %}>
                     {{ unit_number_sort.html }}
                   </th>
                   {% sortable_heading 'Floor' 'floor' current_sort=u_sort param='u_sort' page_param='u_page' as unit_floor_sort %}
-                  <th class="px-4 py-3" {% if unit_floor_sort.aria_sort %}aria-sort="{{ unit_floor_sort.aria_sort }}"{% endif %}>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800" {% if unit_floor_sort.aria_sort %}aria-sort="{{ unit_floor_sort.aria_sort }}"{% endif %}>
                     {{ unit_floor_sort.html }}
                   </th>
-                  <th class="px-4 py-3">{% trans "Apartment owner" %}</th>
-                  <th class="px-4 py-3">{% trans "Contact" %}</th>
-                  <th class="px-4 py-3 text-right">{% trans "Actions" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Apartment owner" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Contact" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800">{% trans "Lawyer orders" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800">{% trans "Actions" %}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                 {% for u in units_page %}
-                  <tr class="text-sm text-slate-700 dark:text-slate-200">
+                  <tr class="text-sm text-slate-700 hover:bg-slate-50/80 dark:text-slate-200 dark:hover:bg-slate-800/70">
                     <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
                       <div class="flex flex-wrap items-center gap-2">
                         <a class="break-words hyphens-auto" href="{% url 'core:unit_update' building_pk=building.id unit_pk=u.id %}">{{ u.number }}</a>
-                        {% include "components/lawyer_orders_indicator.html" with count=u.lawyer_orders_count %}
                       </div>
                     </td>
                     <td class="px-4 py-3">{{ u.floor }}</td>
                     <td class="px-4 py-3">{{ u.owner_name|default:"—" }}</td>
                     <td class="px-4 py-3">{{ u.contact_phone|default:"—" }}</td>
+                    <td class="px-4 py-3 text-right num-tabular">{{ u.lawyer_orders_count|default:0 }}</td>
                     <td class="px-4 py-3 text-right">
+                      <a class="btn btn-secondary btn-sm" href="{% url 'core:unit_update' building_pk=building.id unit_pk=u.id %}">{% trans "Edit" %}</a>
                       <a class="btn btn-danger btn-sm" href="{% url 'core:unit_delete' building_pk=building.id unit_pk=u.id %}">{% trans "Delete" %}</a>
                     </td>
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
-                      {% trans "No units." %}
+                    <td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                      {% if units_has_active_filters %}
+                        {% trans "No units match your filters." %}
+                      {% else %}
+                        {% trans "No units yet." %}
+                      {% endif %}
                     </td>
                   </tr>
                 {% endfor %}
@@ -224,27 +302,23 @@
           </div>
 
           {% if units_page %}
-            {% include "core/includes/pagination.html" with page_obj=units_page paginator=units_page.paginator query_string=units_pagination_query page_param="u_page" %}
+            <div class="space-y-3">
+              {% include "core/includes/pagination.html" with page_obj=units_page paginator=units_page.paginator query_string=units_pagination_query page_param="u_page" %}
+            </div>
           {% endif %}
         </section>
       {% elif active_tab == 'work_orders' %}
         <section class="space-y-5">
-          <div class="flex flex-wrap items-center justify-end gap-3">
-            {% if can_manage_work_orders %}
-              <a class="btn" href="{% url 'core:work_order_create' %}?building={{ building.id }}">{% trans "Add work order" %}</a>
-            {% endif %}
-          </div>
-
           <form method="get" class="filter-panel">
             <input type="hidden" name="tab" value="work_orders"/>
-            <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-3">
-              <div class="space-y-2 md:col-span-2 lg:col-span-3">
+            <div class="space-y-2">
                 <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search working orders" %}</label>
                 <input id="id_w_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
-              </div>
+            </div>
+            <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-3 mt-3">
               <div class="space-y-2">
                 <label for="id_w_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
-                <select id="id_w_status" name="w_status" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+                <select id="id_w_status" name="w_status" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
                   <option value="" {% if not w_status %}selected{% endif %}>{% trans "All" %}</option>
                   {% for value,label in w_status_choices %}
                     <option value="{{ value }}" {% if w_status == value %}selected{% endif %}>{{ label }}</option>
@@ -253,14 +327,14 @@
               </div>
               <div class="space-y-2">
                 <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
-                <select id="id_w_per" name="w_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" onchange="this.form.submit()">
+                <select id="id_w_per" name="w_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
                   <option value="25"  {% if w_per == 25  %}selected{% endif %}>25</option>
                   <option value="50"  {% if w_per == 50  %}selected{% endif %}>50</option>
                   <option value="100" {% if w_per == 100 %}selected{% endif %}>100</option>
                   <option value="200" {% if w_per == 200 %}selected{% endif %}>200</option>
                 </select>
               </div>
-                  <div class="space-y-2">
+                  <div class="space-y-2 md:col-span-2 lg:col-span-3">
                     <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search range" %}</span>
                     <div class="grid gap-3 md:grid-cols-2">
                       <input
@@ -281,12 +355,48 @@
                   </div>
                 </div>
                 <div class="filter-panel__actions">
-                  {% if w_q or w_status or w_per != 25 or w_deadline_from or w_deadline_to %}
+                  {% if workorders_has_active_filters %}
                     <a class="btn btn-secondary" href="{{ tab_urls.work_orders }}">{% trans "Reset" %}</a>
                   {% endif %}
-                  <button class="btn" type="submit">{% trans "Приложи филтрите" %}</button>
+                  <button class="btn" type="submit">{% trans "Apply filters" %}</button>
             </div>
           </form>
+          {% if workorders_active_filter_chips %}
+            <section class="rounded-2xl bg-white p-4 shadow-card dark:bg-slate-900">
+              <div class="flex flex-wrap gap-2">
+                {% for chip in workorders_active_filter_chips %}
+                  <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+                    {{ chip.label }}
+                    <a href="{{ chip.remove_url }}" class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-200 dark:hover:bg-emerald-800/60" aria-label="{% trans 'Remove filter' %}">×</a>
+                  </span>
+                {% endfor %}
+              </div>
+            </section>
+          {% endif %}
+          {% if workorders_page and workorders_page.paginator.num_pages > 1 %}
+            <div class="space-y-3">
+              {% include "core/includes/pagination.html" with page_obj=workorders_page paginator=workorders_page.paginator query_string=workorders_pagination_query page_param="w_page" %}
+              {% if workorders_page.paginator.num_pages > 10 %}
+                <form method="get" class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <input type="hidden" name="tab" value="work_orders"/>
+                  {% for key, value in request.GET.items %}
+                    {% if key != "w_page" and key != "tab" %}
+                      <input type="hidden" name="{{ key }}" value="{{ value }}" />
+                    {% endif %}
+                  {% endfor %}
+                  <label for="id_workorders_page_jump_top" class="font-medium">{% trans "Jump to page" %}</label>
+                  <input id="id_workorders_page_jump_top" type="number" name="w_page" min="1" max="{{ workorders_page.paginator.num_pages }}" value="{{ workorders_page.number }}" class="input w-24 rounded-xl border border-slate-300 px-2 py-1 dark:border-slate-600" />
+                  <button type="submit" class="btn btn-secondary btn-sm">{% trans "Go" %}</button>
+                </form>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if can_manage_work_orders %}
+            <div class="flex flex-wrap items-center justify-end gap-3">
+              <a class="btn" href="{% url 'core:work_order_create' %}?building={{ building.id }}">{% trans "Add work order" %}</a>
+            </div>
+          {% endif %}
 
           <div class="grid gap-4 md:hidden">
             {% if workorders_page and workorders_page.object_list %}
@@ -295,15 +405,14 @@
                 <div class="space-y-1">
                   <div class="flex flex-wrap items-center gap-2">
                     <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
-                      <a href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
+                      <a href="{% url 'core:work_order_update' w.id %}?next={% url 'core:building_detail' building.id %}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
                         {{ w.title }}
                       </a>
                     </h3>
-                    {% include "components/expense_amount_indicator.html" with amount=w.expense_total %}
                   </div>
                   {% if building.is_system_default and w.awaiting_queue_entry %}
                     <p class="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-200">
-                    {% blocktrans with origin=w.building.name %}Очаква одобрение от бекофиса · {{ origin }}{% endblocktrans %}
+                    {% blocktrans with origin=w.building.name %}Awaiting backoffice approval · {{ origin }}{% endblocktrans %}
                     </p>
                   {% elif building.is_system_default and w.forwarded_to_building %}
                     <p class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
@@ -316,7 +425,7 @@
                   {% elif w.forwarded_from_office %}
                     <p class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
                       <span>
-                      {% blocktrans with origin=w.building.name %}Произход · {{ origin }}{% endblocktrans %}
+                      {% blocktrans with origin=w.building.name %}Origin · {{ origin }}{% endblocktrans %}
                       </span>
                       <span>
                         {% if w.forwarded_to_building %}
@@ -339,7 +448,20 @@
                     </div>
                     <div>
                       <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Deadline" %}</dt>
-                      <dd>{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</dd>
+                      <dd class="{% if w.is_overdue %}text-rose-700 dark:text-rose-300 font-semibold{% endif %}">
+                        {% if w.deadline %}
+                          {{ w.deadline|date:"Y-m-d" }}
+                          {% if w.is_overdue %}
+                            <span class="block text-xs font-semibold">{% blocktrans with days=w.overdue_days %}{{ days }} days late{% endblocktrans %}</span>
+                          {% endif %}
+                        {% else %}
+                          —
+                        {% endif %}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Budget" %}</dt>
+                      <dd class="num-tabular">{{ w.expense_total|default_if_none:"0"|floatformat:2 }}</dd>
                     </div>
                     <div>
                       <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Created" %}</dt>
@@ -347,13 +469,14 @@
                     </div>
                   </dl>
                   <div class="flex gap-2">
+                    <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "View" %}</a>
                     {% if w.can_edit_in_building_list %}
                       <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_update' w.id %}?building={{ building.id }}">{% trans "Edit" %}</a>
                     {% endif %}
                     {% if w.status == 'DONE' and not w.archived_at %}
                       <form action="{% url 'core:work_order_archive' w.id %}?building={{ building.id }}" method="post" class="inline-flex">
                         {% csrf_token %}
-                        <button class="btn btn-archive btn-sm">{% trans "Archive" %}</button>
+                        <button class="btn btn-archive btn-sm" type="submit">{% trans "Archive" %}</button>
                       </form>
                     {% endif %}
                     {% if w.can_delete_in_building_list %}
@@ -363,7 +486,14 @@
                 </article>
               {% endfor %}
             {% else %}
-              <p class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">{% trans "No work orders for this building." %}</p>
+              <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                {% if workorders_has_active_filters %}
+                  <p>{% trans "No work orders match your filters." %}</p>
+                  <a class="btn btn-secondary btn-sm mt-3" href="{{ tab_urls.work_orders }}">{% trans "Reset filters" %}</a>
+                {% else %}
+                  <p>{% trans "No work orders for this building yet." %}</p>
+                {% endif %}
+              </div>
             {% endif %}
           </div>
 
@@ -372,30 +502,30 @@
             <table class="min-w-full divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
               <thead class="bg-slate-50 dark:bg-slate-800">
                 <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                  <th class="px-4 py-3">{% trans "Title" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Title" %}</th>
                   {% if building.is_system_default %}
-                    <th class="px-4 py-3">{% trans "Произход" %}</th>
+                    <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Origin" %}</th>
                   {% endif %}
-                  <th class="px-4 py-3">{% trans "Unit" %}</th>
-                  <th class="px-4 py-3">{% trans "Priority" %}</th>
-                  <th class="px-4 py-3">{% trans "Status" %}</th>
-                  <th class="px-4 py-3">{% trans "Deadline" %}</th>
-                  <th class="px-4 py-3">{% trans "Created" %}</th>
-                  <th class="px-4 py-3 text-right">{% trans "Actions" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Unit" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Priority" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Status" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800">{% trans "Budget" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Deadline" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Created" %}</th>
+                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 text-right dark:bg-slate-800">{% trans "Actions" %}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                 {% if workorders_page and workorders_page.object_list %}
                   {% for w in workorders_page.object_list %}
-                    <tr class="text-sm text-slate-700 dark:text-slate-200">
+                    <tr class="text-sm text-slate-700 hover:bg-slate-50/80 dark:text-slate-200 dark:hover:bg-slate-800/70">
                       <td class="px-4 py-3 font-medium text-sky-600 dark:text-sky-300">
                         <div class="flex flex-wrap items-center gap-2">
-                          <a class="break-words hyphens-auto" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{{ w.title }}</a>
-                          {% include "components/expense_amount_indicator.html" with amount=w.expense_total %}
+                          <a class="break-words hyphens-auto" href="{% url 'core:work_order_update' w.id %}?next={% url 'core:building_detail' building.id %}">{{ w.title }}</a>
                         </div>
                         {% if building.is_system_default and w.awaiting_queue_entry %}
                           <div class="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-200">
-                            {% blocktrans with origin=w.building.name %}Очаква одобрение от бекофиса · {{ origin }}{% endblocktrans %}
+                            {% blocktrans with origin=w.building.name %}Awaiting backoffice approval · {{ origin }}{% endblocktrans %}
                           </div>
                         {% elif building.is_system_default and w.forwarded_to_building %}
                           <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
@@ -408,7 +538,7 @@
                         {% elif w.forwarded_from_office %}
                           <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
                             <span>
-                              {% blocktrans with origin=w.building.name %}Произход · {{ origin }}{% endblocktrans %}
+                              {% blocktrans with origin=w.building.name %}Origin · {{ origin }}{% endblocktrans %}
                             </span>
                             <span>
                               {% if w.forwarded_to_building %}
@@ -436,16 +566,27 @@
                       <td class="px-4 py-3">
                         {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
                       </td>
-                      <td class="px-4 py-3">{% if w.deadline %}{{ w.deadline|date:"Y-m-d" }}{% else %}—{% endif %}</td>
-                      <td class="px-4 py-3">{{ w.created_at|date:"Y-m-d" }}</td>
+                      <td class="px-4 py-3 text-right num-tabular">{{ w.expense_total|default_if_none:"0"|floatformat:2 }}</td>
+                      <td class="px-4 py-3 {% if w.is_overdue %}text-rose-700 dark:text-rose-300 font-semibold{% endif %}">
+                        {% if w.deadline %}
+                          {{ w.deadline|date:"Y-m-d" }}
+                          {% if w.is_overdue %}
+                            <span class="block text-xs font-semibold">{% blocktrans with days=w.overdue_days %}{{ days }} days late{% endblocktrans %}</span>
+                          {% endif %}
+                        {% else %}
+                          —
+                        {% endif %}
+                      </td>
+                      <td class="px-4 py-3 num-tabular">{{ w.created_at|date:"Y-m-d" }}</td>
                       <td class="px-4 py-3 text-right space-x-2">
+                        <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "View" %}</a>
                         {% if w.can_edit_in_building_list %}
                           <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_update' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Edit" %}</a>
                         {% endif %}
                         {% if w.status == 'DONE' and not w.archived_at %}
                           <form action="{% url 'core:work_order_archive' w.id %}?building={{ building.id }}" method="post" class="inline-flex">
                             {% csrf_token %}
-                            <button class="btn btn-archive btn-sm">{% trans "Archive" %}</button>
+                            <button class="btn btn-archive btn-sm" type="submit">{% trans "Archive" %}</button>
                           </form>
                         {% endif %}
                         {% if w.can_delete_in_building_list %}
@@ -456,7 +597,13 @@
                   {% endfor %}
                 {% else %}
                   <tr>
-                    <td colspan="7" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">{% trans "No work orders for this building." %}</td>
+                    <td colspan="{% if building.is_system_default %}9{% else %}8{% endif %}" class="px-4 py-6 text-center text-slate-500 dark:text-slate-300">
+                      {% if workorders_has_active_filters %}
+                        {% trans "No work orders match your filters." %}
+                      {% else %}
+                        {% trans "No work orders for this building yet." %}
+                      {% endif %}
+                    </td>
                   </tr>
                 {% endif %}
               </tbody>
@@ -465,7 +612,9 @@
           </div>
 
           {% if workorders_page %}
-            {% include "core/includes/pagination.html" with page_obj=workorders_page paginator=workorders_page.paginator query_string=workorders_pagination_query page_param="w_page" %}
+            <div class="space-y-3">
+              {% include "core/includes/pagination.html" with page_obj=workorders_page paginator=workorders_page.paginator query_string=workorders_pagination_query page_param="w_page" %}
+            </div>
           {% endif %}
         </section>
       {% endif %}

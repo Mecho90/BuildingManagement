@@ -20,7 +20,7 @@
     </h1>
   </header>
 
-  <form method="post" id="admin-user-form" class="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900" novalidate>
+  <form method="post" id="admin-user-form" class="space-y-6" novalidate>
     {% csrf_token %}
     {% if invalid_field_count or form.non_field_errors %}
       <section class="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900 dark:border-rose-500/70 dark:bg-rose-950/30 dark:text-rose-100" aria-live="assertive">

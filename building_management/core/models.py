@@ -502,7 +502,7 @@ class WorkOrder(TimeStampedModel):
     class Status(models.TextChoices):
         OPEN = "OPEN", _("Open")
         IN_PROGRESS = "IN_PROGRESS", _("In progress")
-        AWAITING_APPROVAL = "AWAITING_APPROVAL", _("Очаква одобрение от бекофиса")
+        AWAITING_APPROVAL = "AWAITING_APPROVAL", _("Awaiting backoffice approval")
         APPROVED = "APPROVED", _("Approved")
         REJECTED = "REJECTED", _("Rejected")
         DONE = "DONE", _("Done")

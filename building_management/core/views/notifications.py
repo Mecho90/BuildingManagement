@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import timedelta
-
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
@@ -12,7 +10,7 @@ from django.utils.translation import gettext as _
 from django.views import View
 
 from ..models import Notification
-from ..services import NotificationService
+from ..services import NotificationPayload, NotificationService
 from .common import _safe_next_url
 
 __all__ = ["NotificationSnoozeView"]
@@ -29,6 +27,18 @@ class NotificationSnoozeView(LoginRequiredMixin, View):
             log_id = int(key.rsplit("-", 1)[-1])
         except (TypeError, ValueError):
             return JsonResponse({"error": "not_found"}, status=404)
+        NotificationService(request.user).upsert(
+            NotificationPayload(
+                key=key,
+                category="activity",
+                title=_("Activity notification"),
+                body="",
+            )
+        )
+        Notification.objects.filter(user=request.user, key=key).update(
+            acknowledged_at=timezone.now(),
+            updated_at=timezone.now(),
+        )
         dismissed = request.session.get("dismissed_activity_logs", [])
         if log_id not in dismissed:
             dismissed.append(log_id)
@@ -56,17 +66,7 @@ class NotificationSnoozeView(LoginRequiredMixin, View):
         is_hx = bool(request.headers.get("Hx-Request"))
         next_url = _safe_next_url(request) or request.META.get("HTTP_REFERER") or reverse("core:buildings_list")
 
-        if note.category == "mass_assign":
-            note.acknowledge()
-            self._invalidate_dashboard_cache(request.user)
-            if is_hx:
-                response = HttpResponse(status=204)
-                response["HX-Trigger"] = "notifications:updated"
-                return response
-            messages.info(request, _("Notification dismissed."))
-            return HttpResponseRedirect(next_url)
-
-        note = service.snooze_until(key, target_date=timezone.localdate() + timedelta(days=1))
+        note.acknowledge()
         self._invalidate_dashboard_cache(request.user)
 
         if is_hx:
@@ -74,8 +74,5 @@ class NotificationSnoozeView(LoginRequiredMixin, View):
             response["HX-Trigger"] = "notifications:updated"
             return response
 
-        messages.info(
-            request,
-            _("Notification dismissed until %(date)s.") % {"date": note.snoozed_until.strftime("%Y-%m-%d")},
-        )
+        messages.info(request, _("Notification dismissed."))
         return HttpResponseRedirect(next_url)

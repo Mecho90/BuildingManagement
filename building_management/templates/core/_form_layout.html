@@ -42,8 +42,13 @@
 
     {% with submit_text=submit_label|default:_("Save") cancel_text=cancel_label|default:_("Cancel") %}
       <div class="form-actions">
-        <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{{ cancel_text }}</a>
-        <button class="btn" type="submit">{{ submit_text }}</button>
+        {% if submit_first %}
+          <button class="btn" type="submit">{{ submit_text }}</button>
+          <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{{ cancel_text }}</a>
+        {% else %}
+          <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{{ cancel_text }}</a>
+          <button class="btn" type="submit">{{ submit_text }}</button>
+        {% endif %}
       </div>
     {% endwith %}
   </form>

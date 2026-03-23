@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -96,11 +97,6 @@ class BuildingListView(LoginRequiredMixin, ListView):
                     "work_orders",
                     filter=Q(
                         work_orders__archived_at__isnull=True,
-                        work_orders__status__in=[
-                            WorkOrder.Status.OPEN,
-                            WorkOrder.Status.IN_PROGRESS,
-                            WorkOrder.Status.AWAITING_APPROVAL,
-                        ],
                         work_orders__deadline__lt=today,
                     ),
                     distinct=True,
@@ -343,6 +339,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         ctx = super().get_context_data(**kwargs)
         bld = self.object
         request = self.request
+        today = timezone.localdate()
         building_with_expenses = attach_expense_totals_by_metadata(
             [bld],
             metadata_key="building_id",
@@ -353,6 +350,86 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         )
         if building_with_expenses:
             ctx["building"] = building_with_expenses[0]
+            bld = ctx["building"]
+        total_expense_amount = getattr(bld, "expense_total", Decimal("0.00")) or Decimal("0.00")
+        lawyer_orders_count = int(getattr(bld, "lawyer_orders_count", 0) or 0)
+        lawyer_orders = attach_expense_totals_by_metadata(
+            WorkOrder.objects.visible_to(request.user).filter(
+                building=bld,
+                archived_at__isnull=True,
+                lawyer_only=True,
+            ),
+            metadata_key="work_order_id",
+            metadata_keys=("work_order_id", "work_order"),
+            include_work_order_text_fallback=True,
+            target_attr="expense_total",
+        )
+        lawyer_orders_total_expense = sum(
+            (
+                getattr(work_order, "expense_total", Decimal("0.00")) or Decimal("0.00")
+                for work_order in lawyer_orders
+            ),
+            Decimal("0.00"),
+        )
+        owner = getattr(bld, "owner", None)
+        owner_display = "—"
+        if owner:
+            owner_display = owner.get_full_name().strip() or owner.username
+
+        total_units = Unit.objects.filter(building=bld).count()
+        occupied_units = Unit.objects.filter(building=bld, is_occupied=True).count()
+        open_work_orders = WorkOrder.objects.visible_to(request.user).filter(
+            building=bld,
+            archived_at__isnull=True,
+            status__in=[
+                WorkOrder.Status.OPEN,
+                WorkOrder.Status.IN_PROGRESS,
+                WorkOrder.Status.AWAITING_APPROVAL,
+            ],
+        ).count()
+        overdue_work_orders = WorkOrder.objects.visible_to(request.user).filter(
+            building=bld,
+            archived_at__isnull=True,
+            deadline__lt=today,
+            status__in=[
+                WorkOrder.Status.OPEN,
+                WorkOrder.Status.IN_PROGRESS,
+                WorkOrder.Status.AWAITING_APPROVAL,
+            ],
+        ).count()
+        if total_units == 0:
+            building_status = _("No units")
+            building_status_tone = "info"
+        elif occupied_units == total_units:
+            building_status = _("Fully occupied")
+            building_status_tone = "success"
+        elif occupied_units > 0:
+            building_status = _("Partially occupied")
+            building_status_tone = "warning"
+        else:
+            building_status = _("Vacant")
+            building_status_tone = "danger"
+        ctx.update(
+            {
+                "summary_total_units": total_units,
+                "summary_occupied_units": occupied_units,
+                "summary_open_work_orders": open_work_orders,
+                "summary_overdue_work_orders": overdue_work_orders,
+                "building_status_label": building_status,
+                "building_status_tone": building_status_tone,
+                "building_display_name": _("Office") if bld.is_system_default else bld.name,
+                "owner_display_name": owner_display,
+                "owner_role_label": bld.get_role_display(),
+                "total_expense_amount": total_expense_amount,
+                "has_total_expense_amount": bool(total_expense_amount and total_expense_amount > 0),
+                "lawyer_orders_count": lawyer_orders_count,
+                "has_lawyer_orders": lawyer_orders_count > 0,
+                "lawyer_orders_total_expense": lawyer_orders_total_expense,
+                "has_lawyer_orders_total_expense": bool(
+                    lawyer_orders_total_expense and lawyer_orders_total_expense > 0
+                ),
+            }
+        )
 
         show_units_tab = not bld.is_system_default
         ctx["show_units_tab"] = show_units_tab
@@ -374,6 +451,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 role=MembershipRole.ADMINISTRATOR,
             ).filter(Q(building__isnull=True) | Q(building=bld))
             is_admin_for_building = admin_memberships.exists()
+        ctx["can_delete_building"] = is_admin_for_building or getattr(request.user, "is_superuser", False)
         ctx["show_manage_team_button"] = can_manage_members and is_admin_for_building
         ctx["is_technician_user"] = is_technician_user
         if can_manage_members:
@@ -431,6 +509,18 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             tab_urls["units"] = _tab_url("units")
         ctx["tab_urls"] = tab_urls
 
+        def _remove_filter_url(target_tab: str, *keys: str) -> str:
+            params = request.GET.copy()
+            params["tab"] = target_tab
+            for key in keys:
+                params.pop(key, None)
+            if target_tab == "units":
+                params.pop("u_page", None)
+            if target_tab == "work_orders":
+                params.pop("w_page", None)
+            encoded = params.urlencode()
+            return f"{request.path}?{encoded}" if encoded else request.path
+
         # ========================= Units =========================
         if show_units_tab:
             u_q = (self.request.GET.get("u_q") or "").strip()
@@ -459,6 +549,22 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
 
             units_qs = units_qs.order_by(u_sort, "id")
             units_page = Paginator(units_qs, u_per).get_page(self.request.GET.get("u_page"))
+            units_total = units_page.paginator.count if units_page and units_page.paginator else 0
+            units_result_start = units_page.start_index() if units_total else 0
+            units_result_end = units_page.end_index() if units_total else 0
+            units_active_filter_chips: list[dict[str, str]] = []
+            if u_q:
+                units_active_filter_chips.append(
+                    {"label": _("Search: %(value)s") % {"value": u_q}, "remove_url": _remove_filter_url("units", "u_q")}
+                )
+            if u_sort != "number":
+                units_active_filter_chips.append(
+                    {"label": _("Sort changed"), "remove_url": _remove_filter_url("units", "u_sort")}
+                )
+            if u_per != 25:
+                units_active_filter_chips.append(
+                    {"label": _("Page size: %(value)s") % {"value": u_per}, "remove_url": _remove_filter_url("units", "u_per")}
+                )
 
             ctx.update(
                 {
@@ -467,6 +573,11 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                     "u_per": u_per,
                     "u_sort": u_sort,
                     "u_active": active_tab == "units",
+                    "units_total": units_total,
+                    "units_result_start": units_result_start,
+                    "units_result_end": units_result_end,
+                    "units_active_filter_chips": units_active_filter_chips,
+                    "units_has_active_filters": bool(units_active_filter_chips),
                 }
             )
             ctx["units_pagination_query"] = _querystring_without(self.request, "u_page")
@@ -581,6 +692,9 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
 
             wo_qs = wo_qs.order_by("priority_order", "deadline", "-id")
             workorders_page = Paginator(wo_qs, w_per).get_page(self.request.GET.get("w_page"))
+            workorders_total = workorders_page.paginator.count if workorders_page and workorders_page.paginator else 0
+            workorders_result_start = workorders_page.start_index() if workorders_total else 0
+            workorders_result_end = workorders_page.end_index() if workorders_total else 0
             workorders_page.object_list = attach_expense_totals_by_metadata(
                 workorders_page.object_list,
                 metadata_key="work_order_id",
@@ -589,6 +703,8 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 target_attr="expense_total",
             )
             for work_order in workorders_page.object_list:
+                work_order.is_overdue = bool(work_order.deadline and work_order.deadline < today)
+                work_order.overdue_days = (today - work_order.deadline).days if work_order.is_overdue else 0
                 technician_readonly_forwarded_order = bool(
                     is_technician_user
                     and getattr(work_order, "forwarded_to_building_id", None)
@@ -620,6 +736,31 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                         Capability.MANAGE_BUILDINGS,
                     )
                 )
+            workorders_active_filter_chips: list[dict[str, str]] = []
+            if w_q:
+                workorders_active_filter_chips.append(
+                    {"label": _("Search: %(value)s") % {"value": w_q}, "remove_url": _remove_filter_url("work_orders", "w_q")}
+                )
+            if w_status:
+                status_map = dict(WorkOrder.Status.choices)
+                workorders_active_filter_chips.append(
+                    {
+                        "label": _("Status: %(value)s") % {"value": status_map.get(w_status, w_status)},
+                        "remove_url": _remove_filter_url("work_orders", "w_status"),
+                    }
+                )
+            if w_deadline_from:
+                workorders_active_filter_chips.append(
+                    {"label": _("From: %(value)s") % {"value": w_deadline_from_raw}, "remove_url": _remove_filter_url("work_orders", "w_deadline_from")}
+                )
+            if w_deadline_to:
+                workorders_active_filter_chips.append(
+                    {"label": _("To: %(value)s") % {"value": w_deadline_to_raw}, "remove_url": _remove_filter_url("work_orders", "w_deadline_to")}
+                )
+            if w_per != 25:
+                workorders_active_filter_chips.append(
+                    {"label": _("Page size: %(value)s") % {"value": w_per}, "remove_url": _remove_filter_url("work_orders", "w_per")}
+                )
             ctx.update(
                 {
                     "workorders_page": workorders_page,
@@ -632,6 +773,11 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                     "w_deadline_to": w_deadline_to_raw,
                     "w_active": active_tab == "work_orders",
                     "awaiting_queue_badges": awaiting_queue_badges,
+                    "workorders_total": workorders_total,
+                    "workorders_result_start": workorders_result_start,
+                    "workorders_result_end": workorders_result_end,
+                    "workorders_active_filter_chips": workorders_active_filter_chips,
+                    "workorders_has_active_filters": bool(workorders_active_filter_chips),
                 }
             )
             ctx["workorders_pagination_query"] = _querystring_without(self.request, "w_page")
@@ -696,7 +842,7 @@ class BuildingDeleteView(CapabilityRequiredMixin, LoginRequiredMixin, CachedObje
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
         if not self._user_can_delete(obj):
-            raise PermissionDenied(_("Only backoffice employees or administrators can delete buildings."))
+            raise PermissionDenied(_("Only administrators can delete buildings."))
         return obj
 
     def _user_can_delete(self, building):
@@ -705,7 +851,7 @@ class BuildingDeleteView(CapabilityRequiredMixin, LoginRequiredMixin, CachedObje
             return False
         if user.is_superuser:
             return True
-        allowed_roles = (MembershipRole.BACKOFFICE, MembershipRole.ADMINISTRATOR)
+        allowed_roles = (MembershipRole.ADMINISTRATOR,)
         return BuildingMembership.objects.filter(
             user=user,
             role__in=allowed_roles,

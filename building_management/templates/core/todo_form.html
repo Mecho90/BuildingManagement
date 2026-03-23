@@ -4,7 +4,11 @@
 {% block title %}{{ form_title|default:_("New Task") }} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
-  {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url %}
+  {% if form.instance.pk %}
+    {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url %}
+  {% else %}
+    {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url submit_first=True %}
+  {% endif %}
 {% endblock %}
 
 {% block extra_js %}

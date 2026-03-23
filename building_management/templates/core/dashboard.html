@@ -5,13 +5,13 @@
 
 {% block content %}
 <section class="space-y-8">
-  <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+  <div class="dashboard-header-shell rounded-2xl bg-white p-6 shadow-card dark:bg-slate-900 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
       <h1 class="page-heading text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Dashboard" %}</h1>
     </div>
   </div>
 
-  {% with card_base="ui-card dashboard-card h-full" section_shell="rounded-2xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900 space-y-4" %}
+  {% with card_base="ui-card dashboard-card h-full" section_shell="dashboard-section-shell space-y-4" %}
     <section class="space-y-4">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-xl font-semibold text-brand-foreground dark:text-white">{% trans "Deadline alerts" %}</h2>
@@ -49,20 +49,15 @@
                   </span>
                 </div>
                 <div class="dashboard-card__actions">
-                  <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' alert.id %}" aria-label="{% blocktrans with title=alert.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
-                  <details class="relative">
-                    <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
-                    <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-card dark:border-slate-700 dark:bg-slate-900">
-                      <a class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="{% url 'core:work_order_update' alert.id %}" aria-label="{% blocktrans with title=alert.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
-                    </div>
-                  </details>
+                  <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' alert.id %}?next={{ request.get_full_path|urlencode }}" aria-label="{% blocktrans with title=alert.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
+                  <a class="btn btn-secondary btn-xs w-full sm:w-auto" href="{% url 'core:work_order_update' alert.id %}?next={{ request.get_full_path|urlencode }}" aria-label="{% blocktrans with title=alert.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
                 </div>
               </article>
             {% endfor %}
           </div>
           {% if deadline_alert_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=deadline_alert_page paginator=deadline_alert_page.paginator query_string=deadline_page_query page_param="deadline_page" show_single_page=True %}
+              {% include "core/includes/pagination.html" with page_obj=deadline_alert_page paginator=deadline_alert_page.paginator query_string=deadline_page_query page_param="deadline_page" show_single_page=True min_total_for_controls=4 %}
             </div>
           {% endif %}
         {% else %}
@@ -106,14 +101,9 @@
                     </span>
                   </div>
                   <div class="dashboard-card__actions">
-                    <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' job.id %}" aria-label="{% blocktrans with title=job.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
+                    <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' job.id %}?next={{ request.get_full_path|urlencode }}" aria-label="{% blocktrans with title=job.title %}View work order {{ title }}{% endblocktrans %}">{% trans "View" %}</a>
                     {% if job.can_update %}
-                      <details class="relative">
-                        <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
-                        <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-card dark:border-slate-700 dark:bg-slate-900">
-                          <a class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="{% url 'core:work_order_update' job.id %}" aria-label="{% blocktrans with title=job.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
-                        </div>
-                      </details>
+                      <a class="btn btn-secondary btn-xs w-full sm:w-auto" href="{% url 'core:work_order_update' job.id %}?next={{ request.get_full_path|urlencode }}" aria-label="{% blocktrans with title=job.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
                     {% endif %}
                   </div>
                 </article>
@@ -124,7 +114,7 @@
           {% endif %}
           {% if technician_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=technician_cards_page paginator=technician_cards_page.paginator query_string=technician_page_query page_param="jobs_page" show_single_page=True %}
+              {% include "core/includes/pagination.html" with page_obj=technician_cards_page paginator=technician_cards_page.paginator query_string=technician_page_query page_param="jobs_page" show_single_page=True min_total_for_controls=4 %}
             </div>
           {% endif %}
         </div>
@@ -172,13 +162,8 @@
                     {% endif %}
                   </div>
                   <div class="dashboard-card__actions">
-                    <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' card.id %}" aria-label="{% blocktrans with title=card.title %}Review work order {{ title }}{% endblocktrans %}">{% trans "Review" %}</a>
-                    <details class="relative">
-                      <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
-                      <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-card dark:border-slate-700 dark:bg-slate-900">
-                        <a class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="{% url 'core:work_order_update' card.id %}" aria-label="{% blocktrans with title=card.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
-                      </div>
-                    </details>
+                    <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:work_order_detail' card.id %}?next={{ request.get_full_path|urlencode }}" aria-label="{% blocktrans with title=card.title %}Review work order {{ title }}{% endblocktrans %}">{% trans "Review" %}</a>
+                    <a class="btn btn-secondary btn-xs w-full sm:w-auto" href="{% url 'core:work_order_update' card.id %}?next={{ request.get_full_path|urlencode }}" aria-label="{% blocktrans with title=card.title %}Update work order {{ title }}{% endblocktrans %}">{% trans "Update" %}</a>
                   </div>
                 </article>
               {% endfor %}
@@ -188,7 +173,7 @@
           {% endif %}
           {% if backoffice_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=backoffice_cards_page paginator=backoffice_cards_page.paginator query_string=backoffice_page_query page_param="backoffice_page" show_single_page=True %}
+              {% include "core/includes/pagination.html" with page_obj=backoffice_cards_page paginator=backoffice_cards_page.paginator query_string=backoffice_page_query page_param="backoffice_page" show_single_page=True min_total_for_controls=4 %}
             </div>
           {% endif %}
         </div>
@@ -220,20 +205,15 @@
                   </div>
                 </header>
                 <div class="dashboard-card__actions">
-                  <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:budget_review_decision' budget.id %}">{% trans "Review" %}</a>
-                  <details class="relative">
-                    <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
-                    <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 shadow-card dark:border-slate-700 dark:bg-slate-900">
-                      <a class="block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="{% url 'core:budget_detail' budget.id %}">{% trans "Open budget" %}</a>
-                    </div>
-                  </details>
+                  <a class="btn btn-xs w-full sm:w-auto" href="{% url 'core:budget_review_decision' budget.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Review" %}</a>
+                  <a class="btn btn-secondary btn-xs w-full sm:w-auto" href="{% url 'core:budget_detail' budget.id %}?next={{ request.get_full_path|urlencode }}">{% trans "Open budget" %}</a>
                 </div>
               </article>
             {% endfor %}
           </div>
           {% if pending_budget_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=pending_budget_cards_page paginator=pending_budget_cards_page.paginator query_string=pending_budget_page_query page_param="budget_page" show_single_page=True %}
+              {% include "core/includes/pagination.html" with page_obj=pending_budget_cards_page paginator=pending_budget_cards_page.paginator query_string=pending_budget_page_query page_param="budget_page" show_single_page=True min_total_for_controls=4 %}
             </div>
           {% endif %}
         </div>
@@ -269,19 +249,14 @@
                 </header>
                 <div class="dashboard-card__actions">
                   <a class="btn btn-xs w-full sm:w-auto" href="{{ task.url }}" aria-label="{% blocktrans with title=task.title %}Edit task {{ title }}{% endblocktrans %}">{% trans "Edit" %}</a>
-                  <details class="relative">
-                    <summary class="btn btn-secondary btn-xs w-full list-none cursor-pointer sm:w-auto">{% trans "More" %}</summary>
-                    <div class="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-rose-200 bg-white p-2 shadow-card dark:border-rose-800 dark:bg-slate-900">
-                      <a class="block rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-900/40 dark:text-rose-200 dark:hover:bg-rose-900/60" href="{{ task.delete_url }}" aria-label="{% blocktrans with title=task.title %}Delete task {{ title }}{% endblocktrans %}">{% trans "Delete" %}</a>
-                    </div>
-                  </details>
+                  <a class="btn btn-danger btn-xs w-full sm:w-auto" href="{{ task.delete_url }}" aria-label="{% blocktrans with title=task.title %}Delete task {{ title }}{% endblocktrans %}">{% trans "Delete" %}</a>
                 </div>
               </article>
             {% endfor %}
           </div>
           {% if todo_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=todo_cards_page paginator=todo_cards_page.paginator query_string=todo_page_query page_param="todo_page" show_single_page=True %}
+              {% include "core/includes/pagination.html" with page_obj=todo_cards_page paginator=todo_cards_page.paginator query_string=todo_page_query page_param="todo_page" show_single_page=True min_total_for_controls=4 %}
             </div>
           {% endif %}
         </div>
@@ -334,7 +309,7 @@
           </ul>
           {% if notifications_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=notifications_page paginator=notifications_page.paginator query_string=note_page_query page_param="note_page" show_single_page=True %}
+              {% include "core/includes/pagination.html" with page_obj=notifications_page paginator=notifications_page.paginator query_string=note_page_query page_param="note_page" show_single_page=True min_total_for_controls=4 %}
             </div>
           {% endif %}
         {% else %}
@@ -353,12 +328,26 @@
     (function () {
       const trigger = document.getElementById("mark-all-notes-page");
       if (!trigger) return;
-      const forms = Array.from(document.querySelectorAll(".note-read-form"));
-      trigger.addEventListener("click", function () {
-        forms.forEach((form) => {
-          const button = form.querySelector("button[type='submit']");
-          if (button) button.click();
-        });
+      trigger.addEventListener("click", async function () {
+        const forms = Array.from(document.querySelectorAll(".note-read-form"));
+        if (!forms.length) return;
+        trigger.disabled = true;
+        try {
+          for (const form of forms) {
+            const csrf = form.querySelector("input[name='csrfmiddlewaretoken']");
+            const payload = new URLSearchParams();
+            if (csrf && csrf.value) payload.set("csrfmiddlewaretoken", csrf.value);
+            await fetch(form.action, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Hx-Request": "true" },
+              body: payload,
+            });
+          }
+          window.location.reload();
+        } finally {
+          trigger.disabled = false;
+        }
       });
     })();
   </script>

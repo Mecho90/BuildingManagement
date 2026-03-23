@@ -66,7 +66,7 @@
                 {% trans "All tasks" %}
               </button>
               <button type="button" class="todo-tab nav-link nav-link--active" data-tab="this-week">
-                {% trans "Pending" %}
+                {% trans "Today's tasks" %}
               </button>
               <button type="button" class="todo-tab nav-link" data-tab="upcoming">
                 {% trans "Upcoming" %}
@@ -120,7 +120,7 @@
 
           <div id="todo-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
-          <div id="todo-bulk-bar" class="hidden sticky top-2 z-20 rounded-xl border border-orange-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur dark:border-orange-500/40 dark:bg-slate-900/95">
+          <div id="todo-bulk-bar" class="hidden sticky top-2 z-20">
             <div class="flex flex-wrap items-center gap-2">
               <span id="todo-bulk-count" class="text-sm font-semibold text-slate-700 dark:text-slate-100">0 {% trans "tasks selected" %}</span>
               <button type="button" class="btn btn-sm" id="todo-bulk-mark-done">{% trans "Mark done" %}</button>
@@ -164,6 +164,22 @@
     </div>
   </section>
 </section>
+
+<div id="todo-confirm-modal" class="hidden fixed inset-0 z-50 bg-slate-900/55 p-4">
+  <section class="confirm-shell min-h-full">
+    <div class="confirm-panel" role="dialog" aria-modal="true" aria-labelledby="todo-confirm-title" aria-describedby="todo-confirm-message">
+      <span class="confirm-panel__icon" aria-hidden="true">
+        {% include "components/icons/warning.svg" %}
+      </span>
+      <h2 id="todo-confirm-title" class="confirm-panel__title">{% trans "Delete task" %}</h2>
+      <p id="todo-confirm-message" class="confirm-panel__message">{% trans "This cannot be undone." %}</p>
+      <div class="confirm-panel__actions">
+        <button type="button" id="todo-confirm-cancel" class="btn btn-secondary">{% trans "Cancel" %}</button>
+        <button type="button" id="todo-confirm-accept" class="btn btn-danger">{% trans "Yes, delete" %}</button>
+      </div>
+    </div>
+  </section>
+</div>
 
 {{ todo_config|json_script:"todo-config" }}
 {% endblock %}
@@ -393,5 +409,5 @@
 {% endblock %}
 
 {% block extra_js %}
-  <script src="{% static 'js/todos.js' %}?v=20260321-1" defer></script>
+  <script src="{% static 'js/todos.js' %}?v=20260322-4" defer></script>
 {% endblock %}
