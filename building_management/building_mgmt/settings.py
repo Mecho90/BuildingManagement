@@ -215,16 +215,29 @@ USE_TZ = True
 
 # --- Static files (CSS/JS/images) ---
 # why: served by staticfiles in dev; collected to STATIC_ROOT for prod
-STATIC_URL = "static/"
+_static_url = os.environ.get("DJANGO_STATIC_URL", "/static/").strip() or "/static/"
+if not _static_url.startswith("/"):
+    _static_url = f"/{_static_url}"
+if not _static_url.endswith("/"):
+    _static_url = f"{_static_url}/"
+STATIC_URL = _static_url
 STATICFILES_DIRS = [BASE_DIR / "static"]  # expects static/css/app.css
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-WHITENOISE_MANIFEST_STRICT = False
+WHITENOISE_MANIFEST_STRICT = _env_bool(
+    "DJANGO_WHITENOISE_MANIFEST_STRICT",
+    default=not DEBUG,
+)
 
 # --- Media storage ---
 _media_root = os.environ.get("DJANGO_MEDIA_ROOT")
 MEDIA_ROOT = Path(_media_root).expanduser() if _media_root else BASE_DIR / "media"
-MEDIA_URL = os.environ.get("DJANGO_MEDIA_URL", "/media/")
+_media_url = os.environ.get("DJANGO_MEDIA_URL", "/media/").strip() or "/media/"
+if not _media_url.startswith("/"):
+    _media_url = f"/{_media_url}"
+if not _media_url.endswith("/"):
+    _media_url = f"{_media_url}/"
+MEDIA_URL = _media_url
 
 FILE_STORAGE_BACKEND = os.environ.get("DJANGO_FILE_STORAGE", "local").strip().lower()
 if FILE_STORAGE_BACKEND in {"", "local", "filesystem"}:

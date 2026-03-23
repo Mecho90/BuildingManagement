@@ -811,15 +811,16 @@ html.dark .confirm-panel .confirm-panel__message strong {
   line-height: 1.4;
 }
 
-/* Dashboard clean wrappers: remove outer frame borders */
+/* Dashboard wrapper framing */
 .dashboard-header-shell,
 .dashboard-section-shell {
-  border: 0 !important;
+  border: 2px solid var(--brand-yellow-strong) !important;
+  border-radius: 1.75rem !important;
 }
 
 .dark .dashboard-header-shell,
 .dark .dashboard-section-shell {
-  border: 0 !important;
+  border-color: var(--brand-yellow-strong) !important;
 }
 
 /* Badges */
@@ -2178,6 +2179,68 @@ html.dark .budget-by-requester .budget-requester-row__name {
 html.dark .budget-by-requester .budget-requester-row__amount {
   color: #ffffff !important;
   opacity: 1 !important;
+}
+
+/* Budgets list: keep borders, remove yellow glow/shadows on section wrappers */
+.budget-page .shadow-card,
+.budget-page .ui-panel,
+.budget-page .rounded-2xl.border,
+.budget-page .rounded-3xl.border,
+.budget-page .shadow-sm {
+  box-shadow: none !important;
+}
+
+.budget-page .budget-summary-shell {
+  border: 2px solid var(--brand-yellow-strong) !important;
+  border-radius: 1.5rem !important;
+  box-shadow: none !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+.budget-page .budget-summary-card {
+  border: 2px solid var(--brand-yellow-strong) !important;
+  border-radius: 1rem !important;
+  box-shadow: none !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+}
+
+html.dark .budget-page .budget-summary-card {
+  border: 2px solid var(--brand-yellow-strong) !important;
+  box-shadow: none !important;
+  background: rgba(15, 23, 42, 0.84) !important;
+}
+
+html.dark .budget-page .budget-summary-shell {
+  border: 2px solid var(--brand-yellow-strong) !important;
+  background: rgba(15, 23, 42, 0.72) !important;
+}
+
+/* Standard page title style: match Budgets page heading */
+.page-heading {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 1.5rem !important;
+  line-height: 2rem !important;
+  font-weight: 600 !important;
+  color: rgb(15 23 42) !important;
+}
+
+.dark .page-heading {
+  color: rgb(255 255 255) !important;
+}
+
+.dark .rounded-2xl.border .page-heading,
+.dark .rounded-3xl.border .page-heading,
+.dark .ui-card .page-heading,
+.dark .ui-panel .page-heading,
+.dark .shadow-card .page-heading,
+.dark .filter-panel .page-heading {
+  color: rgb(255 255 255) !important;
 }
 
 /* Shared markup only: responsive spacing + horizontal table scroll */

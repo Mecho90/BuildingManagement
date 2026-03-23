@@ -138,7 +138,7 @@
           <img src="{% static 'img/logo-Galus.png' %}" alt="{% trans 'Galus logo' %}" />
         </div>
         <div class="space-y-2">
-          <h1 class="text-2xl font-semibold text-brand-foreground dark:text-white">{% trans "Building Management" %}</h1>
+          <h1 class="page-heading">{% trans "Building Management" %}</h1>
         </div>
         <form action="{% url 'set_language' %}" method="post" class="mx-auto flex max-w-xs items-center gap-2 text-left" aria-label="{% trans 'Change language' %}">
           {% csrf_token %}
