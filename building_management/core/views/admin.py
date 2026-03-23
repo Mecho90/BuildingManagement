@@ -669,11 +669,16 @@ class AdminLawyerWorkOrderBulkDeleteView(BulkDeleteView):
     empty_text = _("There are no lawyer work orders available to delete.")
     submit_label = _("Delete lawyer work orders")
     success_url_name = "core:mass_delete_lawyer_work_orders"
+    left_actions_layout = True
 
     def get_queryset(self):
         return (
             WorkOrder.objects.visible_to(self.request.user)
-            .filter(lawyer_only=True)
+            .filter(
+                lawyer_only=True,
+                archived_at__isnull=True,
+                status__in=(WorkOrder.Status.OPEN, WorkOrder.Status.IN_PROGRESS),
+            )
             .select_related("building")
             .order_by("-created_at")
         )

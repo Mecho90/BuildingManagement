@@ -66,7 +66,7 @@ body {
   background-size: 100% 100%, 120% 120%, cover !important;
   background-repeat: no-repeat, no-repeat, no-repeat !important;
   background-position: center, center, center !important;
-  background-attachment: fixed, fixed, fixed !important;
+  background-attachment: scroll, scroll, scroll !important;
   background-color: #fffdf6;
 }
 
@@ -79,8 +79,21 @@ body {
   background-size: 100% 100%, 120% 120%, cover !important;
   background-repeat: no-repeat, no-repeat, no-repeat !important;
   background-position: center, center, center !important;
-  background-attachment: fixed, fixed, fixed !important;
+  background-attachment: scroll, scroll, scroll !important;
   background-color: #030712;
+}
+
+/* Smooth scrolling on smaller windows + prevent viewport bounce above header. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
+@media (min-width: 1200px) and (prefers-reduced-motion: no-preference) {
+  body,
+  .dark body {
+    background-attachment: fixed, fixed, fixed !important;
+  }
 }
 
 a,
@@ -364,11 +377,29 @@ a:hover {
   touch-action: manipulation;
 }
 
+.btn:not(.btn-secondary):not(.btn-danger):not(.btn-ghost):not(.btn-archive):visited,
+.btn.btn-primary:visited,
+a.btn.btn-primary:visited {
+  color: #fff !important;
+}
+
 .btn:hover,
 .btn:focus-visible {
   transform: translateY(-1px);
   filter: brightness(1.05);
   box-shadow: 0 22px 45px -18px rgba(234, 88, 12, 0.85);
+}
+
+.btn:not(.btn-secondary):not(.btn-danger):not(.btn-ghost):not(.btn-archive):hover,
+.btn:not(.btn-secondary):not(.btn-danger):not(.btn-ghost):not(.btn-archive):focus-visible,
+.btn.btn-primary:hover,
+.btn.btn-primary:focus-visible {
+  color: #fff !important;
+}
+
+.btn-secondary:visited,
+a.btn.btn-secondary:visited {
+  color: var(--brand-orange-strong) !important;
 }
 
 .btn-secondary {
@@ -1459,6 +1490,7 @@ html.dark input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .buildings-filter-panel .filter-panel__actions {
   margin-top: 0.1rem;
 }
+
 
 /* Meta badges */
 .meta-badge {

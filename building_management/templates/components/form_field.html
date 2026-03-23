@@ -48,7 +48,7 @@
           {% endif %}
         </div>
         {% if help_text %}
-          <p class="form-field__support">{{ help_text|safe }}</p>
+          <div class="form-field__support">{{ help_text|safe }}</div>
         {% endif %}
         {% if field.errors %}
           <div class="form-field__errors">

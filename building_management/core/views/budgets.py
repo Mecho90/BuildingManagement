@@ -768,8 +768,11 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
             primary_url = ""
             primary_label = ""
             primary_kind = ""
-            if work_order_id and work_order_id in visible_work_order_ids:
+            if work_order_id:
+                # Always expose the direct work-order link when an expense is linked.
+                # Access control is still enforced by the work-order detail view itself.
                 work_order_url = reverse("core:work_order_detail", args=[work_order_id])
+            if work_order_id and work_order_id in visible_work_order_ids:
                 work_order_number_label = _("Work order #%(id)s") % {"id": work_order_id}
                 work_order_label = work_order_title or work_order_number_label
                 primary_url = work_order_url

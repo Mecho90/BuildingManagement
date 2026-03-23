@@ -13,10 +13,8 @@
       </p>
     </div>
     <div class="flex flex-wrap gap-3">
-      <a href="{{ archive_work_orders_url }}" class="btn btn-primary">{% trans "Archived Work Orders" %}</a>
-      {% if archive_budgets_url %}
-        <a href="{{ archive_budgets_url }}" class="btn btn-primary">{% trans "Archived Budgets" %}</a>
-      {% endif %}
+      <a href="{% url 'core:work_orders_archive' %}" class="btn btn-primary">{% trans "Archived Work Orders" %}</a>
+      <a href="{% url 'core:budget_archived_list' %}" class="btn btn-primary">{% trans "Archived Budgets" %}</a>
     </div>
   </div>
 
@@ -30,17 +28,15 @@
     {% endwith %}
 
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {% if owner_choices %}
-        <div class="space-y-2">
-          <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
-          <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
-            <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
-            {% for opt in owner_choices %}
-              <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      {% endif %}
+      <div class="space-y-2">
+        <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
+        <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+          <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
+          {% for opt in owner_choices %}
+            <option value="{{ opt.id }}" {% if owner == opt.id %}selected{% endif %}>{{ opt.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
       <div class="space-y-2">
         <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>

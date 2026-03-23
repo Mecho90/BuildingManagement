@@ -12,6 +12,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.text import capfirst
 from django.template.defaultfilters import filesizeformat
 from django.utils.translation import gettext_lazy as _
+from django.db import transaction
 from django.db.models import F, Q
 from django.db.models.functions import Lower
 
@@ -1843,22 +1844,20 @@ def _apply_user_role(user, role: str | None):
     user.is_superuser = role == MembershipRole.ADMINISTRATOR
     user.is_staff = user.is_superuser
     user.save(update_fields=["is_superuser", "is_staff"])
-    global_membership, created = BuildingMembership.objects.get_or_create(
-        user=user,
-        building=None,
-        defaults={"role": role},
-    )
-    if not created and global_membership.role != role:
-        global_membership.role = role
-        global_membership.save(update_fields=["role"])
-    other_memberships = BuildingMembership.objects.filter(user=user).exclude(pk=global_membership.pk)
-    for membership in other_memberships:
-        if membership.role != role:
-            membership.role = role
-            membership.save()
-        elif role != MembershipRole.TECHNICIAN and membership.technician_subrole:
-            membership.technician_subrole = ""
-            membership.save(update_fields=["technician_subrole"])
+    with transaction.atomic():
+        memberships = BuildingMembership.objects.filter(user=user)
+
+        # Keep role updates conflict-safe by harmonizing all memberships first.
+        memberships.exclude(role=role).update(role=role)
+        if role != MembershipRole.TECHNICIAN:
+            memberships.exclude(technician_subrole="").update(technician_subrole="")
+
+        if not memberships.filter(building__isnull=True).exists():
+            BuildingMembership.objects.create(
+                user=user,
+                building=None,
+                role=role,
+            )
 
 
 class AdminUserCreateForm(RoleSelectionMixin, UserCreationForm):

@@ -60,7 +60,7 @@
       </div>
 
       {% if owner_choices %}
-        <div class="space-y-1 md:col-span-2 lg:col-span-4">
+        <div class="space-y-1">
           <label for="id_owner" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Owner" %}</label>
           <select id="id_owner" name="owner" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
             <option value="" {% if not owner %}selected{% endif %}>{% trans "All owners" %}</option>
@@ -71,7 +71,7 @@
         </div>
       {% endif %}
 
-      <div class="space-y-1 md:col-span-2 lg:col-span-4">
+      <div class="space-y-1">
         <label for="id_sort" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Sort" %}</label>
         <select id="id_sort" name="sort" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           <option value="" {% if not sort or sort == 'priority' %}selected{% endif %}>{% trans "All" %}</option>
@@ -83,7 +83,7 @@
         </select>
       </div>
 
-      <div class="space-y-1 md:col-span-2 lg:col-span-4">
+      <div class="space-y-1">
         <label for="id_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
         <select id="id_per" name="per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
           {% for opt in per_choices %}
@@ -92,7 +92,7 @@
         </select>
       </div>
 
-      <div class="space-y-1 md:col-span-2 lg:col-span-2">
+      <div class="space-y-1 md:col-span-2 lg:col-span-3">
         <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Date range" %}</span>
         <div class="grid gap-2 md:grid-cols-2">
           <label for="id_deadline_from" class="sr-only">{% trans "From date" %}</label>

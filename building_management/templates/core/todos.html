@@ -90,7 +90,7 @@
                 />
               </div>
 
-              <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 {% if owner_filter_options %}lg:grid-cols-3{% else %}lg:grid-cols-2{% endif %}">
+              <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {% if owner_filter_options %}
                   <div class="space-y-2">
                     <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-owner-filter">{% trans "Owner" %}</label>
@@ -102,9 +102,9 @@
                     </select>
                   </div>
                 {% endif %}
-                <div class="space-y-2">
+                <div class="space-y-2 {% if not owner_filter_options %}sm:col-span-2{% endif %}">
                   <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="todo-page-size">{% trans "Page size" %}</label>
-                  <select id="todo-page-size" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
+                  <select id="todo-page-size" class="input w-full rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
                     {% for size in page_size_options %}
                       <option value="{{ size }}"{% if size == todo_config.defaultPageSize %} selected{% endif %}>{{ size }}</option>
                     {% endfor %}
