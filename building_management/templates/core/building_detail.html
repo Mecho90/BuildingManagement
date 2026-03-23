@@ -209,47 +209,7 @@
             {% endif %}
           </div>
 
-          <div class="grid gap-4 md:hidden">
-            {% for u in units_page %}
-              <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="space-y-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">{{ u.number }}</h3>
-                    </div>
-                    {% with floor_val=u.floor|default:"—" %}
-                      <p class="text-sm text-slate-500 dark:text-slate-400">{% blocktrans with value=floor_val %}Floor {{ value }}{% endblocktrans %}</p>
-                    {% endwith %}
-                  </div>
-                  <div class="flex gap-2">
-                    <a class="btn btn-secondary btn-sm" href="{% url 'core:unit_update' building_pk=building.id unit_pk=u.id %}">{% trans "Edit" %}</a>
-                    <a class="btn btn-danger btn-sm" href="{% url 'core:unit_delete' building_pk=building.id unit_pk=u.id %}">{% trans "Delete" %}</a>
-                  </div>
-                </div>
-                <dl class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                  <div>
-                    <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Owner" %}</dt>
-                    <dd>{{ u.owner_name|default:"—" }}</dd>
-                  </div>
-                  <div>
-                    <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Contact" %}</dt>
-                    <dd>{{ u.contact_phone|default:"—" }}</dd>
-                  </div>
-                </dl>
-              </article>
-            {% empty %}
-              <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                {% if units_has_active_filters %}
-                  <p>{% trans "No units match your filters." %}</p>
-                  <a class="btn btn-secondary btn-sm mt-3" href="{{ tab_urls.units }}">{% trans "Reset filters" %}</a>
-                {% else %}
-                  <p>{% trans "No units yet." %}</p>
-                {% endif %}
-              </div>
-            {% endfor %}
-          </div>
-
-          <div class="hidden md:block">
+          <div>
             <div class="overflow-x-auto overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-700">
             <table class="min-w-full divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
               <thead class="bg-slate-50 dark:bg-slate-800">
@@ -398,106 +358,7 @@
             </div>
           {% endif %}
 
-          <div class="grid gap-4 md:hidden">
-            {% if workorders_page and workorders_page.object_list %}
-              {% for w in workorders_page.object_list %}
-                <article class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900">
-                <div class="space-y-1">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <h3 class="text-lg font-semibold text-sky-600 dark:text-sky-300 break-words hyphens-auto">
-                      <a href="{% url 'core:work_order_update' w.id %}?next={% url 'core:building_detail' building.id %}" class="hover:text-sky-700 dark:hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900">
-                        {{ w.title }}
-                      </a>
-                    </h3>
-                  </div>
-                  {% if building.is_system_default and w.awaiting_queue_entry %}
-                    <p class="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-200">
-                    {% blocktrans with origin=w.building.name %}Awaiting backoffice approval · {{ origin }}{% endblocktrans %}
-                    </p>
-                  {% elif building.is_system_default and w.forwarded_to_building %}
-                    <p class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
-                      {% blocktrans with destination=w.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
-                    </p>
-                  {% elif building.is_system_default and not w.forwarded_to_building %}
-                    <p class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
-                      {% trans "Forwarding target removed – reassign required" %}
-                    </p>
-                  {% elif w.forwarded_from_office %}
-                    <p class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
-                      <span>
-                      {% blocktrans with origin=w.building.name %}Origin · {{ origin }}{% endblocktrans %}
-                      </span>
-                      <span>
-                        {% if w.forwarded_to_building %}
-                          {% blocktrans with destination=w.forwarded_to_building.name %}Destination · {{ destination }}{% endblocktrans %}
-                        {% else %}
-                          {% trans "Destination · Removed" %}
-                        {% endif %}
-                      </span>
-                    </p>
-                  {% endif %}
-                  <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
-                    {% include "core/includes/status_badge.html" with status=w.status label=w.get_status_display %}
-                    {% include "components/badges/priority.html" with level=w.priority label=w.get_priority_display size="sm" %}
-                  </div>
-                </div>
-                  <dl class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <div>
-                      <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Unit" %}</dt>
-                      <dd>{% if w.unit_id %}#{{ w.unit.number }}{% else %}—{% endif %}</dd>
-                    </div>
-                    <div>
-                      <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Deadline" %}</dt>
-                      <dd class="{% if w.is_overdue %}text-rose-700 dark:text-rose-300 font-semibold{% endif %}">
-                        {% if w.deadline %}
-                          {{ w.deadline|date:"Y-m-d" }}
-                          {% if w.is_overdue %}
-                            <span class="block text-xs font-semibold">{% blocktrans with days=w.overdue_days %}{{ days }} days late{% endblocktrans %}</span>
-                          {% endif %}
-                        {% else %}
-                          —
-                        {% endif %}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Budget" %}</dt>
-                      <dd class="num-tabular">{{ w.expense_total|default_if_none:"0"|floatformat:2 }}</dd>
-                    </div>
-                    <div>
-                      <dt class="font-semibold text-slate-500 dark:text-slate-400">{% trans "Created" %}</dt>
-                      <dd>{{ w.created_at|date:"Y-m-d" }}</dd>
-                    </div>
-                  </dl>
-                  <div class="flex gap-2">
-                    <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_detail' w.id %}?next={{ request.get_full_path|urlencode }}">{% trans "View" %}</a>
-                    {% if w.can_edit_in_building_list %}
-                      <a class="btn btn-secondary btn-sm" href="{% url 'core:work_order_update' w.id %}?building={{ building.id }}">{% trans "Edit" %}</a>
-                    {% endif %}
-                    {% if w.status == 'DONE' and not w.archived_at %}
-                      <form action="{% url 'core:work_order_archive' w.id %}?building={{ building.id }}" method="post" class="inline-flex">
-                        {% csrf_token %}
-                        <button class="btn btn-archive btn-sm" type="submit">{% trans "Archive" %}</button>
-                      </form>
-                    {% endif %}
-                    {% if w.can_delete_in_building_list %}
-                      <a class="btn btn-danger btn-sm" href="{% url 'core:work_order_delete' w.id %}?building={{ building.id }}">{% trans "Delete" %}</a>
-                    {% endif %}
-                  </div>
-                </article>
-              {% endfor %}
-            {% else %}
-              <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                {% if workorders_has_active_filters %}
-                  <p>{% trans "No work orders match your filters." %}</p>
-                  <a class="btn btn-secondary btn-sm mt-3" href="{{ tab_urls.work_orders }}">{% trans "Reset filters" %}</a>
-                {% else %}
-                  <p>{% trans "No work orders for this building yet." %}</p>
-                {% endif %}
-              </div>
-            {% endif %}
-          </div>
-
-          <div class="hidden md:block">
+          <div>
             <div class="overflow-x-auto overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-700">
             <table class="min-w-full divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
               <thead class="bg-slate-50 dark:bg-slate-800">
