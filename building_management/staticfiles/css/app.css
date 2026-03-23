@@ -44,10 +44,16 @@
   }
 
   .btn-danger {
-    @apply border border-rose-300 bg-none bg-rose-500/90 text-white shadow-md transition
+    @apply border border-rose-300 bg-none bg-rose-500/90 text-black shadow-md transition
            hover:bg-rose-500 hover:shadow-lg
            focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white
-           dark:border-rose-600 dark:bg-rose-600/80 dark:hover:bg-rose-500 dark:focus-visible:ring-offset-slate-900;
+           dark:border-rose-600 dark:bg-rose-600/80 dark:hover:bg-rose-500 dark:text-black dark:focus-visible:ring-offset-slate-900;
+  }
+
+  .btn-archive {
+    @apply from-amber-400 via-amber-300 to-amber-500 text-amber-950
+           focus-visible:ring-amber-300 focus-visible:ring-offset-white
+           dark:from-amber-500 dark:via-amber-400 dark:to-amber-500 dark:text-slate-900 dark:focus-visible:ring-amber-400 dark:focus-visible:ring-offset-slate-900;
   }
 
   .btn.is-disabled,
@@ -62,6 +68,9 @@
 
   label {
     @apply mb-1 block text-sm font-semibold tracking-wide text-slate-700 dark:text-emerald-200;
+  }
+  .filter-panel label {
+    @apply font-normal tracking-normal;
   }
 
   .input,
@@ -117,6 +126,16 @@
     @apply flex items-center gap-2;
   }
 
+  .filter-panel {
+    @apply rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-card text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300;
+  }
+
+
+  .page-heading {
+    @apply inline-flex items-center rounded-2xl bg-white/90 px-6 py-3 text-3xl font-semibold text-brand-foreground shadow-lg
+           dark:bg-slate-900/80 dark:text-white;
+  }
+
   textarea,
   textarea.input {
     @apply min-h-[6rem] resize-y;
@@ -148,7 +167,7 @@
   }
 
   .form-actions {
-    @apply mt-2 flex gap-4;
+    @apply mt-2 flex flex-wrap items-center justify-end gap-4;
   }
 
   table thead th {
@@ -166,6 +185,19 @@
 
   table tbody tr:hover td {
     @apply bg-emerald-50/70 dark:bg-slate-800/70;
+  }
+
+  .lawyer-alert-indicator {
+    @apply inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-orange-700 shadow-sm
+           dark:border-orange-500/60 dark:bg-orange-500/10 dark:text-orange-200;
+  }
+
+  .lawyer-alert-indicator__icon {
+    @apply text-base leading-none;
+  }
+
+  .lawyer-alert-indicator__count {
+    @apply leading-none;
   }
 }
 
@@ -217,3 +249,6 @@
   color: #991b1b;
   box-shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.25);
 }
+  .filter-panel option {
+    @apply font-normal text-slate-600 dark:text-slate-300;
+  }
