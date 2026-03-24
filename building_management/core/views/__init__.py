@@ -49,6 +49,8 @@ from .buildings import (
 )
 from .audit import AuditTrailView
 from .budgets import (
+    BudgetArchivedBulkDeleteView,
+    BudgetArchivedItemDeleteView,
     BudgetArchivePurgePreviewView,
     BudgetArchivePurgeView,
     BudgetArchivedRequesterDeleteView,
@@ -94,6 +96,8 @@ from .work_orders import (
 from ..views_theme import toggle_theme
 
 __all__ = [
+    "BudgetArchivedBulkDeleteView",
+    "BudgetArchivedItemDeleteView",
     "BudgetArchivePurgePreviewView",
     "BudgetArchivePurgeView",
     "BudgetArchivedRequesterDeleteView",

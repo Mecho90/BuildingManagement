@@ -772,19 +772,9 @@ class WorkOrderForm(forms.ModelForm):
 
         forward_target = cleaned.get("forwarded_to_building")
         if self.forwarding_enabled:
-            if not forward_target:
-                if self._forward_target_initial is not None:
-                    self.add_error(
-                        "forwarded_to_building",
-                        _(
-                            "Forwarded Office work orders must stay assigned. Select a different building instead of clearing the destination."
-                        ),
-                    )
-                else:
-                    self.add_error(
-                        "forwarded_to_building",
-                        _("Select a destination building for Office work orders."),
-                    )
+            # Forwarding from Office is optional: allow status/field changes
+            # even when no destination building is selected.
+            pass
         else:
             # Preserve existing forwarding metadata for already-forwarded orders
             # when forwarding controls are intentionally hidden.

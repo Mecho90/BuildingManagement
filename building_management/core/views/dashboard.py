@@ -275,7 +275,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             return None
         if not resolver.has(Capability.VIEW_BUDGETS):
             return None
-        qs = BudgetRequest.objects.visible_to(user).active()
+        qs = BudgetRequest.objects.visible_to(user).active().exclude(status__iexact=BudgetRequest.Status.REJECTED)
         if not qs.exists():
             return None
         amount_field = DecimalField(max_digits=12, decimal_places=2)

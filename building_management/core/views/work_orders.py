@@ -33,6 +33,7 @@ from ..models import (
     BudgetFeatureFlag,
     Building,
     BuildingMembership,
+    Expense,
     MembershipRole,
     WorkOrder,
     WorkOrderAttachment,
@@ -910,6 +911,49 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
             include_work_order_text_fallback=True,
             target_attr="expense_total",
         )
+        orders = list(ctx.get("orders") or [])
+        order_ids = [order.pk for order in orders if getattr(order, "pk", None)]
+        if order_ids:
+            id_values = order_ids + [str(order_id) for order_id in order_ids]
+            budget_expenses = (
+                Expense.objects.visible_to(self.request.user)
+                .filter(status__in=[Expense.Status.LOGGED, Expense.Status.APPROVED])
+                .filter(Q(metadata__work_order_id__in=id_values) | Q(metadata__work_order__in=id_values))
+                .select_related("budget_request")
+                .only("metadata", "amount", "budget_request_id", "budget_request__title", "budget_request__currency")
+            )
+            work_order_budget_map: dict[int, dict[int, dict[str, object]]] = {}
+            for expense in budget_expenses:
+                meta = expense.metadata or {}
+                linked_order_id = meta.get("work_order_id", meta.get("work_order"))
+                try:
+                    linked_order_id = int(linked_order_id)
+                except (TypeError, ValueError):
+                    continue
+                budget_id = getattr(expense, "budget_request_id", None)
+                if not linked_order_id or not budget_id:
+                    continue
+                budgets_for_order = work_order_budget_map.setdefault(linked_order_id, {})
+                budget_row = budgets_for_order.get(budget_id)
+                if budget_row is None:
+                    budget_row = {
+                        "id": budget_id,
+                        "title": expense.budget_request.title or _("Budget #%(id)s") % {"id": budget_id},
+                        "currency": expense.budget_request.currency,
+                        "amount": 0,
+                    }
+                    budgets_for_order[budget_id] = budget_row
+                budget_row["amount"] = budget_row["amount"] + (expense.amount or 0)
+            for order in orders:
+                order_budgets = list(work_order_budget_map.get(order.pk, {}).values())
+                order_budgets.sort(key=lambda item: str(item.get("title", "")).lower())
+                for budget_row in order_budgets:
+                    budget_row["url"] = reverse("core:budget_detail", args=[budget_row["id"]])
+                order.budget_links = order_budgets
+        else:
+            for order in orders:
+                order.budget_links = []
+
         paginator = ctx.get("paginator")
         total_orders = 0
         if paginator is not None:

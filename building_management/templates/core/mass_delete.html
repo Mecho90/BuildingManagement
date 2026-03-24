@@ -18,7 +18,7 @@
 
   {% if has_options %}
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <form method="get" class="ml-auto w-full max-w-sm text-sm text-slate-600 dark:text-slate-300">
+      <form method="get" class="{% if full_width_page_size %}w-full{% else %}ml-auto w-full max-w-sm{% endif %} text-sm text-slate-600 dark:text-slate-300">
         {% for key, value in request.GET.items %}
           {% if key != "per" and key != "page" %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">

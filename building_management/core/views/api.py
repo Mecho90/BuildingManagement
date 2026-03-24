@@ -26,8 +26,6 @@ from ..models import (
     BudgetRequest,
     BudgetRequestEvent,
     Building,
-    BuildingMembership,
-    MembershipRole,
     TodoActivity,
     TodoItem,
     Expense,
@@ -312,6 +310,7 @@ def _bounded_int_param(raw_value, *, default: int, min_value: int, max_value: in
 def _todo_queryset_for(request):
     return (
         TodoItem.objects.visible_to(request.user)
+        .filter(user=request.user)
         .select_related("todo_list", "user")
         .prefetch_related("activities__actor")
     )
@@ -325,12 +324,7 @@ def _user_can_assign_todo_owner(user) -> bool:
 
 
 def _user_can_view_all_todos(user) -> bool:
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    if getattr(user, "is_superuser", False):
-        return True
-    memberships = BuildingMembership.objects.filter(user=user).values_list("role", flat=True)
-    return any(role == MembershipRole.ADMINISTRATOR for role in memberships)
+    return False
 
 
 def _resolve_todo_owner(request, raw_owner, *, required: bool = False, allow_self: bool = False):
@@ -501,6 +495,11 @@ def _todo_list_view(request):
         week_filter = _parse_week_param(params.get("week_start"))
         if params.get("week_start") and week_filter is None:
             return JsonResponse({"error": _("Invalid week_start. Use YYYY-MM-DD.")}, status=400)
+    due_date_filter = None
+    if "due_date" in params:
+        due_date_filter = parse_date((params.get("due_date") or "").strip())
+        if params.get("due_date") and due_date_filter is None:
+            return JsonResponse({"error": _("Invalid due_date. Use YYYY-MM-DD.")}, status=400)
 
     status_param = (params.get("status") or "").strip()
     status_requested: set[str] | None = None
@@ -523,8 +522,17 @@ def _todo_list_view(request):
         target_week = week_filter or start_of_week()
         qs = qs.for_week(target_week)
     if upcoming_only:
-        cutoff = start_of_week() + timedelta(days=7)
-        qs = qs.filter(week_start__gte=cutoff)
+        upcoming_days = _bounded_int_param(
+            params.get("upcoming_days"),
+            default=7,
+            min_value=1,
+            max_value=60,
+        )
+        today = timezone.localdate()
+        qs = qs.filter(
+            due_date__gt=today,
+            due_date__lte=today + timedelta(days=upcoming_days),
+        )
 
     if status_requested:
         qs = qs.filter(status__in=status_requested)
@@ -550,6 +558,8 @@ def _todo_list_view(request):
     query = (params.get("q") or "").strip()
     if query:
         qs = qs.filter(models.Q(title__icontains=query) | models.Q(description__icontains=query))
+    if due_date_filter is not None:
+        qs = qs.filter(due_date=due_date_filter)
 
     try:
         per_value = int(params.get("per", 25))
@@ -885,6 +895,7 @@ def todo_ics_feed(request):
         raise Http404()
     qs = (
         TodoItem.objects.visible_to(request.user)
+        .filter(user=request.user)
         .exclude(status=TodoItem.Status.ARCHIVED)
         .order_by("due_date", "pk")
     )
@@ -935,6 +946,7 @@ def api_todo_calendar(request):
 
     qs = (
         TodoItem.objects.visible_to(request.user)
+        .filter(user=request.user)
         .filter(
             models.Q(due_date__range=(start_date, end_date))
             | models.Q(due_date__isnull=True, week_start__range=(start_date, end_date))

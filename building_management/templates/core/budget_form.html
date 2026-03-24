@@ -52,7 +52,7 @@
           </div>
         {% endif %}
       {% endfor %}
-      <div class="flex justify-end gap-3">
+      <div class="flex justify-start gap-3">
         <a href="{% if cancel_url %}{{ cancel_url }}{% else %}{% url 'core:budget_list' %}{% endif %}" class="btn btn-ghost">{% trans "Cancel" %}</a>
         <button type="submit" class="btn btn-primary">
           {% if object %}{% trans "Save changes" %}{% else %}{% trans "Submit for approval" %}{% endif %}

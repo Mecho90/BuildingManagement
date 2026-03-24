@@ -3,26 +3,20 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.contrib import messages
-from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView, CreateView, UpdateView, DeleteView
 
-from ..models import BuildingMembership, MembershipRole, TodoActivity, TodoItem, start_of_week
+from ..models import TodoActivity, TodoItem, start_of_week
 from ..forms import TodoItemForm
 from .common import _safe_next_url
 
 
 def _user_can_filter_owner(user):
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    if getattr(user, "is_superuser", False):
-        return True
-    roles = set(BuildingMembership.objects.filter(user=user).values_list("role", flat=True))
-    return bool(roles & {MembershipRole.ADMINISTRATOR})
+    # To-Do planner is personal for all roles.
+    return False
 
 
 class TodoListPageView(LoginRequiredMixin, TemplateView):
@@ -37,16 +31,6 @@ class TodoListPageView(LoginRequiredMixin, TemplateView):
         owner_filter_enabled = _user_can_filter_owner(self.request.user)
         owner_filter_default = str(self.request.user.pk) if owner_filter_enabled else ""
         owner_filter_options: list[dict[str, str]] = []
-        if owner_filter_enabled:
-            User = get_user_model()
-            owner_qs = User.objects.filter(is_active=True).order_by(Lower("username"))
-            owner_filter_options = [
-                {
-                    "value": str(obj.pk),
-                    "label": obj.get_full_name() or obj.get_username(),
-                }
-                for obj in owner_qs
-            ]
         config = {
             "apiUrl": reverse("core:api_todos"),
             "detailUrl": reverse("core:api_todo_detail", args=[0]).replace("/0/", "/{id}/"),
@@ -71,10 +55,8 @@ class TodoListPageView(LoginRequiredMixin, TemplateView):
             "ownerOptions": owner_filter_options,
             "canAssignOwner": owner_filter_enabled,
         }
-        personal_only = owner_filter_enabled
         task_qs = TodoItem.objects.visible_to(self.request.user)
-        if personal_only:
-            task_qs = task_qs.filter(user=self.request.user).exclude(status=TodoItem.Status.DONE)
+        task_qs = task_qs.filter(user=self.request.user).exclude(status=TodoItem.Status.DONE)
 
         ctx.update(
             {
@@ -135,7 +117,7 @@ class TodoUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "core/todo_form.html"
 
     def get_queryset(self):
-        return TodoItem.objects.visible_to(self.request.user)
+        return TodoItem.objects.visible_to(self.request.user).filter(user=self.request.user)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -166,7 +148,7 @@ class TodoDeleteView(LoginRequiredMixin, DeleteView):
     template_name = "core/todo_confirm_delete.html"
 
     def get_queryset(self):
-        return TodoItem.objects.visible_to(self.request.user)
+        return TodoItem.objects.visible_to(self.request.user).filter(user=self.request.user)
 
     def get_success_url(self):
         return reverse("core:todo_list")

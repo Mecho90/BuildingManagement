@@ -107,20 +107,23 @@
         </div>
       {% endif %}
 
-      <form method="post" action="{% if can_purge_archives %}{{ archive_requester_delete_action }}{% else %}{% url 'core:budget_archived_list' %}{% endif %}" class="space-y-4" id="archive-requester-bulk-form">
+      <form method="post" action="{% if can_purge_archives %}{{ archive_bulk_delete_action }}{% else %}{% url 'core:budget_archived_list' %}{% endif %}" class="space-y-4" id="archive-budget-bulk-form">
         {% csrf_token %}
         {% if can_purge_archives %}
           <div class="flex flex-wrap items-center justify-between gap-2 px-1 py-1">
             <span class="text-sm font-medium text-slate-600 dark:text-slate-300"
-                  id="archive-requester-selection-count"
-                  data-label-singular="{% trans 'requester selected' %}"
-                  data-label-plural="{% trans 'requesters selected' %}">
-              0 {% trans "requesters selected" %}
+                  id="archive-budget-selection-count"
+                  data-label-singular="{% trans 'budget selected' %}"
+                  data-label-plural="{% trans 'budgets selected' %}">
+              0 {% trans "budgets selected" %}
             </span>
             <div class="flex items-center gap-2">
-              <button type="button" class="btn" id="archive-select-all-requesters">{% trans "Select all on page" %}</button>
+              <button type="button" class="btn" id="archive-select-all-budgets">{% trans "Select all on page" %}</button>
             </div>
           </div>
+          <p class="px-1 text-xs text-slate-500 dark:text-slate-400">
+            {% trans "Requesters are removed from this list automatically when they no longer have archived budgets." %}
+          </p>
         {% endif %}
 
       <div class="space-y-4">
@@ -128,17 +131,6 @@
             <section class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm shadow-sm transition-colors duration-150 hover:border-slate-300 hover:bg-white dark:border-slate-600 dark:bg-slate-800/80 dark:hover:border-slate-500 dark:hover:bg-slate-800">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="flex items-start gap-2">
-                  {% if can_purge_archives and group.owner %}
-                    <label class="inline-flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        name="requester_ids"
-                        value="{{ group.owner.id }}"
-                        data-requester-select
-                        class="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                      />
-                    </label>
-                  {% endif %}
                   <div>
                     <span class="archive-building-name block text-base font-semibold text-slate-700 dark:text-slate-100 break-words leading-snug">{{ group.owner_name }}</span>
                   </div>
@@ -148,16 +140,35 @@
               <div class="space-y-2">
                 {% for budget in group.budgets %}
                   <div class="ui-panel flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
+                    <div class="flex items-start gap-2">
+                      {% if can_purge_archives %}
+                        <label class="inline-flex items-center">
+                          <input
+                            type="checkbox"
+                            name="budget_ids"
+                            value="{{ budget.pk }}"
+                            data-budget-select
+                            class="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                          />
+                        </label>
+                      {% endif %}
+                      <div>
                       <p class="font-semibold text-slate-900 dark:text-slate-100">{{ budget.title|default:_("Untitled budget") }}</p>
                       <p class="text-xs text-brand-foreground dark:text-white">
                         {% blocktrans with approved=budget.approved_total|floatformat:2 currency=budget.currency archived=budget.archived_at|date:"Y-m-d" %}
                           Approved {{ approved }} {{ currency }} · Archived {{ archived }}
                         {% endblocktrans %}
                       </p>
+                      </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
                       <a href="{% url 'core:budget_detail' budget.pk %}" class="btn btn-xs btn-secondary">{% trans "View" %}</a>
+                      {% if can_purge_archives %}
+                        <form method="post" action="{% url 'core:budget_archived_item_delete' budget.pk %}?next={{ request.get_full_path|urlencode }}" class="inline-flex">
+                          {% csrf_token %}
+                          <button type="submit" class="btn btn-xs btn-danger">{% trans "Delete" %}</button>
+                        </form>
+                      {% endif %}
                     </div>
                   </div>
                 {% endfor %}
@@ -172,12 +183,12 @@
               type="checkbox"
               name="confirm"
               value="1"
-              id="archive-confirm-requester-delete"
+              id="archive-confirm-budget-delete"
               class="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
             />
-            <span>{% trans "I understand selected requesters' archived budgets will be permanently removed." %}</span>
+            <span>{% trans "I understand selected archived budgets will be permanently removed." %}</span>
           </label>
-          <button class="btn btn-danger w-full sm:w-auto" type="submit" id="archive-delete-requesters-btn">{% trans "Delete selected requesters' archived budgets" %}</button>
+          <button class="btn btn-danger w-full sm:w-auto" type="submit" id="archive-delete-budgets-btn">{% trans "Delete selected archived budgets" %}</button>
         {% endif %}
       </form>
 
@@ -232,11 +243,9 @@
            data-result-suffix="{% trans 'will be permanently deleted (including expenses and files).' %}">
         </p>
       </div>
-      <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
-        <span class="inline-flex items-center gap-2">
-          <span class="text-amber-600 dark:text-amber-300" aria-hidden="true">⚠️</span>
-          <span>{% trans "Deletion is permanent and cannot be undone." %}</span>
-        </span>
+      <div class="rounded-xl border border-red-200 bg-red-50/90 p-3 text-sm font-semibold text-red-700 dark:border-red-500/60 dark:bg-red-500/20 dark:text-red-100 flex items-center gap-2">
+        <span aria-hidden="true" class="text-lg leading-none">⚠️</span>
+        <span>{% trans "Deletion is permanent and cannot be undone." %}</span>
       </div>
       <form method="post" action="{{ archive_purge_action }}" class="space-y-4" id="archive-purge-form">
         {% csrf_token %}
@@ -261,13 +270,13 @@
   {{ block.super }}
   <script>
     (function () {
-      const form = document.getElementById("archive-requester-bulk-form");
+      const form = document.getElementById("archive-budget-bulk-form");
       if (!form) return;
-      const checkboxes = Array.from(form.querySelectorAll("input[data-requester-select]"));
-      const confirmEl = document.getElementById("archive-confirm-requester-delete");
-      const deleteBtn = document.getElementById("archive-delete-requesters-btn");
-      const selectAllBtn = document.getElementById("archive-select-all-requesters");
-      const countEl = document.getElementById("archive-requester-selection-count");
+      const checkboxes = Array.from(form.querySelectorAll("input[data-budget-select]"));
+      const confirmEl = document.getElementById("archive-confirm-budget-delete");
+      const deleteBtn = document.getElementById("archive-delete-budgets-btn");
+      const selectAllBtn = document.getElementById("archive-select-all-budgets");
+      const countEl = document.getElementById("archive-budget-selection-count");
       if (!checkboxes.length || !confirmEl || !deleteBtn || !countEl) return;
 
       function selectedCount() {
@@ -276,8 +285,8 @@
 
       function updateState() {
         const count = selectedCount();
-        const singular = countEl.dataset.labelSingular || "requester selected";
-        const plural = countEl.dataset.labelPlural || "requesters selected";
+        const singular = countEl.dataset.labelSingular || "budget selected";
+        const plural = countEl.dataset.labelPlural || "budgets selected";
         countEl.textContent = `${count} ${count === 1 ? singular : plural}`;
         deleteBtn.disabled = !(count > 0 && confirmEl.checked);
       }

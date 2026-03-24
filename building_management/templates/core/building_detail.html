@@ -5,7 +5,7 @@
 
 {% block content %}
 <section class="space-y-6">
-  <header class="sticky top-3 z-20 rounded-2xl bg-white/95 p-6 shadow-card backdrop-blur dark:bg-slate-900/95 space-y-4">
+  <header class="rounded-2xl bg-white/95 p-6 shadow-card backdrop-blur dark:bg-slate-900/95 space-y-4">
     <nav aria-label="{% trans 'Breadcrumb' %}">
       <ol class="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <li class="text-slate-700 dark:text-slate-200 font-medium">
@@ -103,11 +103,13 @@
     </div>
   </header>
 
-  <section class="grid gap-3" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
-    <article class="rounded-2xl bg-white p-4 shadow-card dark:bg-slate-900">
-      <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total units" %}</p>
-      <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100 num-tabular">{{ summary_total_units }}</p>
-    </article>
+  <section class="grid gap-3 grid-cols-1 sm:grid-cols-2 {% if building.is_system_default %}lg:grid-cols-2{% else %}lg:grid-cols-3{% endif %}">
+    {% if not building.is_system_default %}
+      <article class="rounded-2xl bg-white p-4 shadow-card dark:bg-slate-900">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Total units" %}</p>
+        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100 num-tabular">{{ summary_total_units }}</p>
+      </article>
+    {% endif %}
     <article class="rounded-2xl bg-white p-4 shadow-card dark:bg-slate-900">
       <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{% trans "Open work orders" %}</p>
       <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100 num-tabular">{{ summary_open_work_orders }}</p>
@@ -119,12 +121,16 @@
   </section>
 
   <div class="rounded-2xl bg-white shadow-sm dark:bg-slate-900">
-    <nav class="planner-tabs building-tabs flex items-center gap-2 border-b border-slate-200 px-4 pt-4 dark:border-slate-700" aria-label="{% trans 'Building sections' %}">
-      <a href="{{ tab_urls.work_orders }}" class="nav-link px-6 py-3 text-sm font-semibold uppercase tracking-wide {% if active_tab == 'work_orders' %}nav-link--active{% endif %}">
+    <nav class="planner-tabs building-tabs flex flex-wrap items-center gap-2 overflow-x-auto border-b border-slate-200 px-4 pt-4 dark:border-slate-700" aria-label="{% trans 'Building sections' %}">
+      <a href="{{ tab_urls.work_orders }}"
+         class="nav-link px-6 py-3 text-sm font-semibold uppercase tracking-wide {% if active_tab == 'work_orders' %}nav-link--active{% endif %}"
+         {% if active_tab == 'work_orders' %}style="color: #ffffff !important; text-decoration: none !important;" aria-current="page"{% endif %}>
         {% trans "Work Orders" %}
       </a>
       {% if show_units_tab %}
-        <a href="{{ tab_urls.units }}" class="nav-link px-6 py-3 text-sm font-semibold uppercase tracking-wide {% if active_tab == 'units' %}nav-link--active{% endif %}">
+        <a href="{{ tab_urls.units }}"
+           class="nav-link px-6 py-3 text-sm font-semibold uppercase tracking-wide {% if active_tab == 'units' %}nav-link--active{% endif %}"
+           {% if active_tab == 'units' %}style="color: #ffffff !important; text-decoration: none !important;" aria-current="page"{% endif %}>
           {% trans "Units" %}
         </a>
       {% endif %}
@@ -272,11 +278,11 @@
           <form method="get" class="filter-panel">
             <input type="hidden" name="tab" value="work_orders"/>
             <div class="space-y-2">
-                <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search working orders" %}</label>
+                <label for="id_w_q" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search work orders" %}</label>
                 <input id="id_w_q" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40" type="text" name="w_q" value="{{ w_q }}" placeholder="{% trans "Title or description" %}"/>
             </div>
-            <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-3 mt-3">
-              <div class="space-y-2">
+            <div class="filter-panel__grid md:grid-cols-2 lg:grid-cols-2 gap-3 mt-3">
+              <div class="space-y-1">
                 <label for="id_w_status" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Status" %}</label>
                 <select id="id_w_status" name="w_status" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
                   <option value="" {% if not w_status %}selected{% endif %}>{% trans "All" %}</option>
@@ -285,7 +291,7 @@
                   {% endfor %}
                 </select>
               </div>
-              <div class="space-y-2">
+              <div class="space-y-1">
                 <label for="id_w_per" class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Page size" %}</label>
                 <select id="id_w_per" name="w_per" class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40">
                   <option value="25"  {% if w_per == 25  %}selected{% endif %}>25</option>
@@ -294,9 +300,10 @@
                   <option value="200" {% if w_per == 200 %}selected{% endif %}>200</option>
                 </select>
               </div>
-                  <div class="space-y-2 md:col-span-2 lg:col-span-3">
-                    <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Search range" %}</span>
-                    <div class="grid gap-3 md:grid-cols-2">
+                  <div class="space-y-1 md:col-span-2 lg:col-span-2">
+                    <span class="text-sm font-medium text-slate-600 dark:text-slate-300">{% trans "Date range" %}</span>
+                    <div class="grid gap-2 md:grid-cols-2">
+                      <label for="id_w_deadline_from" class="sr-only">{% trans "From date" %}</label>
                       <input
                         id="id_w_deadline_from"
                         name="w_deadline_from"
@@ -304,6 +311,7 @@
                         value="{{ w_deadline_from }}"
                         class="input rounded-2xl border border-emerald-100/80 focus:border-emerald-400 focus:ring-emerald-200/70 dark:border-emerald-500/40"
                       />
+                      <label for="id_w_deadline_to" class="sr-only">{% trans "To date" %}</label>
                       <input
                         id="id_w_deadline_to"
                         name="w_deadline_to"
@@ -391,10 +399,6 @@
                         {% elif building.is_system_default and w.forwarded_to_building %}
                           <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
                             {% blocktrans with destination=w.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
-                          </div>
-                        {% elif building.is_system_default and not w.forwarded_to_building %}
-                          <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
-                            {% trans "Forwarding target removed – reassign required" %}
                           </div>
                         {% elif w.forwarded_from_office %}
                           <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">

@@ -378,6 +378,10 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
 
         total_units = Unit.objects.filter(building=bld).count()
         occupied_units = Unit.objects.filter(building=bld, is_occupied=True).count()
+        office_visible_filter = Q()
+        if bld.is_system_default:
+            office_visible_filter = Q(forwarded_to_building__isnull=True)
+
         open_work_orders = WorkOrder.objects.visible_to(request.user).filter(
             building=bld,
             archived_at__isnull=True,
@@ -386,7 +390,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 WorkOrder.Status.IN_PROGRESS,
                 WorkOrder.Status.AWAITING_APPROVAL,
             ],
-        ).count()
+        ).filter(office_visible_filter).count()
         overdue_work_orders = WorkOrder.objects.visible_to(request.user).filter(
             building=bld,
             archived_at__isnull=True,
@@ -396,7 +400,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 WorkOrder.Status.IN_PROGRESS,
                 WorkOrder.Status.AWAITING_APPROVAL,
             ],
-        ).count()
+        ).filter(office_visible_filter).count()
         if total_units == 0:
             building_status = _("No units")
             building_status_tone = "info"
@@ -438,7 +442,12 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         is_technician_user = user_has_role(request.user, MembershipRole.TECHNICIAN)
         can_manage_building = resolver.has(Capability.MANAGE_BUILDINGS, building_id=bld.pk) if resolver else False
         can_manage_units = can_manage_building or (resolver.has(Capability.CREATE_UNITS, building_id=bld.pk) if resolver else False)
-        can_manage_work_orders = can_manage_building or (resolver.has(Capability.CREATE_WORK_ORDERS, building_id=bld.pk) if resolver else False)
+        can_manage_work_orders = can_manage_building or (
+            resolver.has(Capability.CREATE_WORK_ORDERS, building_id=bld.pk)
+            or resolver.has(Capability.CREATE_WORK_ORDERS)
+            if resolver
+            else False
+        )
         ctx["can_manage_building"] = can_manage_building
         ctx["can_manage_units"] = can_manage_units
         ctx["can_manage_work_orders"] = can_manage_work_orders

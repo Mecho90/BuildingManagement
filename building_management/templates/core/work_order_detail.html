@@ -59,13 +59,6 @@
               </p>
             {% endif %}
           </div>
-          {% if can_reroute_order %}
-            {% if next_url %}
-              <a class="btn btn-sm" href="{% url 'core:work_order_update' order.id %}?next={{ next_url|urlencode }}#forwarding-section">{% trans "Re-route" %}</a>
-            {% else %}
-              <a class="btn btn-sm" href="{% url 'core:work_order_update' order.id %}#forwarding-section">{% trans "Re-route" %}</a>
-            {% endif %}
-          {% endif %}
         </div>
       {% endif %}
     </header>

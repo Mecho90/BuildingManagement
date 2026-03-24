@@ -447,6 +447,7 @@ class BulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, FormView):
     success_url_name = ""
     warning_text = _("Deletion is permanent and cannot be undone.")
     left_actions_layout = False
+    full_width_page_size = False
     paginate_choices = (25, 50, 100, 200)
     default_paginate_by = 25
 
@@ -550,6 +551,7 @@ class BulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, FormView):
                 "page_query": _querystring_without(self.request, "page"),
                 "warning_text": self.warning_text,
                 "left_actions_layout": self.left_actions_layout,
+                "full_width_page_size": self.full_width_page_size,
             }
         )
         return ctx
@@ -610,6 +612,7 @@ class AdminWorkOrderBulkDeleteView(BulkDeleteView):
     empty_text = _("There are no work orders available to delete.")
     submit_label = _("Delete work orders")
     success_url_name = "core:mass_delete_work_orders"
+    full_width_page_size = True
 
     def get_queryset(self):
         return (

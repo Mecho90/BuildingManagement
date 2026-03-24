@@ -41,7 +41,7 @@
     </div>
 
     {% with submit_text=submit_label|default:_("Save") cancel_text=cancel_label|default:_("Cancel") %}
-      <div class="form-actions">
+      <div class="form-actions {% if actions_left %}justify-start{% endif %}">
         {% if submit_first %}
           <button class="btn" type="submit">{{ submit_text }}</button>
           <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{{ cancel_text }}</a>

@@ -328,6 +328,7 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
             if is_budget_admin
             else base_budget_qs.filter(requester=user)
         )
+        summary_qs = summary_qs.exclude(status__iexact=BudgetRequest.Status.REJECTED)
         totals = summary_qs.aggregate(
             requested_total=models.Sum("requested_amount"),
             approved_total=models.Sum(totals_expr),
@@ -1319,7 +1320,7 @@ class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, Tem
             ctx["archive_purge_form"] = ArchivePurgeForm()
             ctx["archive_purge_action"] = reverse("core:budget_archived_purge")
             ctx["archive_purge_preview_url"] = reverse("core:budget_archived_purge_preview")
-            ctx["archive_requester_delete_action"] = reverse("core:budget_archived_requester_delete")
+            ctx["archive_bulk_delete_action"] = reverse("core:budget_archived_bulk_delete")
         return ctx
 
 
@@ -1431,6 +1432,76 @@ class BudgetArchivedRequesterDeleteView(LoginRequiredMixin, BudgetFeatureRequire
         deleted = qs.count()
         if not deleted:
             messages.info(request, _("No archived budgets matched the selected requesters."))
+            return redirect("core:budget_archived_list")
+        qs.delete()
+        messages.success(
+            request,
+            ngettext(
+                "Deleted %(count)s archived budget permanently.",
+                "Deleted %(count)s archived budgets permanently.",
+                deleted,
+            )
+            % {"count": deleted},
+        )
+        return redirect("core:budget_archived_list")
+
+
+class BudgetArchivedItemDeleteView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
+    """
+    Permanently delete one archived budget from the archived budgets list.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        resolver = CapabilityResolver(request.user)
+        if not resolver.has(Capability.APPROVE_BUDGETS) or not user_is_admin_or_backoffice(request.user):
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, pk: int, *args, **kwargs):
+        budget = get_object_or_404(
+            BudgetRequest.objects.visible_to(request.user),
+            pk=pk,
+            archived_at__isnull=False,
+        )
+        budget.delete()
+        messages.success(request, _("Archived budget deleted permanently."))
+        return redirect(_safe_next_url(request) or reverse("core:budget_archived_list"))
+
+
+class BudgetArchivedBulkDeleteView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
+    """
+    Permanently delete multiple archived budgets selected in the archived budgets list.
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        resolver = CapabilityResolver(request.user)
+        if not resolver.has(Capability.APPROVE_BUDGETS) or not user_is_admin_or_backoffice(request.user):
+            raise Http404()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        budget_ids_raw = request.POST.getlist("budget_ids")
+        budget_ids: list[int] = []
+        for value in budget_ids_raw:
+            try:
+                budget_ids.append(int(value))
+            except (TypeError, ValueError):
+                continue
+        budget_ids = sorted(set(budget_ids))
+        if not budget_ids:
+            messages.error(request, _("Select at least one archived budget."))
+            return redirect("core:budget_archived_list")
+        if not request.POST.get("confirm"):
+            messages.error(request, _("Please confirm the permanent deletion."))
+            return redirect("core:budget_archived_list")
+
+        qs = (
+            BudgetRequest.objects.visible_to(request.user)
+            .filter(pk__in=budget_ids, archived_at__isnull=False)
+        )
+        deleted = qs.count()
+        if not deleted:
+            messages.info(request, _("No archived budgets matched the selected items."))
             return redirect("core:budget_archived_list")
         qs.delete()
         messages.success(

@@ -18,10 +18,16 @@ urlpatterns = [
     path("budgets/archived/", views.BudgetArchivedListView.as_view(), name="budget_archived_list"),
     path("budgets/archived/purge/", views.BudgetArchivePurgeView.as_view(), name="budget_archived_purge"),
     path("budgets/archived/purge/preview/", views.BudgetArchivePurgePreviewView.as_view(), name="budget_archived_purge_preview"),
+    path("budgets/archived/bulk-delete/", views.BudgetArchivedBulkDeleteView.as_view(), name="budget_archived_bulk_delete"),
     path(
         "budgets/archived/requesters/delete/",
         views.BudgetArchivedRequesterDeleteView.as_view(),
         name="budget_archived_requester_delete",
+    ),
+    path(
+        "budgets/archived/<int:pk>/delete/",
+        views.BudgetArchivedItemDeleteView.as_view(),
+        name="budget_archived_item_delete",
     ),
     path("budgets/review/", views.BudgetReviewQueueView.as_view(), name="budget_review_queue"),
     path("budgets/<int:pk>/review/", views.BudgetReviewDecisionView.as_view(), name="budget_review_decision"),

@@ -189,8 +189,8 @@
   }
 
   const TAB_QUERIES = {
-    "this-week": () => ({ week_start: config.currentWeek }),
-    upcoming: () => ({ include_history: 1, upcoming: 1, status: "pending,in_progress" }),
+    "this-week": () => ({ due_date: isoToday, status: "pending,in_progress" }),
+    upcoming: () => ({ include_history: 1, upcoming: 1, upcoming_days: 14, status: "pending,in_progress" }),
     all: () => ({ include_history: 1, created_only: 1, status: "pending,in_progress" }),
     created: () => ({ include_history: 1, created_only: 1, status: "pending,in_progress" }),
     completed: () => ({ include_history: 1, status: "done", history: 1 }),
@@ -641,23 +641,29 @@
     const ownerBadge = showOwner ? `<span class="todo-card__owner">${ownerName}</span>` : "";
     const isSelected = state.completedSelection.has(String(item.id));
     const selectionControl = `<label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300"><input type="checkbox" data-task-select value="${item.id}" ${isSelected ? "checked" : ""} class="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 dark:border-slate-600 dark:bg-slate-900"/>${t("Select")}</label>`;
-    const completedMeta = item.completed_at
+    const showCompletedMeta = state.currentTab !== "completed";
+    const completedMeta = showCompletedMeta && item.completed_at
       ? `<span class="inline-flex items-center gap-1"><span class="font-semibold">${t("Completed")}:</span> ${relativeTime(item.completed_at)}</span>`
       : "";
     const dueRelative = item.due_date ? relativeDaysLabel(item.due_date) : "";
     const isOverdue = dueRelative.includes(t("late"));
     const dueMetaClass = isOverdue ? "todo-card__due--overdue" : "";
     const cardClass = cardStatusClass(status);
-    const quickStatus = `
+    const showQuickEdit = state.currentTab !== "completed";
+    const quickStatus = showQuickEdit
+      ? `
       <label>${t("Status")}
         <select class="input" data-inline-status>
           ${statusOptions(status)}
         </select>
-      </label>`;
-    const quickDue = `
+      </label>`
+      : "";
+    const quickDue = showQuickEdit
+      ? `
       <label>${t("Due date")}
         <input type="date" class="input" data-inline-due min="${isoToday}" value="${item.due_date || ""}" />
-      </label>`;
+      </label>`
+      : "";
 
     return `
       <article class="${cardClass}" data-todo-id="${item.id}" data-title="${safeTitle}" data-status="${status}" data-date="${item.due_date || item.week_start || ""}">
@@ -673,10 +679,12 @@
           <div class="todo-card__meta">
             ${completedMeta}
           </div>
-          <div class="todo-card__quick-edit">
+          ${showQuickEdit
+            ? `<div class="todo-card__quick-edit">
             ${quickStatus}
             ${quickDue}
-          </div>
+          </div>`
+            : ""}
         </div>
         <div class="todo-card__actions">
           ${selectionControl}
