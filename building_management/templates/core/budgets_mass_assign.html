@@ -45,7 +45,7 @@
               <p class="mt-1 text-sm font-medium text-rose-700 dark:text-rose-300">{{ form.title.errors|join:", " }}</p>
             {% endif %}
           </div>
-          <div>
+          <div class="md:col-span-2">
             <label class="form-label" for="{{ form.requested_amount.id_for_label }}">{% trans "Budget amount" %}</label>
             <div class="flex items-center gap-2">
               <span class="text-lg font-semibold text-slate-600 dark:text-slate-300">€</span>
@@ -88,10 +88,8 @@
               <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 <tr>
                   <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Select" %}</th>
-                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Username" %}</th>
                   <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Name" %}</th>
                   <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Role" %}</th>
-                  <th class="sticky top-0 z-10 bg-slate-50 px-4 py-3 dark:bg-slate-800">{% trans "Last login" %}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200 bg-white dark:divide-slate-700 dark:bg-slate-900">
@@ -103,10 +101,8 @@
                         <span class="sr-only">{% blocktrans with username=assignee.username %}Select {{ username }}{% endblocktrans %}</span>
                       </label>
                     </td>
-                    <td class="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{{ assignee.username }}</td>
                     <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ assignee.get_full_name|default:"—" }}</td>
                     <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ assignee.mass_assign_role_display }}</td>
-                    <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ assignee.last_login|date:"Y-m-d H:i"|default:"—" }}</td>
                   </tr>
                 {% endfor %}
               </tbody>

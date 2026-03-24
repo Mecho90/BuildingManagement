@@ -649,21 +649,6 @@
     const isOverdue = dueRelative.includes(t("late"));
     const dueMetaClass = isOverdue ? "todo-card__due--overdue" : "";
     const cardClass = cardStatusClass(status);
-    const showQuickEdit = state.currentTab !== "completed";
-    const quickStatus = showQuickEdit
-      ? `
-      <label>${t("Status")}
-        <select class="input" data-inline-status>
-          ${statusOptions(status)}
-        </select>
-      </label>`
-      : "";
-    const quickDue = showQuickEdit
-      ? `
-      <label>${t("Due date")}
-        <input type="date" class="input" data-inline-due min="${isoToday}" value="${item.due_date || ""}" />
-      </label>`
-      : "";
 
     return `
       <article class="${cardClass}" data-todo-id="${item.id}" data-title="${safeTitle}" data-status="${status}" data-date="${item.due_date || item.week_start || ""}">
@@ -679,12 +664,6 @@
           <div class="todo-card__meta">
             ${completedMeta}
           </div>
-          ${showQuickEdit
-            ? `<div class="todo-card__quick-edit">
-            ${quickStatus}
-            ${quickDue}
-          </div>`
-            : ""}
         </div>
         <div class="todo-card__actions">
           ${selectionControl}

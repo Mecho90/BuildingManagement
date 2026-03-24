@@ -5,9 +5,9 @@
 
 {% block content %}
   {% if form.instance.pk %}
-    {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url %}
+    {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url actions_left=True %}
   {% else %}
-    {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url submit_first=True %}
+    {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url actions_left=True %}
   {% endif %}
 {% endblock %}
 

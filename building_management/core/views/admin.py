@@ -562,8 +562,10 @@ class AdminBuildingBulkDeleteView(BulkDeleteView):
     page_title = _("Mass delete buildings")
     intro_text = ""
     empty_text = _("There are no buildings available to delete.")
-    submit_label = _("Delete buildings")
+    submit_label = _("Delete")
     success_url_name = "core:mass_delete_buildings"
+    left_actions_layout = True
+    full_width_page_size = True
 
     def get_queryset(self):
         budget_exists = BudgetRequest.objects.filter(building_id=OuterRef("pk"))
@@ -610,8 +612,9 @@ class AdminWorkOrderBulkDeleteView(BulkDeleteView):
     page_title = _("Mass delete work orders")
     intro_text = ""
     empty_text = _("There are no work orders available to delete.")
-    submit_label = _("Delete work orders")
+    submit_label = _("Delete")
     success_url_name = "core:mass_delete_work_orders"
+    left_actions_layout = True
     full_width_page_size = True
 
     def get_queryset(self):
@@ -627,7 +630,7 @@ class AdminWorkOrderBulkArchiveView(BulkDeleteView):
     page_title = _("Mass archive work orders")
     intro_text = ""
     empty_text = _("There are no completed work orders available to archive.")
-    submit_label = _("Archive work orders")
+    submit_label = _("Save")
     success_url_name = "core:mass_archive_work_orders"
     warning_text = _("Archiving moves selected work orders to the archive list.")
     left_actions_layout = True
@@ -670,7 +673,7 @@ class AdminLawyerWorkOrderBulkDeleteView(BulkDeleteView):
     page_title = _("Mass delete lawyer work orders")
     intro_text = ""
     empty_text = _("There are no lawyer work orders available to delete.")
-    submit_label = _("Delete lawyer work orders")
+    submit_label = _("Delete")
     success_url_name = "core:mass_delete_lawyer_work_orders"
     left_actions_layout = True
 
