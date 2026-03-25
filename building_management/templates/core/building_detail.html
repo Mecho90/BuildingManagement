@@ -400,19 +400,6 @@
                           <div class="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
                             {% blocktrans with destination=w.forwarded_to_building.name %}Forwarded to {{ destination }}{% endblocktrans %}
                           </div>
-                        {% elif w.forwarded_from_office %}
-                          <div class="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-200">
-                            <span>
-                              {% blocktrans with origin=w.building.name %}Origin · {{ origin }}{% endblocktrans %}
-                            </span>
-                            <span>
-                              {% if w.forwarded_to_building %}
-                                {% blocktrans with destination=w.forwarded_to_building.name %}Destination · {{ destination }}{% endblocktrans %}
-                              {% else %}
-                                {% trans "Destination · Removed" %}
-                              {% endif %}
-                            </span>
-                          </div>
                         {% endif %}
                       </td>
                       {% if building.is_system_default %}

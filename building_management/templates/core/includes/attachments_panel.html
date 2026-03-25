@@ -107,7 +107,21 @@
     </ul>
   </div>
 
-  {% if attachments_show_upload %}
+  {% if attachment_form_field %}
+    <div class="attachment-upload">
+      <div class="attachment-upload__controls">
+        <label class="attachment-upload__button" for="{{ attachment_form_field.id_for_label }}">
+          {{ attachment_i18n.upload_button }}
+        </label>
+        <div class="sr-only">
+          {{ attachment_form_field }}
+        </div>
+      </div>
+      <p class="attachment-upload__hint">
+        {{ attachment_form_field.help_text|default:attachment_i18n.upload_hint }}
+      </p>
+    </div>
+  {% elif attachments_show_upload %}
     {% if attachments_upload_enabled %}
       <div class="attachment-upload"
            data-attachment-upload
@@ -158,6 +172,11 @@
   {% if remove_attachments_field and remove_attachments_field.errors %}
     <div class="errors">
       {% for e in remove_attachments_field.errors %}<div>{{ e }}</div>{% endfor %}
+    </div>
+  {% endif %}
+  {% if attachment_form_field and attachment_form_field.errors %}
+    <div class="errors">
+      {% for e in attachment_form_field.errors %}<div>{{ e }}</div>{% endfor %}
     </div>
   {% endif %}
 

@@ -160,17 +160,12 @@ class OfficeVisibilityTests(TestCase):
         self.assertContains(response, "Очаква одобрение от бекофиса · Tower 2")
         self.assertContains(response, "Очаква одобрение от бекофиса · Central Plaza")
 
-    def test_destination_owner_sees_forwarded_origin_and_destination_badges(self):
+    def test_destination_owner_sees_forwarded_order_title(self):
         User = get_user_model()
         destination_owner = User.objects.create_user(username="destination", password="pass")
         destination_building = Building.objects.create(
             owner=destination_owner,
             name="Destination",
-        )
-        BuildingMembership.objects.create(
-            user=destination_owner,
-            building=destination_building,
-            role=MembershipRole.ADMINISTRATOR,
         )
         order = WorkOrder.objects.create(
             building=self.office,
@@ -182,8 +177,37 @@ class OfficeVisibilityTests(TestCase):
         self.client.force_login(destination_owner)
         response = self.client.get(reverse("core:building_detail", args=[destination_building.pk]))
         self.assertContains(response, order.title)
-        self.assertContains(response, "Origin · Office")
-        self.assertContains(response, f"Destination · {destination_building.name}")
+
+    def test_building_work_orders_tab_hides_lawyer_only_orders(self):
+        User = get_user_model()
+        reviewer = User.objects.create_user(username="reviewer-hidden-lawyer", password="pass")
+        BuildingMembership.objects.create(
+            user=reviewer,
+            building=None,
+            role=MembershipRole.BACKOFFICE,
+        )
+        visible_order = WorkOrder.objects.create(
+            building=self.another_building,
+            title="Visible maintenance ticket",
+            deadline=timezone.localdate(),
+            lawyer_only=False,
+        )
+        hidden_order = WorkOrder.objects.create(
+            building=self.another_building,
+            title="Hidden legal ticket",
+            deadline=timezone.localdate(),
+            lawyer_only=True,
+        )
+
+        self.client.force_login(reviewer)
+        response = self.client.get(reverse("core:building_detail", args=[self.another_building.pk]))
+        page_orders = list(response.context["workorders_page"].object_list)
+        page_order_ids = {order.id for order in page_orders}
+
+        self.assertIn(visible_order.id, page_order_ids)
+        self.assertNotIn(hidden_order.id, page_order_ids)
+        self.assertContains(response, visible_order.title)
+        self.assertNotContains(response, hidden_order.title)
 
     def test_building_list_bootstraps_office_for_global_staff(self):
         Building.objects.all().delete()

@@ -1,12 +1,12 @@
 {% load i18n form_helpers %}
 {# Generic form layout used by all create/update pages #}
-<section class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+<section class="{% firstof layout_section_class 'space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900' %}">
   <header class="space-y-1">
-    <h1 class="page-heading">{{ title }}</h1>
+    <h1 class="page-heading {% firstof layout_title_class '' %}">{{ title }}</h1>
     {% if subtitle %}<p class="text-sm text-slate-500 dark:text-slate-400">{{ subtitle }}</p>{% endif %}
   </header>
 
-  <form method="post" novalidate class="space-y-6"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
+  <form method="post" novalidate class="{% firstof layout_form_class 'space-y-6' %}"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
     {% csrf_token %}
     {% if next_url %}
       <input type="hidden" name="next" value="{{ next_url }}"/>
@@ -23,7 +23,7 @@
       {% endif %}
     {% endfor %}
 
-    <div class="grid gap-5">
+    <div class="{% firstof layout_fields_class 'grid gap-5' %}">
       {% with icons=field_icons %}
         {% if form.owner %}
           {% with owner_icon=icons|dict_get:"owner" %}
@@ -33,7 +33,13 @@
         {% for field in form.visible_fields %}
           {% if not form.owner or field.name != 'owner' %}
             {% with icon_name=icons|dict_get:field.name %}
-              {% include "components/form_field.html" with field=field icon=icon_name %}
+              {% if address_full_width and field.name == 'address' %}
+                {% include "components/form_field.html" with field=field icon=icon_name wrapper_class="md:col-span-2" %}
+              {% elif description_full_width and field.name == 'description' %}
+                {% include "components/form_field.html" with field=field icon=icon_name wrapper_class="md:col-span-2" %}
+              {% else %}
+                {% include "components/form_field.html" with field=field icon=icon_name %}
+              {% endif %}
             {% endwith %}
           {% endif %}
         {% endfor %}

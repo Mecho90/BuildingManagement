@@ -152,6 +152,10 @@ class BuildingForm(forms.ModelForm):
         if "owner" in self.fields:
             self.fields["owner"].label = "Owner"
 
+        # Keep a predictable field order for the building form layout.
+        ordered_fields = ["owner", "role", "name", "address", "description"]
+        self.order_fields([name for name in ordered_fields if name in self.fields])
+
         if self._can_assign_owner:
             owner_queryset = (
                 User.objects.filter(
@@ -534,14 +538,14 @@ class WorkOrderForm(forms.ModelForm):
             self.fields["building"].required = False
         else:
             if user:
-                bqs = Building.objects.visible_to(user)
+                bqs = Building.objects.visible_to(user).exclude(is_system_default=True)
             else:
                 bqs = Building.objects.none()
             self.fields["building"].queryset = bqs
 
         field_qs = self.fields["building"].queryset
         if field_qs is not None:
-            self.fields["building"].queryset = field_qs.order_by("-is_system_default", "name", "id")
+            self.fields["building"].queryset = field_qs.order_by("name", "id")
 
         self.fields["building"].label = _("Building")
 
@@ -1475,6 +1479,7 @@ class WorkOrderBudgetChargeForm(forms.Form):
         self.fields["budget"].queryset = qs
         self.fields["budget"].empty_label = _("Select a budget")
         self.fields["budget"].label_from_instance = self._format_budget_label
+        self.fields["attachments"].widget.attrs["class"] = "sr-only"
 
     def _format_budget_label(self, budget: BudgetRequest) -> str:
         title = (budget.title or "").strip()

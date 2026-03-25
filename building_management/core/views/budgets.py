@@ -174,6 +174,35 @@ def _extract_work_order_id_from_text(*texts):
     return None
 
 
+def _expense_attachment_i18n():
+    return {
+        "zoom_in": _("Zoom in"),
+        "zoom_out": _("Zoom out"),
+        "close": _("Close"),
+        "reset": _("Reset zoom"),
+        "open": _("Open original"),
+        "loading": _("Loading..."),
+        "tap_hint": _("Tap to zoom"),
+        "download": _("Download"),
+        "zoom": _("Zoom"),
+        "empty": _("No attachments uploaded yet."),
+        "uploaded_at": _("Uploaded %(date)s"),
+        "delete": _("Delete"),
+        "delete_confirm": _("Are you sure you want to delete this attachment?"),
+        "delete_title": _("Delete attachment"),
+        "delete_note": _("This action cannot be undone."),
+        "delete_confirm_button": _("Yes, delete"),
+        "cancel": _("Cancel"),
+        "upload_button": _("Upload files"),
+        "upload_hint": _("Upload one or more images or documents related to this expense."),
+        "uploading": _("Uploading…"),
+        "uploaded": _("Uploaded"),
+        "failed": _("Upload failed"),
+        "preview": _("Preview"),
+        "doc_loading": _("Loading preview…"),
+    }
+
+
 class BudgetFeatureRequiredMixin(CapabilityRequiredMixin):
     required_capabilities = (Capability.VIEW_BUDGETS,)
 
@@ -769,11 +798,8 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
             primary_url = ""
             primary_label = ""
             primary_kind = ""
-            if work_order_id:
-                # Always expose the direct work-order link when an expense is linked.
-                # Access control is still enforced by the work-order detail view itself.
-                work_order_url = reverse("core:work_order_detail", args=[work_order_id])
             if work_order_id and work_order_id in visible_work_order_ids:
+                work_order_url = reverse("core:work_order_detail", args=[work_order_id])
                 work_order_number_label = _("Work order #%(id)s") % {"id": work_order_id}
                 work_order_label = work_order_title or work_order_number_label
                 primary_url = work_order_url
@@ -844,6 +870,9 @@ class BudgetDetailView(LoginRequiredMixin, BudgetFeatureRequiredMixin, DetailVie
         ctx["can_log_expense"] = can_manage_expenses
         if can_manage_expenses:
             ctx["expense_form"] = BudgetExpenseForm(user=self.request.user, budget=budget)
+            ctx["expense_attachment_items"] = []
+            ctx["expense_attachment_i18n"] = _expense_attachment_i18n()
+            ctx["expense_attachment_panel_title"] = _("Attachments")
         ctx["events"] = budget.events.select_related("actor")
         resolver = CapabilityResolver(self.request.user)
         ctx["can_review_budget"] = (

@@ -448,6 +448,7 @@ class BulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, FormView):
     warning_text = _("Deletion is permanent and cannot be undone.")
     left_actions_layout = False
     full_width_page_size = False
+    items_grid_class = "space-y-3"
     paginate_choices = (25, 50, 100, 200)
     default_paginate_by = 25
 
@@ -552,6 +553,7 @@ class BulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, FormView):
                 "warning_text": self.warning_text,
                 "left_actions_layout": self.left_actions_layout,
                 "full_width_page_size": self.full_width_page_size,
+                "items_grid_class": self.items_grid_class,
             }
         )
         return ctx
@@ -616,6 +618,7 @@ class AdminWorkOrderBulkDeleteView(BulkDeleteView):
     success_url_name = "core:mass_delete_work_orders"
     left_actions_layout = True
     full_width_page_size = True
+    items_grid_class = "grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
 
     def get_queryset(self):
         return (
@@ -676,6 +679,8 @@ class AdminLawyerWorkOrderBulkDeleteView(BulkDeleteView):
     submit_label = _("Delete")
     success_url_name = "core:mass_delete_lawyer_work_orders"
     left_actions_layout = True
+    full_width_page_size = True
+    items_grid_class = "grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
 
     def get_queryset(self):
         return (

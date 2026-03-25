@@ -660,6 +660,7 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
 
 def _render_attachment_panel(request, *, order=None, form=None) -> dict[str, object]:
     context = _build_attachment_panel_context(request, order)
+    has_persisted_order = bool(order and getattr(order, "pk", None))
 
     if form is not None:
         try:
@@ -670,6 +671,14 @@ def _render_attachment_panel(request, *, order=None, form=None) -> dict[str, obj
             context["remove_attachments_field"] = form["remove_attachments"]
         except KeyError:
             context["remove_attachments_field"] = None
+
+        # Creation form has no persisted order yet, so async attachment API
+        # cannot be used. Reuse the same attachment panel styles with the form
+        # file input to allow selecting files before first save.
+        if not has_persisted_order and context.get("new_attachments_field") is not None:
+            context["attachment_form_field"] = context["new_attachments_field"]
+            context["new_attachments_field"] = None
+            context["attachments_show_upload"] = False
 
     html = render_to_string(
         "core/includes/attachments_panel.html",
@@ -1904,6 +1913,7 @@ class MassAssignWorkOrdersView(CapabilityRequiredMixin, LoginRequiredMixin, Form
             return self._building_queryset
         qs = (
             Building.objects.filter(role=Building.Role.TECH_SUPPORT)
+            .exclude(is_system_default=True)
             .select_related("owner")
             .order_by("name", "id")
         )
@@ -2705,4 +2715,9 @@ class WorkOrderBudgetChargeView(LoginRequiredMixin, UserPassesTestMixin, FormVie
         ctx["next_url"] = self.request.GET.get("next") or reverse(
             "core:work_order_detail", args=[self.work_order.pk]
         )
+        form = ctx.get("form")
+        attachment_panel_ctx = _build_attachment_panel_context(self.request, None)
+        attachment_panel_ctx["attachment_form_field"] = form["attachments"] if form is not None else None
+        attachment_panel_ctx["attachments_show_upload"] = False
+        ctx.update(attachment_panel_ctx)
         return ctx

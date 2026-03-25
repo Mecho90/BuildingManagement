@@ -27,27 +27,62 @@
   {% if building %}
     {% if form.instance.pk %}
       {% blocktrans with name=building.name asvar page_title %}Edit Unit in {{ name }}{% endblocktrans %}
-      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% else %}
       {% blocktrans with name=building.name asvar page_title %}New Unit in {{ name }}{% endblocktrans %}
-      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% endif %}
-
   {% elif form.instance.building_id %}
     {% if form.instance.pk %}
       {% blocktrans with name=form.instance.building.name asvar page_title %}Edit Unit in {{ name }}{% endblocktrans %}
-      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% else %}
       {% blocktrans with name=form.instance.building.name asvar page_title %}New Unit in {{ name }}{% endblocktrans %}
-      {% include "core/_form_layout.html" with form=form title=page_title cancel_url=cancel_url %}
     {% endif %}
-
   {% else %}
-    {# Robust fallback if no building is available yet #}
     {% if form.instance.pk %}
-      {% include "core/_form_layout.html" with form=form title=_('Edit Unit') cancel_url=cancel_url %}
+      {% trans "Edit Unit" as page_title %}
     {% else %}
-      {% include "core/_form_layout.html" with form=form title=_('New Unit') cancel_url=cancel_url %}
+      {% trans "New Unit" as page_title %}
     {% endif %}
   {% endif %}
+
+  <section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900 sm:p-5">
+    <header class="space-y-1">
+      <h1 class="page-heading text-2xl">{{ page_title }}</h1>
+    </header>
+
+    <form method="post" novalidate class="space-y-4"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
+      {% csrf_token %}
+
+      {% if next_url %}
+        <input type="hidden" name="next" value="{{ next_url }}"/>
+      {% endif %}
+
+      {% if form.non_field_errors %}
+        {% include "components/alert.html" with variant="danger" items=form.non_field_errors aria_live="assertive" %}
+      {% endif %}
+
+      {% for h in form.hidden_fields %}
+        {{ h }}
+        {% if h.errors %}
+          <div class="errors">{% for e in h.errors %}<div>{{ e }}</div>{% endfor %}</div>
+        {% endif %}
+      {% endfor %}
+
+      <div class="grid gap-3 md:grid-cols-2">
+        {% include "components/form_field.html" with field=form.number %}
+        {% include "components/form_field.html" with field=form.owner_name %}
+      </div>
+
+      <div class="grid gap-3 md:grid-cols-2">
+        {% include "components/form_field.html" with field=form.floor %}
+        {% include "components/form_field.html" with field=form.contact_phone %}
+      </div>
+
+      {% include "components/form_field.html" with field=form.description %}
+
+      <div class="form-actions justify-start">
+        <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>
+        <button class="btn" type="submit">{% trans "Save" %}</button>
+      </div>
+    </form>
+  </section>
 {% endblock %}

@@ -129,6 +129,12 @@ class WorkOrderFormForwardingTests(TestCase):
             self.destination_owner.get_full_name() or self.destination_owner.username,
         )
 
+    def test_building_dropdown_excludes_office(self):
+        form = WorkOrderForm(user=self.admin)
+        building_ids = set(form.fields["building"].queryset.values_list("id", flat=True))
+        self.assertNotIn(self.office.pk, building_ids)
+        self.assertIn(self.destination.pk, building_ids)
+
     def test_existing_forward_target_cannot_be_cleared(self):
         order = WorkOrder.objects.create(
             building=self.office,

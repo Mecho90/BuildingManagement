@@ -18,6 +18,7 @@ from core.models import (
     Expense,
     ExpenseCategory,
     MembershipRole,
+    WorkOrder,
 )
 
 
@@ -522,4 +523,55 @@ class BudgetFilterFormTests(TestCase):
         self.assertEqual(
             technician_field.label_from_instance(self.user),
             "Господин Лимон",
+        )
+
+
+class BudgetDetailExpenseLinksTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        BudgetFeatureFlag.objects.create(key="budgets", is_enabled=True)
+        self.tech = User.objects.create_user(username="budget-tech-links", password="pass")
+        self.owner = User.objects.create_user(username="budget-owner-links", password="pass")
+        self.building = Building.objects.create(owner=self.owner, name="Budget Link Building")
+        BuildingMembership.objects.create(
+            user=self.tech,
+            building=self.building,
+            role=MembershipRole.TECHNICIAN,
+        )
+        BuildingMembership.objects.create(
+            user=self.tech,
+            building=None,
+            role=MembershipRole.TECHNICIAN,
+        )
+        self.budget = BudgetRequest.objects.create(
+            requester=self.tech,
+            building=self.building,
+            title="Linked budget",
+            requested_amount=Decimal("100.00"),
+            approved_amount=Decimal("100.00"),
+            status=BudgetRequest.Status.APPROVED,
+        )
+
+    def test_hidden_work_order_link_when_user_cannot_access_order(self):
+        restricted_work_order = WorkOrder.objects.create(
+            building=self.building,
+            title="Lawyer order",
+            deadline=timezone.localdate(),
+            lawyer_only=True,
+        )
+        Expense.objects.create(
+            budget_request=self.budget,
+            label="Expense on hidden order",
+            amount=Decimal("20.00"),
+            status=Expense.Status.LOGGED,
+            metadata={"work_order_id": restricted_work_order.pk},
+        )
+
+        self.client.force_login(self.tech)
+        response = self.client.get(reverse("core:budget_detail", args=[self.budget.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            reverse("core:work_order_detail", args=[restricted_work_order.pk]),
         )

@@ -3,7 +3,7 @@
   {% with attr_icon=field.field.widget.attrs|dict_get:"icon" %}
     {% with label_text=label|default:field.label help_text=help_text|default:field.help_text icon_name=icon|default:attr_icon %}
       {% if input_type == "checkbox" %}
-        <div class="form-field form-field--choice">
+        <div class="form-field form-field--choice {% firstof wrapper_class '' %}">
           <label class="form-field__choice">
             {{ field }}
             <span>
@@ -22,7 +22,7 @@
         {% endif %}
       </div>
     {% else %}
-      <div class="form-field">
+      <div class="form-field {% firstof wrapper_class '' %}">
         {% if label_text %}
           <label class="form-field__label" for="{{ field.id_for_label }}">
             {{ label_text }}

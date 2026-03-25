@@ -649,6 +649,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             wo_qs = (
                 WorkOrder.objects.visible_to(self.request.user)
                 .filter(filter_expr)
+                .filter(lawyer_only=False)
                 .select_related("building", "unit", "forwarded_to_building")
                 .annotate(
                     priority_order=Case(

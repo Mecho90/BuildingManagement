@@ -1,16 +1,25 @@
 {% extends "base.html" %}
 {% load i18n static %}
-{% block title %}{% if form.instance.pk %}{% trans "Edit Work Order" %}{% else %}{% trans "New Work Order" %}{% endif %} · {% trans "Building Management" %}{% endblock %}
+{% if form.instance.pk and form.instance.lawyer_only %}
+  {% trans "Edit Lawyer Work Order" as form_page_title %}
+{% elif form.instance.pk %}
+  {% trans "Edit Work Order" as form_page_title %}
+{% elif request.GET.lawyer_only %}
+  {% trans "New Lawyer Order" as form_page_title %}
+{% else %}
+  {% trans "New Work Order" as form_page_title %}
+{% endif %}
+{% block title %}{{ form_page_title }} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
-<section class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+<section class="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card dark:border-slate-700 dark:bg-slate-900 sm:p-5">
   <header class="space-y-1">
-    <h1 class="page-heading">
-      {% if form.instance.pk %}{% trans "Edit Work Order" %}{% else %}{% trans "New Work Order" %}{% endif %}
+    <h1 class="page-heading text-2xl">
+      {{ form_page_title }}
     </h1>
   </header>
 
-  <form method="post" novalidate class="space-y-6"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
+  <form method="post" novalidate class="space-y-4"{% if form.is_multipart %} enctype="multipart/form-data"{% endif %}>
     {% csrf_token %}
     {% if next_url %}
       <input type="hidden" name="next" value="{{ next_url }}"/>
@@ -27,9 +36,36 @@
       {% endif %}
     {% endfor %}
 
-    <div class="grid gap-5">
+    {% if form.unit and not form.unit.is_hidden %}
+      <div class="grid gap-3 md:grid-cols-2">
+        {% if form.title and not form.title.is_hidden %}
+          {% include "components/form_field.html" with field=form.title %}
+        {% endif %}
+        {% include "components/form_field.html" with field=form.unit %}
+      </div>
+    {% else %}
+      <div class="grid gap-3 md:grid-cols-2">
+        {% if form.title and not form.title.is_hidden %}
+          {% include "components/form_field.html" with field=form.title wrapper_class="md:col-span-2" %}
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="grid gap-3 sm:grid-cols-3">
+      {% if form.status and not form.status.is_hidden %}
+        {% include "components/form_field.html" with field=form.status %}
+      {% endif %}
+      {% if form.priority and not form.priority.is_hidden %}
+        {% include "components/form_field.html" with field=form.priority %}
+      {% endif %}
+      {% if form.deadline and not form.deadline.is_hidden %}
+        {% include "components/form_field.html" with field=form.deadline %}
+      {% endif %}
+    </div>
+
+    <div class="grid gap-3 md:grid-cols-2">
       {% for field in form.visible_fields %}
-        {% if field.name != 'new_attachments' and field.name != 'remove_attachments' and field.name != 'forwarded_to_building' and field.name != 'forward_note' and field.name != 'budget_charge_budget' and field.name != 'budget_charge_amount' %}
+        {% if field.name != 'title' and field.name != 'unit' and field.name != 'status' and field.name != 'priority' and field.name != 'deadline' and field.name != 'description' and field.name != 'new_attachments' and field.name != 'remove_attachments' and field.name != 'forwarded_to_building' and field.name != 'forward_note' and field.name != 'budget_charge_budget' and field.name != 'budget_charge_amount' %}
           {% include "components/form_field.html" with field=field %}
         {% endif %}
       {% endfor %}
@@ -62,6 +98,7 @@
       {{ form.forwarding_owner_map|json_script:"forwarding-owner-map" }}
     {% endif %}
 
+    {% include "components/form_field.html" with field=form.description %}
     {{ attachment_panel_html|safe }}
 
     <div class="form-actions mt-2 flex flex-wrap items-center justify-start gap-3">
