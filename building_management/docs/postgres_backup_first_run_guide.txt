@@ -1,0 +1,71 @@
+PostgreSQL Backup Orchestrator - First Run Guide
+Project: /Users/mdonev/Desktop/MDonevProgramming/building_management
+
+Step 1: Go to the project root
+Command:
+cd /Users/mdonev/Desktop/MDonevProgramming/building_management
+Why:
+Run from project root so relative paths (for example `backups/`) are created in the expected place.
+
+Step 2: Verify required binaries exist
+Command:
+which python3 pg_dump pg_restore createdb dropdb
+
+Step 3: Set environment variables to match Django database settings
+Commands:
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=building_mgmt
+export DB_PASSWORD=building_mgmt
+export DB_NAME=building_mgmt
+
+Step 4: Create the first logical backup
+Command:
+python3 scripts/postgres_backup_orchestrator.py backup-logical --db-name building_mgmt
+
+Step 5: Confirm backup file exists
+Command:
+ls -lah backups/*.dump
+
+Step 6: Verify restore using the latest backup file
+Command:
+python3 scripts/postgres_backup_orchestrator.py restore-test \
+  --backup-file "$(ls -1t backups/*.dump | head -n 1)" \
+  --restore-db restore_verification_building_mgmt \
+  --db-host localhost \
+  --db-port 5432 \
+  --db-user building_mgmt \
+  --db-password building_mgmt
+
+Step 7: Run deploy gate (backup + migrate) without restore verification
+Command:
+python3 scripts/postgres_backup_orchestrator.py deploy-gate \
+  --db-host localhost \
+  --db-port 5432 \
+  --db-user building_mgmt \
+  --db-name building_mgmt \
+  --db-password building_mgmt \
+  -- python3 manage.py migrate
+
+Step 8 (Optional, one-time as postgres): Allow restore verification with app user
+Command:
+psql -h localhost -U postgres -d postgres -c "ALTER ROLE building_mgmt CREATEDB;"
+
+Step 9: Run full deploy gate with restore verification
+Command:
+python3 scripts/postgres_backup_orchestrator.py deploy-gate \
+  --db-host localhost \
+  --db-port 5432 \
+  --db-user building_mgmt \
+  --db-name building_mgmt \
+  --db-password building_mgmt \
+  --verify-restore \
+  --restore-db restore_verification_building_mgmt \
+  -- python3 manage.py migrate
+
+Notes:
+- Do not use placeholders like "..." in commands.
+- If you omit --db-name and DB_NAME is unset, the script defaults to database "postgres".
+- `restore-test` defaults to `restore_verification`; if that DB is owned by another user, pass `--restore-db restore_verification_building_mgmt`.
+- If you get `permission denied to create database`, grant `CREATEDB` to the DB role (step 8) or run restore checks with an admin role.
+- For production, prefer a dedicated backup/ops DB role and keep restore verification enabled.

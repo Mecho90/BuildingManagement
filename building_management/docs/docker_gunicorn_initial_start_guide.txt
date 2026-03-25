@@ -1,0 +1,77 @@
+Docker + Gunicorn Initial Start Guide (Local + AWS EC2)
+Project root: /path/to/building_management
+
+Step 1: Go to project root
+Command:
+cd /path/to/building_management
+
+Step 2: (Optional) Activate virtual environment
+Command:
+source .venv/bin/activate
+
+Step 3: Install Python and frontend dependencies
+Commands:
+pip install -r requirements.txt
+npm install
+npm run build:css
+
+Step 4A: Start PostgreSQL with Docker (use this if DB is on the same EC2 host)
+Command:
+docker compose up -d postgres
+
+Step 4B: Use external PostgreSQL (RDS or managed DB) instead of Docker
+Command example:
+export DATABASE_URL=postgres://<db_user>:<db_password>@<rds-endpoint>:5432/<db_name>
+
+Step 5A: Confirm Docker Postgres is healthy (skip if using RDS/external DB)
+Commands:
+docker compose ps
+docker compose logs --tail=50 postgres
+
+Step 6: Set database connection for Django (if using Docker local DB)
+Command example:
+export DATABASE_URL=postgres://building_mgmt:building_mgmt@localhost:5432/building_mgmt
+
+Step 7: Run migrations
+Command:
+python3 manage.py migrate
+
+Step 8: Collect static files for Gunicorn/Whitenoise
+Command:
+python3 manage.py collectstatic --noinput
+
+Step 9: Start app with Gunicorn (same as Procfile)
+Command:
+gunicorn -c gunicorn.conf.py building_mgmt.wsgi:application
+
+Step 10: Verify app is reachable
+Commands:
+curl -I http://127.0.0.1:8000
+
+Optional: Stop services
+Commands:
+CTRL+C   (stop Gunicorn in terminal)
+docker compose down
+
+Optional: One-command restart flow after first setup
+Commands:
+cd /path/to/building_management
+source .venv/bin/activate
+docker compose up -d postgres
+export DATABASE_URL=postgres://building_mgmt:building_mgmt@localhost:5432/building_mgmt
+python3 manage.py migrate
+python3 manage.py collectstatic --noinput
+gunicorn -c gunicorn.conf.py building_mgmt.wsgi:application
+
+AWS EC2 notes:
+- Replace `/path/to/building_management` with your real EC2 app directory (for example `/home/ec2-user/building_management`).
+- If using RDS, skip Docker Postgres steps (4A, 5A, Docker down) and use step 4B only.
+- Ensure security groups allow EC2 -> Postgres on port `5432`.
+- Do not run Gunicorn in an interactive shell for production; run it via `systemd` and put Nginx in front.
+
+General notes:
+- `Procfile` command is: `web: gunicorn -c gunicorn.conf.py building_mgmt.wsgi:application`.
+- `docker-compose.yml` defaults: user `building_mgmt`, password `building_mgmt`, db `building_mgmt`, port `5432`.
+- If port 5432 is already taken, set `POSTGRES_PORT` before `docker compose up`, for example:
+  `export POSTGRES_PORT=5433`
+  and update `DATABASE_URL` to use `5433`.
