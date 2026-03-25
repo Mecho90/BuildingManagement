@@ -174,7 +174,7 @@
               <tr class="text-sm text-slate-700 hover:bg-slate-50/80 dark:text-slate-200 dark:hover:bg-slate-800/70">
                 <td class="px-4 py-3 font-medium">
                   <div class="flex flex-wrap items-center gap-2">
-                    <a href="{% url 'core:building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{{ b.name }}</a>
+                    <a href="{% url 'core:building_detail' b.id %}" class="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200 break-words hyphens-auto">{% if b.is_system_default %}{% trans "Office" %}{% else %}{{ b.name }}{% endif %}</a>
                   </div>
                 </td>
                 {% if show_owner_column %}

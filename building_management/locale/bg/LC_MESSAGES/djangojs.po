@@ -18,6 +18,12 @@ msgstr "Краен срок"
 msgid "Mark done"
 msgstr "Отбележи като завършена"
 
+msgid "task selected"
+msgstr "избрана задача"
+
+msgid "tasks selected"
+msgstr "избрани задачи"
+
 msgid "Edit"
 msgstr "Редактирай"
 
@@ -59,3 +65,9 @@ msgstr "Нед"
 
 msgid "Are you sure you want to delete"
 msgstr "Сигурни ли сте, че искате да изтриете"
+
+msgid "Select"
+msgstr "Избери"
+
+msgid "No tasks yet. Create your first task to get started."
+msgstr "Все още няма задачи. Създайте първата си задача, за да започнете."

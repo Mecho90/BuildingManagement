@@ -62,13 +62,17 @@
         <h2 id="mass-step-2" class="text-xl font-semibold text-brand-foreground dark:text-white" style="margin:0;">{% trans "Select users" %}</h2>
 
         {% if assignee_filtered_total %}
-          <div class="mt-2 flex flex-wrap items-center justify-end gap-3 text-sm">
-            <div class="flex flex-wrap items-center gap-2">
+          <div class="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <span
+              class="text-sm font-semibold text-slate-700 dark:text-slate-200"
+              data-selected-count-label
+              data-selected-template="{% blocktrans with count='__COUNT__' %}{{ count }} selected{% endblocktrans %}"
+            >
+              {% blocktrans with count=summary_selected_users %}{{ count }} selected{% endblocktrans %}
+            </span>
+            <div class="ml-auto flex flex-wrap items-center gap-2">
               <button type="button" class="btn btn-secondary btn-sm" data-select-all>{% trans "Select all on page" %}</button>
               <button type="button" class="btn btn-secondary btn-sm" data-clear-selection>{% trans "Clear selection" %}</button>
-              <span class="text-sm font-semibold text-slate-700 dark:text-slate-200" data-selected-count-label>
-                {% blocktrans with count=summary_selected_users %}{{ count }} selected{% endblocktrans %}
-              </span>
             </div>
           </div>
 
@@ -150,7 +154,10 @@
         var users = selectedCount();
         var budgets = templateSelectedCount();
 
-        if (selectedCountLabel) selectedCountLabel.textContent = users + ' selected';
+        if (selectedCountLabel) {
+          var template = selectedCountLabel.dataset.selectedTemplate || '__COUNT__ избрани';
+          selectedCountLabel.textContent = template.replace('__COUNT__', String(users));
+        }
         if (submitBtn) {
           submitBtn.disabled = !(budgets > 0 && users > 0 && confirmBox && confirmBox.checked);
         }

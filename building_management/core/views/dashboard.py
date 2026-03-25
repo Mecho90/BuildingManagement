@@ -119,7 +119,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             {
                 "id": wo.pk,
                 "title": wo.title,
-                "building": getattr(wo.building, "name", "-"),
+                "building": self._display_building_name(getattr(wo, "building", None)),
                 "priority": wo.priority,
                 "priority_label": wo.get_priority_display(),
                 "status_code": wo.status,
@@ -150,6 +150,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         )
         return list({*membership_ids, *owned_ids})
 
+    def _display_building_name(self, building) -> str:
+        if not building:
+            return "-"
+        if getattr(building, "is_system_default", False):
+            return _("Office")
+        return getattr(building, "name", "-") or "-"
+
     def _backoffice_cards(self, user, resolver):
         query = _querystring_without(self.request, "backoffice_page")
         if not user or not user.is_authenticated:
@@ -175,7 +182,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 {
                     "id": wo.pk,
                     "title": wo.title,
-                    "building": getattr(wo.building, "name", "-"),
+                    "building": self._display_building_name(getattr(wo, "building", None)),
                     "deadline": wo.deadline,
                     "note": wo.replacement_request_note,
                     "awaiting_since": wo.updated_at.strftime("%Y-%m-%d %H:%M"),
@@ -212,7 +219,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         cards = []
         for budget in qs:
             requester = budget.requester.get_full_name() or budget.requester.username
-            building = getattr(budget.building, "name", "")
+            building = self._display_building_name(getattr(budget, "building", None))
             cards.append(
                 {
                     "id": budget.pk,
@@ -370,7 +377,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 {
                     "id": wo.pk,
                     "title": wo.title,
-                    "building": getattr(wo.building, "name", "-"),
+                    "building": self._display_building_name(getattr(wo, "building", None)),
                     "priority": wo.priority,
                     "priority_label": wo.get_priority_display(),
                     "status_code": wo.status,

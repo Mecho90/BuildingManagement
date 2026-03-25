@@ -36,7 +36,7 @@
               {% if address_full_width and field.name == 'address' %}
                 {% include "components/form_field.html" with field=field icon=icon_name wrapper_class="md:col-span-2" %}
               {% elif description_full_width and field.name == 'description' %}
-                {% include "components/form_field.html" with field=field icon=icon_name wrapper_class="md:col-span-2" %}
+                {% include "components/form_field.html" with field=field icon=icon_name wrapper_class=description_wrapper_class|default:"md:col-span-2" %}
               {% else %}
                 {% include "components/form_field.html" with field=field icon=icon_name %}
               {% endif %}

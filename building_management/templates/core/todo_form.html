@@ -1,14 +1,68 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n form_helpers %}
 
 {% block title %}{{ form_title|default:_("New Task") }} · {% trans "Building Management" %}{% endblock %}
 
 {% block content %}
-  {% if form.instance.pk %}
-    {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url actions_left=True %}
-  {% else %}
-    {% include "core/_form_layout.html" with form=form title=form_title|default:_('New Task') cancel_url=cancel_url actions_left=True %}
-  {% endif %}
+<section class="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-card dark:border-slate-700 dark:bg-slate-900">
+  <header class="space-y-1">
+    <h1 class="page-heading">{{ form_title|default:_("New Task") }}</h1>
+  </header>
+
+  <form method="post" novalidate class="space-y-6">
+    {% csrf_token %}
+    {% if next_url %}
+      <input type="hidden" name="next" value="{{ next_url }}"/>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+      {% include "components/alert.html" with variant="danger" items=form.non_field_errors aria_live="assertive" %}
+    {% endif %}
+
+    {% for h in form.hidden_fields %}
+      {{ h }}
+      {% if h.errors %}
+        <div class="errors">{% for e in h.errors %}<div>{{ e }}</div>{% endfor %}</div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="todo-form-layout">
+      <div class="todo-form-row todo-form-row--top">
+        {% include "components/form_field.html" with field=form.title %}
+        {% include "components/form_field.html" with field=form.status %}
+        {% include "components/form_field.html" with field=form.due_date %}
+      </div>
+      <div class="todo-form-row">
+        {% include "components/form_field.html" with field=form.description %}
+      </div>
+    </div>
+
+    <div class="form-actions justify-start">
+      <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>
+      <button class="btn" type="submit">{% trans "Save" %}</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <style>
+    .todo-form-layout {
+      display: grid;
+      gap: 1.25rem;
+    }
+    .todo-form-row {
+      display: grid;
+      gap: 1.25rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 1024px) {
+      .todo-form-row--top {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+  </style>
 {% endblock %}
 
 {% block extra_js %}

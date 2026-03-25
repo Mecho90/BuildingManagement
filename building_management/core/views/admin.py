@@ -27,7 +27,7 @@ from django.db.models.functions import Lower, Cast
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
-from django.utils.translation import gettext as _, ngettext
+from django.utils.translation import gettext_lazy as _, ngettext
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
 from ..forms import (
@@ -568,6 +568,7 @@ class AdminBuildingBulkDeleteView(BulkDeleteView):
     success_url_name = "core:mass_delete_buildings"
     left_actions_layout = True
     full_width_page_size = True
+    items_grid_class = "grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
 
     def get_queryset(self):
         budget_exists = BudgetRequest.objects.filter(building_id=OuterRef("pk"))
@@ -637,6 +638,8 @@ class AdminWorkOrderBulkArchiveView(BulkDeleteView):
     success_url_name = "core:mass_archive_work_orders"
     warning_text = _("Archiving moves selected work orders to the archive list.")
     left_actions_layout = True
+    full_width_page_size = True
+    items_grid_class = "grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
 
     def get_queryset(self):
         return (

@@ -145,12 +145,12 @@ class BuildingForm(forms.ModelForm):
             else False
         )
         self._can_assign_owner = self._user_can_assign_owner(user)
-        self.fields["name"].label = "Name"
-        self.fields["address"].label = "Address"
-        self.fields["description"].label = "Description"
-        self.fields["role"].label = "Role"
+        self.fields["name"].label = _("Name")
+        self.fields["address"].label = _("Address")
+        self.fields["description"].label = _("Description")
+        self.fields["role"].label = _("Role")
         if "owner" in self.fields:
-            self.fields["owner"].label = "Owner"
+            self.fields["owner"].label = _("Owner")
 
         # Keep a predictable field order for the building form layout.
         ordered_fields = ["owner", "role", "name", "address", "description"]
@@ -179,7 +179,7 @@ class BuildingForm(forms.ModelForm):
                 str(pk) for pk in sorted(technician_ids)
             )
             self.fields["owner"].label_from_instance = lambda obj: obj.get_full_name() or obj.get_username()
-            self.fields["owner"].label = "Owner"
+            self.fields["owner"].label = _("Owner")
         else:
             self.fields.pop("owner", None)
 
@@ -204,10 +204,10 @@ class BuildingForm(forms.ModelForm):
             role_field.help_text = ""
         elif is_editing_existing and not self._is_admin:
             role_field.disabled = True
-            role_field.help_text = "Only administrators can change the building role once it has been set."
+            role_field.help_text = _("Only administrators can change the building role once it has been set.")
         elif not owner_is_technician:
             role_field.disabled = True
-            role_field.help_text = "Role is editable only when the assigned user has the Technician role."
+            role_field.help_text = _("Role is editable only when the assigned user has the Technician role.")
 
     def save(self, commit: bool = True):
         obj: Building = super().save(commit=False)
@@ -287,7 +287,7 @@ class TodoItemForm(forms.ModelForm):
         self.fields["status"].label = _("Status")
         self.fields["due_date"].widget.attrs.setdefault("class", "input")
         self.fields["due_date"].widget.attrs.setdefault("min", timezone.localdate().isoformat())
-        self.fields["due_date"].label = _("Due date")
+        self.fields["due_date"].label = _("Date")
         self.fields["due_date"].widget.attrs.setdefault("data-date-placeholder", _("dd.mm.yyyy"))
         self.fields["description"].widget.attrs.setdefault("class", "input")
         self.fields["description"].label = _("Description")
@@ -1442,7 +1442,7 @@ class ArchivePurgeForm(forms.Form):
 class WorkOrderBudgetChargeForm(forms.Form):
     budget = forms.ModelChoiceField(queryset=BudgetRequest.objects.none(), label=_("Budget"))
     amount = forms.DecimalField(
-        label=_("Charge amount"),
+        label=_("Amount"),
         max_digits=12,
         decimal_places=2,
         min_value=Decimal("0.01"),

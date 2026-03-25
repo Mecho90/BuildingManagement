@@ -49,7 +49,7 @@
     <div>
       <div class="space-y-6">
         <section class="space-y-4 rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
-          <div class="grid gap-5 md:grid-cols-3">
+          <div class="grid gap-5 grid-cols-1 sm:grid-cols-3">
             {% if form.username %}
               <div>
                 {% include "components/form_field.html" with field=form.username icon="user" help_text="" %}
