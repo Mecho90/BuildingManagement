@@ -733,6 +733,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             field_label_map = {
                 "deadline": _("deadline"),
                 "description": _("description"),
+                "forwarded_to_building": _("forwarded to building"),
                 "priority": _("priority"),
                 "replacement_request_note": _("replacement note"),
                 "title": _("title"),

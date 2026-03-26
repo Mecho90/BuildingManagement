@@ -142,6 +142,8 @@ If `DATABASE_URL` is omitted the app will automatically use a local SQLite datab
 
 Prefer a one-off container instead of compose? Run `docker run` with the same env vars/port mapping.
 
+For a full step-by-step setup (local Docker and external PostgreSQL), see `docs/postgres_connection_guide.md`.
+
 Optional env vars:
 
 - `DJANGO_DB_CONN_MAX_AGE` – persistent connection lifetime in seconds (default `60`).

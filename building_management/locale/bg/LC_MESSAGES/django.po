@@ -2279,11 +2279,8 @@ msgid "No date"
 msgstr "Краен срок"
 
 #: core/views/dashboard.py:344
-#, fuzzy
-#| msgid "overdue by %(count)s day"
-#| msgid_plural "overdue by %(count)s days"
 msgid "overdue by 1 day"
-msgstr "просрочена с %(count)s ден"
+msgstr "просрочена с 1 ден"
 
 #: core/views/dashboard.py:347
 #, python-format
@@ -2303,10 +2300,8 @@ msgid "Deadline is today"
 msgstr "Крайният срок е днес"
 
 #: core/views/dashboard.py:357
-#, fuzzy
-#| msgid "Deadline is today"
 msgid "deadline is tomorrow"
-msgstr "Крайният срок е днес"
+msgstr "крайният срок е утре"
 
 #: core/views/dashboard.py:359 core/views/dashboard.py:367
 #, python-format
@@ -2314,9 +2309,7 @@ msgid "%(priority)s task with an upcoming deadline"
 msgstr ""
 
 #: core/views/dashboard.py:362
-#, fuzzy, python-format
-#| msgid "due in %(count)s day"
-#| msgid_plural "due in %(count)s days"
+#, python-format
 msgid "deadline in %(count)s day"
 msgid_plural "deadline in %(count)s days"
 msgstr[0] "с краен срок след %(count)s ден"
@@ -2364,7 +2357,7 @@ msgstr "%(actor)s създаде \"%(title)s\" за %(building)s."
 #: core/views/dashboard.py:708
 #, python-format
 msgid "%(actor)s changed the status of \"%(title)s\" from %(from)s to %(to)s."
-msgstr ""
+msgstr "%(actor)s промени статуса на \"%(title)s\" от %(from)s на %(to)s."
 
 #: core/views/dashboard.py:718
 #, python-format
@@ -2372,73 +2365,60 @@ msgid "%(actor)s recorded an approval decision for \"%(title)s\" (%(status)s)."
 msgstr ""
 
 #: core/views/dashboard.py:721
-#, fuzzy
-#| msgid "Superuser status"
 msgid "updated status"
-msgstr "Статут на супер-потребител"
+msgstr "актуализиран статус"
 
 #: core/views/dashboard.py:727
-#, fuzzy
-#| msgid "Deadline"
 msgid "deadline"
 msgstr "Краен срок"
 
 #: core/views/dashboard.py:728
-#, fuzzy
-#| msgid "Description"
 msgid "description"
 msgstr "Описание"
 
 #: core/views/dashboard.py:729
-#, fuzzy
-#| msgid "Priority"
+msgid "forwarded to building"
+msgstr "пренасочено към сграда"
+
+#: core/views/dashboard.py:729
 msgid "priority"
 msgstr "Приоритет"
 
 #: core/views/dashboard.py:730
-#, fuzzy
-#| msgid "Replacement request note"
 msgid "replacement note"
 msgstr "Бележка към заявката за замяна"
 
 #: core/views/dashboard.py:731
-#, fuzzy
-#| msgid "Title"
 msgid "title"
 msgstr "Заглавие"
 
 #: core/views/dashboard.py:732
-#, fuzzy
-#| msgid "Add unit"
 msgid "unit"
-msgstr "Добавяне на апартамент"
+msgstr "апартамент"
 
 #: core/views/dashboard.py:737
-#, fuzzy
-#| msgid "Details"
 msgid "details"
 msgstr "Детайли"
 
 #: core/views/dashboard.py:738
 #, python-format
 msgid "%(actor)s updated %(fields)s for \"%(title)s\"."
-msgstr ""
+msgstr "%(actor)s актуализира %(fields)s за \"%(title)s\"."
 
 #: core/views/dashboard.py:744
 #, python-format
 msgid "%(actor)s updated attachments for \"%(title)s\"."
-msgstr ""
+msgstr "%(actor)s актуализира прикачените файлове за \"%(title)s\"."
 
 #: core/views/dashboard.py:749
 #, python-format
 msgid "%(actor)s reassigned \"%(title)s\"."
-msgstr ""
+msgstr "%(actor)s пренасочи \"%(title)s\"."
 
 #: core/views/dashboard.py:755
-#, fuzzy, python-format
-#| msgid "Back to archived list"
+#, python-format
 msgid "%(actor)s archived \"%(title)s\"."
-msgstr "Назад към списъка с архивирани"
+msgstr "%(actor)s архивира \"%(title)s\"."
 
 #: core/views/notifications.py:34
 #, fuzzy
