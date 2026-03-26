@@ -86,6 +86,11 @@ def _attachment_payload(
         url = attachment.file.url
     except ValueError:
         url = ""
+    thumbnail_url = ""
+    try:
+        thumbnail_url = attachment.thumbnail.url
+    except ValueError:
+        thumbnail_url = ""
     absolute_url = request.build_absolute_uri(url) if url else ""
     office_viewer_allowed = _office_viewer_enabled(request)
 
@@ -101,8 +106,10 @@ def _attachment_payload(
     size_bytes = attachment.size or 0
 
     extension = Path(filename).suffix.lower().lstrip(".")
+    image_extensions = {"jpg", "jpeg", "png", "gif", "bmp", "webp", "tif", "tiff", "avif", "svg"}
+    is_image = content_type.startswith("image/") or extension in image_extensions
     doc_extensions = {"doc", "docx", "odt", "rtf", "txt"}
-    if content_type.startswith("image/"):
+    if is_image:
         category = "image"
     elif extension == "pdf":
         category = "pdf"
@@ -143,7 +150,7 @@ def _attachment_payload(
     )
     preview_url = None
     preview_external = False
-    if content_type.startswith("image/"):
+    if is_image:
         preview_url = url
     elif extension == "pdf":
         preview_url = url
@@ -174,11 +181,12 @@ def _attachment_payload(
         "size": size_bytes,
         "size_display": filesizeformat(size_bytes),
         "url": url,
+        "thumbnail_url": thumbnail_url or url,
         "preview_url": preview_url,
         "preview_external": preview_external,
         "created_at": created.isoformat(),
         "created_display": created.strftime("%Y-%m-%d %H:%M"),
-        "is_image": content_type.startswith("image/"),
+        "is_image": is_image,
         "category": category,
         "extension": extension,
         "delete_url": delete_url,

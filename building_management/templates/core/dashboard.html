@@ -23,7 +23,7 @@
       </div>
       <div class="{{ section_shell }}">
         {% if deadline_alert_cards %}
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {% for alert in deadline_alert_cards %}
               <article class="{{ card_base }}">
                 <header class="dashboard-card__header">
@@ -57,7 +57,7 @@
           </div>
           {% if deadline_alert_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=deadline_alert_page paginator=deadline_alert_page.paginator query_string=deadline_page_query page_param="deadline_page" show_single_page=True min_total_for_controls=4 %}
+              {% include "core/includes/pagination.html" with page_obj=deadline_alert_page paginator=deadline_alert_page.paginator query_string=deadline_page_query page_param="deadline_page" show_single_page=True min_total_for_controls=6 %}
             </div>
           {% endif %}
         {% else %}
@@ -78,7 +78,7 @@
         </div>
         <div class="{{ section_shell }}">
           {% if technician_cards %}
-            <div class="grid gap-4 md:grid-cols-2">
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {% for job in technician_cards %}
                 <article class="{{ card_base }}">
                   <header class="dashboard-card__header">
@@ -114,7 +114,7 @@
           {% endif %}
           {% if technician_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=technician_cards_page paginator=technician_cards_page.paginator query_string=technician_page_query page_param="jobs_page" show_single_page=True min_total_for_controls=4 %}
+              {% include "core/includes/pagination.html" with page_obj=technician_cards_page paginator=technician_cards_page.paginator query_string=technician_page_query page_param="jobs_page" show_single_page=True min_total_for_controls=6 %}
             </div>
           {% endif %}
         </div>
@@ -131,7 +131,7 @@
         </div>
         <div class="{{ section_shell }}">
           {% if backoffice_cards %}
-            <div class="grid gap-4 md:grid-cols-2">
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {% for card in backoffice_cards %}
                 <article class="{{ card_base }}">
                   <header class="dashboard-card__header">
@@ -173,7 +173,7 @@
           {% endif %}
           {% if backoffice_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=backoffice_cards_page paginator=backoffice_cards_page.paginator query_string=backoffice_page_query page_param="backoffice_page" show_single_page=True min_total_for_controls=4 %}
+              {% include "core/includes/pagination.html" with page_obj=backoffice_cards_page paginator=backoffice_cards_page.paginator query_string=backoffice_page_query page_param="backoffice_page" show_single_page=True min_total_for_controls=6 %}
             </div>
           {% endif %}
         </div>
@@ -189,7 +189,7 @@
           </span>
         </div>
         <div class="{{ section_shell }}">
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {% for budget in pending_budget_cards %}
               <article class="{{ card_base }}">
                 <header class="dashboard-card__header">
@@ -213,7 +213,7 @@
           </div>
           {% if pending_budget_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=pending_budget_cards_page paginator=pending_budget_cards_page.paginator query_string=pending_budget_page_query page_param="budget_page" show_single_page=True min_total_for_controls=4 %}
+              {% include "core/includes/pagination.html" with page_obj=pending_budget_cards_page paginator=pending_budget_cards_page.paginator query_string=pending_budget_page_query page_param="budget_page" show_single_page=True min_total_for_controls=6 %}
             </div>
           {% endif %}
         </div>
@@ -231,7 +231,7 @@
           {% endif %}
         </div>
         <div class="{{ section_shell }}">
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {% for task in todo_cards %}
               <article class="{{ card_base }}">
                 <header class="dashboard-card__header">
@@ -256,7 +256,7 @@
           </div>
           {% if todo_cards_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=todo_cards_page paginator=todo_cards_page.paginator query_string=todo_page_query page_param="todo_page" show_single_page=True min_total_for_controls=4 %}
+              {% include "core/includes/pagination.html" with page_obj=todo_cards_page paginator=todo_cards_page.paginator query_string=todo_page_query page_param="todo_page" show_single_page=True min_total_for_controls=6 %}
             </div>
           {% endif %}
         </div>
@@ -309,7 +309,7 @@
           </ul>
           {% if notifications_page %}
             <div class="mt-4">
-              {% include "core/includes/pagination.html" with page_obj=notifications_page paginator=notifications_page.paginator query_string=note_page_query page_param="note_page" show_single_page=True min_total_for_controls=4 %}
+              {% include "core/includes/pagination.html" with page_obj=notifications_page paginator=notifications_page.paginator query_string=note_page_query page_param="note_page" show_single_page=True min_total_for_controls=6 %}
             </div>
           {% endif %}
         {% else %}

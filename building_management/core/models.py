@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import mimetypes
 import uuid
 from datetime import date, datetime, timedelta
@@ -12,6 +13,7 @@ from pathlib import Path
 from django.apps import apps
 from django.conf import settings
 from django.core.cache import cache
+from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
@@ -740,6 +742,11 @@ def work_order_attachment_upload_to(instance, filename: str) -> str:
     return f"work_orders/{work_order_id}/{uuid.uuid4().hex}{extension}"
 
 
+def work_order_attachment_thumbnail_upload_to(instance, filename: str) -> str:
+    work_order_id = instance.work_order_id or "unassigned"
+    return f"work_orders/{work_order_id}/thumbnails/{uuid.uuid4().hex}.webp"
+
+
 class WorkOrderAttachment(TimeStampedModel):
     work_order = models.ForeignKey(
         WorkOrder,
@@ -768,6 +775,24 @@ class WorkOrderAttachment(TimeStampedModel):
         editable=False,
         default=0,
     )
+    thumbnail = models.FileField(
+        upload_to=work_order_attachment_thumbnail_upload_to,
+        verbose_name=_("Thumbnail"),
+        editable=False,
+        blank=True,
+    )
+    thumbnail_width = models.PositiveIntegerField(
+        _("Thumbnail width"),
+        editable=False,
+        null=True,
+        blank=True,
+    )
+    thumbnail_height = models.PositiveIntegerField(
+        _("Thumbnail height"),
+        editable=False,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -776,6 +801,66 @@ class WorkOrderAttachment(TimeStampedModel):
 
     def __str__(self) -> str:  # pragma: no cover
         return self.original_name or Path(self.file.name).name
+
+    def _is_image_attachment(self) -> bool:
+        mime = (self.content_type or "").lower()
+        if mime.startswith("image/"):
+            return True
+        extension = Path(self.file.name or "").suffix.lower().lstrip(".")
+        return extension in {"jpg", "jpeg", "png", "gif", "bmp", "webp", "tif", "tiff", "avif", "svg"}
+
+    def _clear_thumbnail(self):
+        if self.thumbnail:
+            storage = self.thumbnail.storage
+            name = self.thumbnail.name
+            self.thumbnail = None
+            self.thumbnail_width = None
+            self.thumbnail_height = None
+            try:
+                storage.delete(name)
+            except Exception:
+                pass
+            super().save(update_fields=["thumbnail", "thumbnail_width", "thumbnail_height", "updated_at"])
+
+    def _generate_thumbnail(self):
+        if not self.file or not self._is_image_attachment():
+            self._clear_thumbnail()
+            return
+        try:
+            from PIL import Image, UnidentifiedImageError
+        except Exception:
+            return
+
+        try:
+            self.file.open("rb")
+            with Image.open(self.file) as image:
+                image = image.convert("RGBA") if image.mode in {"RGBA", "LA", "P"} else image.convert("RGB")
+                if hasattr(Image, "Resampling"):
+                    image.thumbnail((480, 480), Image.Resampling.LANCZOS)
+                else:  # pragma: no cover - Pillow < 9.1 fallback
+                    image.thumbnail((480, 480), Image.LANCZOS)
+                buffer = io.BytesIO()
+                image.save(buffer, format="WEBP", quality=80, method=6)
+                content = buffer.getvalue()
+                if not content:
+                    return
+                thumb_name = f"{Path(self.file.name).stem}_thumb.webp"
+                if self.thumbnail:
+                    try:
+                        self.thumbnail.delete(save=False)
+                    except Exception:
+                        pass
+                self.thumbnail.save(thumb_name, content=ContentFile(content), save=False)
+                self.thumbnail_width = image.width
+                self.thumbnail_height = image.height
+                super().save(update_fields=["thumbnail", "thumbnail_width", "thumbnail_height", "updated_at"])
+        except (FileNotFoundError, OSError, UnidentifiedImageError):
+            return
+        finally:
+            try:
+                self.file.close()
+            except Exception:
+                pass
 
     def save(self, *args, **kwargs):
         if self.file:
@@ -795,6 +880,7 @@ class WorkOrderAttachment(TimeStampedModel):
                 self.size = 0
 
         super().save(*args, **kwargs)
+        self._generate_thumbnail()
 
 
 class WorkOrderForwarding(TimeStampedModel):

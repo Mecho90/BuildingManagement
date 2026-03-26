@@ -36,18 +36,22 @@
       {% endif %}
     {% endfor %}
 
-    {% if form.unit and not form.unit.is_hidden %}
-      <div class="grid gap-3 md:grid-cols-2">
-        {% if form.title and not form.title.is_hidden %}
+    <div class="grid gap-3 md:grid-cols-2">
+      {% if form.title and not form.title.is_hidden %}
+        {% if form.building and not form.building.is_hidden %}
           {% include "components/form_field.html" with field=form.title %}
-        {% endif %}
-        {% include "components/form_field.html" with field=form.unit %}
-      </div>
-    {% else %}
-      <div class="grid gap-3 md:grid-cols-2">
-        {% if form.title and not form.title.is_hidden %}
+        {% else %}
           {% include "components/form_field.html" with field=form.title wrapper_class="md:col-span-2" %}
         {% endif %}
+      {% endif %}
+      {% if form.building and not form.building.is_hidden %}
+        {% include "components/form_field.html" with field=form.building %}
+      {% endif %}
+    </div>
+
+    {% if form.unit and not form.unit.is_hidden %}
+      <div class="grid gap-3">
+        {% include "components/form_field.html" with field=form.unit %}
       </div>
     {% endif %}
 
@@ -65,11 +69,14 @@
 
     <div class="grid gap-3 md:grid-cols-2">
       {% for field in form.visible_fields %}
-        {% if field.name != 'title' and field.name != 'unit' and field.name != 'status' and field.name != 'priority' and field.name != 'deadline' and field.name != 'description' and field.name != 'new_attachments' and field.name != 'remove_attachments' and field.name != 'forwarded_to_building' and field.name != 'forward_note' and field.name != 'budget_charge_budget' and field.name != 'budget_charge_amount' %}
+        {% if field.name != 'title' and field.name != 'building' and field.name != 'unit' and field.name != 'status' and field.name != 'priority' and field.name != 'deadline' and field.name != 'description' and field.name != 'new_attachments' and field.name != 'remove_attachments' and field.name != 'forwarded_to_building' and field.name != 'forward_note' and field.name != 'budget_charge_budget' and field.name != 'budget_charge_amount' %}
           {% include "components/form_field.html" with field=field %}
         {% endif %}
       {% endfor %}
     </div>
+
+    {% include "components/form_field.html" with field=form.description %}
+    {{ attachment_panel_html|safe }}
 
     {% if form.forwarding_enabled %}
       <section id="forwarding-section" class="space-y-4 rounded-2xl border border-orange-200/70 bg-orange-50/50 p-4 dark:border-orange-500/50 dark:bg-orange-500/10">
@@ -97,9 +104,6 @@
       </section>
       {{ form.forwarding_owner_map|json_script:"forwarding-owner-map" }}
     {% endif %}
-
-    {% include "components/form_field.html" with field=form.description %}
-    {{ attachment_panel_html|safe }}
 
     <div class="form-actions mt-2 flex flex-wrap items-center justify-start gap-3">
       <a class="btn btn-secondary" href="{{ cancel_url|default:'javascript:history.back()' }}">{% trans "Cancel" %}</a>

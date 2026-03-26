@@ -41,6 +41,7 @@ def _config_from_settings() -> AttachmentValidationConfig:
             "application/x-7z-compressed",
             "application/x-tar",
             "application/gzip",
+            "image/webp",
         ),
     )
     if isinstance(raw_types, str):

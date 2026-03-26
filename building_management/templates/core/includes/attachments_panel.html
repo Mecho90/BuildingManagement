@@ -45,7 +45,11 @@
                         data-src="{{ item.url }}"
                         data-name="{{ item.filename }}"
                         data-type="{{ item.mime }}">
-                  <img src="{{ item.url }}" alt="{{ item.filename }}" loading="lazy"/>
+                  {% if item.thumbnail_url %}
+                    <img src="{{ item.thumbnail_url }}" alt="{{ item.filename }}" loading="lazy"/>
+                  {% else %}
+                    <img src="{{ item.url }}" alt="{{ item.filename }}" loading="lazy"/>
+                  {% endif %}
                   <span class="attachment-card__preview-hint">{{ attachment_i18n.tap_hint }}</span>
                 </button>
               {% else %}
@@ -108,11 +112,13 @@
   </div>
 
   {% if attachment_form_field %}
-    <div class="attachment-upload">
+    <div class="attachment-upload" data-attachment-form-upload>
       <div class="attachment-upload__controls">
-        <label class="attachment-upload__button" for="{{ attachment_form_field.id_for_label }}">
+        <button type="button"
+                class="attachment-upload__button"
+                data-attachment-form-upload-trigger>
           {{ attachment_i18n.upload_button }}
-        </label>
+        </button>
         <div class="sr-only">
           {{ attachment_form_field }}
         </div>

@@ -125,3 +125,38 @@ class WorkOrderAttachmentTests(TestCase):
         log_entry = WorkOrderAuditLog.objects.latest("pk")
         payload = log_entry.payload.get("attachments")
         self.assertEqual(payload["removed"], ["panel.txt"])
+
+    def test_api_upload_accepts_webp_files(self):
+        self.client.force_login(self.allowed)
+        url = reverse("core:api_workorder_attachments", args=[self.work_order.pk])
+        webp_file = SimpleUploadedFile(
+            "preview.webp",
+            b"RIFF\x00\x00\x00\x00WEBPVP8 ",
+            content_type="image/webp",
+        )
+        response = self.client.post(url, {"files": webp_file})
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()["attachments"][0]
+        self.assertTrue(payload["is_image"])
+        self.assertEqual(payload["category"], "image")
+        self.assertEqual(payload["extension"], "webp")
+
+    def test_api_payload_treats_webp_extension_as_image_when_content_type_missing(self):
+        attachment = WorkOrderAttachment.objects.create(
+            work_order=self.work_order,
+            file=SimpleUploadedFile(
+                "fallback.webp",
+                b"RIFF\x00\x00\x00\x00WEBPVP8 ",
+                content_type="image/webp",
+            ),
+            original_name="fallback.webp",
+        )
+        WorkOrderAttachment.objects.filter(pk=attachment.pk).update(content_type="")
+        self.client.force_login(self.allowed)
+        url = reverse("core:api_workorder_attachments", args=[self.work_order.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["attachments"][0]
+        self.assertTrue(payload["is_image"])
+        self.assertEqual(payload["category"], "image")
+        self.assertEqual(payload["extension"], "webp")

@@ -172,8 +172,8 @@ class LawyerWorkOrderListView(LoginRequiredMixin, LawyerOrAdminRequiredMixin, Li
     model = WorkOrder
     template_name = "core/lawyer_work_orders.html"
     context_object_name = "work_orders"
-    paginate_by = 25
-    _per_choices = (25, 50, 100, 200)
+    paginate_by = 20
+    _per_choices = (20, 50, 100)
 
     def get_queryset(self):
         request = self.request
@@ -509,6 +509,11 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
                 url = attachment.file.url
             except ValueError:
                 url = ""
+            thumbnail_url = ""
+            try:
+                thumbnail_url = attachment.thumbnail.url
+            except ValueError:
+                thumbnail_url = ""
             absolute_url = request.build_absolute_uri(url) if url else ""
 
             filename = (attachment.original_name or "").strip()
@@ -520,8 +525,9 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
                 filename = _("Attachment %(id)s") % {"id": attachment.pk}
 
             mime = (attachment.content_type or "").lower()
-            is_image = mime.startswith("image/")
             extension = Path(filename).suffix.lower().lstrip(".")
+            image_extensions = {"jpg", "jpeg", "png", "gif", "bmp", "webp", "tif", "tiff", "avif", "svg"}
+            is_image = mime.startswith("image/") or extension in image_extensions
             size_raw = getattr(attachment, "size", 0) or 0
             size_label = filesizeformat(size_raw) if size_raw else ""
             created = timezone.localtime(attachment.created_at)
@@ -581,6 +587,7 @@ def _build_attachment_panel_context(request, order: WorkOrder | None):
                 {
                     "attachment": attachment,
                     "url": url,
+                    "thumbnail_url": thumbnail_url or url,
                     "absolute_url": absolute_url,
                     "filename": filename,
                     "mime": mime,
@@ -750,9 +757,9 @@ class WorkOrderListView(LoginRequiredMixin, ListView):
     model = WorkOrder
     template_name = "core/work_orders_list.html"
     context_object_name = "orders"
-    paginate_by = 25
+    paginate_by = 20
 
-    _per_choices = (25, 50, 100, 200)
+    _per_choices = (20, 50, 100)
 
     def get_queryset(self):
         extra = {"user_id": getattr(getattr(self.request, "user", None), "pk", None)}
@@ -2064,10 +2071,10 @@ class ArchivedWorkOrderFilterMixin:
     Shared filtering helpers for archived work order views.
     """
 
-    SUMMARY_PER_CHOICES = (25, 50, 100, 200)
-    SUMMARY_PER_DEFAULT = 25
-    DETAIL_PER_CHOICES = (25, 50, 100, 200)
-    DETAIL_PER_DEFAULT = 25
+    SUMMARY_PER_CHOICES = (20, 50, 100)
+    SUMMARY_PER_DEFAULT = 20
+    DETAIL_PER_CHOICES = (20, 50, 100)
+    DETAIL_PER_DEFAULT = 20
 
     _sort_choices = [
         ("archived_desc", _lazy("Archived (Newest first)")),

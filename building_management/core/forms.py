@@ -1310,7 +1310,7 @@ class BudgetFilterForm(forms.Form):
         required=False,
         label=_("Page size"),
         coerce=int,
-        choices=((25, "25"), (50, "50"), (100, "100"), (200, "200")),
+        choices=((20, "20"), (50, "50"), (100, "100")),
     )
     show_requester = False
 

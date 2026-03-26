@@ -67,14 +67,16 @@ class BuildingListView(LoginRequiredMixin, ListView):
     model = Building
     template_name = "core/buildings_list.html"
     context_object_name = "buildings"
+    PAGINATE_DEFAULT = 20
+    PAGINATE_CHOICES = (20, 50, 100)
 
     def get_paginate_by(self, queryset):
-        allowed = {25, 50, 100, 200}
+        allowed = set(self.PAGINATE_CHOICES)
         try:
-            value = int(self.request.GET.get("per", 25))
+            value = int(self.request.GET.get("per", self.PAGINATE_DEFAULT))
         except (TypeError, ValueError):
-            value = 25
-        return value if value in allowed else 25
+            value = self.PAGINATE_DEFAULT
+        return value if value in allowed else self.PAGINATE_DEFAULT
 
     def get_queryset(self):
         user = self.request.user
@@ -228,9 +230,12 @@ class BuildingListView(LoginRequiredMixin, ListView):
         )
         ctx["q"] = (self.request.GET.get("q") or "").strip()
         try:
-            ctx["per"] = int(self.request.GET.get("per", 25))
+            ctx["per"] = int(self.request.GET.get("per", self.PAGINATE_DEFAULT))
         except (TypeError, ValueError):
-            ctx["per"] = 25
+            ctx["per"] = self.PAGINATE_DEFAULT
+        if ctx["per"] not in self.PAGINATE_CHOICES:
+            ctx["per"] = self.PAGINATE_DEFAULT
+        ctx["per_choices"] = self.PAGINATE_CHOICES
         ctx["sort"] = getattr(self, "_effective_sort", "name")
         can_manage_buildings = getattr(self, "_can_manage_buildings", False)
         ctx["show_owner_column"] = can_manage_buildings
@@ -297,10 +302,10 @@ class BuildingListView(LoginRequiredMixin, ListView):
             active_filter_chips.append(
                 {"label": _("Sort changed"), "remove_url": _remove_filter_url("sort")}
             )
-        if ctx.get("per", 25) != 25:
+        if ctx.get("per", self.PAGINATE_DEFAULT) != self.PAGINATE_DEFAULT:
             active_filter_chips.append(
                 {
-                    "label": _("Page size: %(value)s") % {"value": ctx.get("per", 25)},
+                    "label": _("Page size: %(value)s") % {"value": ctx.get("per", self.PAGINATE_DEFAULT)},
                     "remove_url": _remove_filter_url("per"),
                 }
             )
@@ -312,6 +317,8 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
     model = Building
     template_name = "core/building_detail.html"
     context_object_name = "building"
+    TABLE_PER_DEFAULT = 20
+    TABLE_PER_CHOICES = (20, 50, 100)
 
     # Only buildings the user may see
     def get_queryset(self):
@@ -329,9 +336,12 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
 
     def _get_int(self, key: str, default: int) -> int:
         try:
-            return int(self.request.GET.get(key, default))
+            value = int(self.request.GET.get(key, default))
         except (TypeError, ValueError):
             return default
+        if value not in self.TABLE_PER_CHOICES:
+            return default
+        return value
 
     # View ------------------------------------------------------------------
 
@@ -533,7 +543,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
         # ========================= Units =========================
         if show_units_tab:
             u_q = (self.request.GET.get("u_q") or "").strip()
-            u_per = self._get_int("u_per", 25)
+            u_per = self._get_int("u_per", self.TABLE_PER_DEFAULT)
             u_sort = (self.request.GET.get("u_sort") or "number").strip()
             if u_sort.lstrip("-") not in {"number", "floor", "owner_name"}:
                 u_sort = "number"
@@ -570,7 +580,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 units_active_filter_chips.append(
                     {"label": _("Sort changed"), "remove_url": _remove_filter_url("units", "u_sort")}
                 )
-            if u_per != 25:
+            if u_per != self.TABLE_PER_DEFAULT:
                 units_active_filter_chips.append(
                     {"label": _("Page size: %(value)s") % {"value": u_per}, "remove_url": _remove_filter_url("units", "u_per")}
                 )
@@ -595,7 +605,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
             # ===================== Work Orders =======================
             # EXACTLY the names your template uses
             w_q = (self.request.GET.get("w_q") or "").strip()
-            w_per = self._get_int("w_per", 25)
+            w_per = self._get_int("w_per", self.TABLE_PER_DEFAULT)
             w_status = (self.request.GET.get("w_status") or "").strip().upper()
             w_deadline_from_raw = (self.request.GET.get("w_deadline_from") or "").strip()
             w_deadline_to_raw = (self.request.GET.get("w_deadline_to") or "").strip()
@@ -767,7 +777,7 @@ class BuildingDetailView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectMi
                 workorders_active_filter_chips.append(
                     {"label": _("To: %(value)s") % {"value": w_deadline_to_raw}, "remove_url": _remove_filter_url("work_orders", "w_deadline_to")}
                 )
-            if w_per != 25:
+            if w_per != self.TABLE_PER_DEFAULT:
                 workorders_active_filter_chips.append(
                     {"label": _("Page size: %(value)s") % {"value": w_per}, "remove_url": _remove_filter_url("work_orders", "w_per")}
                 )

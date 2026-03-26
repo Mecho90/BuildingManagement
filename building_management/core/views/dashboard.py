@@ -31,6 +31,8 @@ from .common import _querystring_without, _safe_next_url
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "core/dashboard.html"
+    CARDS_PER_PAGE = 6
+    NOTIFICATIONS_PER_PAGE = 6
     DEADLINE_WINDOWS = {
         WorkOrder.Priority.HIGH: 5,
         WorkOrder.Priority.MEDIUM: 3,
@@ -131,7 +133,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             for wo in qs
         ]
 
-        paginator = Paginator(cards, 4)
+        paginator = Paginator(cards, self.CARDS_PER_PAGE)
         try:
             page_number = int(self.request.GET.get("jobs_page", 1))
         except (TypeError, ValueError):
@@ -191,7 +193,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 }
             )
 
-        paginator = Paginator(cards, 4)
+        paginator = Paginator(cards, self.CARDS_PER_PAGE)
         try:
             page_number = int(self.request.GET.get("backoffice_page", 1))
         except (TypeError, ValueError):
@@ -231,7 +233,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     "updated": budget.updated_at,
                 }
             )
-        paginator = Paginator(cards, 4)
+        paginator = Paginator(cards, self.CARDS_PER_PAGE)
         try:
             page_number = int(self.request.GET.get("budget_page", 1))
         except (TypeError, ValueError):
@@ -268,7 +270,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     "delete_url": f"{reverse('core:todo_delete', args=[item.pk])}?next={next_target}",
                 }
             )
-        paginator = Paginator(items, 4)
+        paginator = Paginator(items, self.CARDS_PER_PAGE)
         try:
             page_number = int(self.request.GET.get("todo_page", 1))
         except (TypeError, ValueError):
@@ -397,7 +399,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 priority_order.get(item["priority"], 99),
             )
         )
-        paginator = Paginator(cards, 4)
+        paginator = Paginator(cards, self.CARDS_PER_PAGE)
         try:
             page_number = int(self.request.GET.get("deadline_page", 1))
         except (TypeError, ValueError):
@@ -486,7 +488,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     def _notifications_context(self):
         notifications_list = self._build_notifications()
-        note_paginator = Paginator(notifications_list, 4)
+        note_paginator = Paginator(notifications_list, self.NOTIFICATIONS_PER_PAGE)
         try:
             note_page_number = int(self.request.GET.get("note_page", 1))
         except (TypeError, ValueError):

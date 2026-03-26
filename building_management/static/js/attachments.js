@@ -3,8 +3,9 @@
   const attachmentsList = wrapper ? wrapper.querySelector("[data-attachments]") : null
   const emptyState = wrapper ? wrapper.querySelector("[data-attachments-empty]") : null
   const uploadRoot = document.querySelector("[data-attachment-upload]")
+  const formUploadRoot = document.querySelector("[data-attachment-form-upload]")
 
-  if (!attachmentsList && !uploadRoot) {
+  if (!attachmentsList && !uploadRoot && !formUploadRoot) {
     return
   }
 
@@ -76,10 +77,112 @@
   if (uploadRoot && attachmentsList) {
     initUploader()
   }
+  if (formUploadRoot) {
+    initFormUploadPicker()
+  }
 
   // -------------------------------------------------------------------------
   // Attachment actions
   // -------------------------------------------------------------------------
+
+  function initFormUploadPicker () {
+    const trigger = formUploadRoot.querySelector("[data-attachment-form-upload-trigger]")
+    const input = formUploadRoot.querySelector("input[type='file']")
+    if (!trigger || !input) {
+      return
+    }
+    const draftPreviewUrls = []
+
+    const clearDraftPreviews = () => {
+      if (attachmentsList) {
+        attachmentsList.querySelectorAll('[data-draft-preview="1"]').forEach((node) => node.remove())
+      }
+      while (draftPreviewUrls.length) {
+        const url = draftPreviewUrls.pop()
+        try {
+          URL.revokeObjectURL(url)
+        } catch (error) {
+          /* noop */
+        }
+      }
+    }
+
+    const formatFileSize = (bytes) => {
+      const value = Number(bytes) || 0
+      if (value <= 0) {
+        return ""
+      }
+      const units = ["B", "KB", "MB", "GB", "TB"]
+      const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1)
+      const scaled = value / Math.pow(1024, index)
+      const precision = scaled >= 100 || index === 0 ? 0 : 1
+      return `${scaled.toFixed(precision)} ${units[index]}`
+    }
+
+    const fileCategory = (file) => {
+      const type = (file.type || "").toLowerCase()
+      const ext = ((file.name || "").split(".").pop() || "").toLowerCase()
+      const imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "webp", "tif", "tiff", "avif", "svg"]
+      if (type.startsWith("image/")) {
+        return "image"
+      }
+      if (imageExtensions.includes(ext)) {
+        return "image"
+      }
+      if (ext === "pdf") {
+        return "pdf"
+      }
+      if (["doc", "docx", "odt", "rtf", "txt"].includes(ext)) {
+        return "doc"
+      }
+      return "file"
+    }
+
+    const updateSelection = () => {
+      clearDraftPreviews()
+      if (attachmentsList) {
+        updateEmptyState()
+      }
+
+      const files = Array.from(input.files || [])
+      if (attachmentsList) {
+        files.forEach((file, index) => {
+          const ext = ((file.name || "").split(".").pop() || "").toLowerCase()
+          const isImage = fileCategory(file) === "image"
+          let objectUrl = ""
+          if (isImage) {
+            objectUrl = URL.createObjectURL(file)
+            draftPreviewUrls.push(objectUrl)
+          }
+          const meta = {
+            id: `draft-${index}-${file.name}-${file.size}-${file.lastModified}`,
+            name: file.name || "Attachment",
+            content_type: file.type || "",
+            size_display: formatFileSize(file.size),
+            category: fileCategory(file),
+            extension: ext,
+            is_image: isImage,
+            url: objectUrl,
+            created_display: "after save",
+            created_iso: new Date().toISOString()
+          }
+          const card = renderAttachment(meta)
+          if (card) {
+            card.dataset.draftPreview = "1"
+            attachmentsList.appendChild(card)
+          }
+        })
+        updateEmptyState()
+      }
+    }
+
+    trigger.addEventListener("click", function () {
+      input.click()
+    })
+    input.addEventListener("change", updateSelection)
+    window.addEventListener("beforeunload", clearDraftPreviews)
+    updateSelection()
+  }
 
   function onAttachmentsClick (event) {
     const target = event.target
@@ -170,7 +273,7 @@
       button.dataset.type = meta.content_type || ""
 
       const img = document.createElement("img")
-      img.src = meta.url
+      img.src = meta.thumbnail_url || meta.url
       img.alt = meta.name || ""
       img.loading = "lazy"
       button.appendChild(img)

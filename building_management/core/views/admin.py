@@ -80,9 +80,9 @@ class AdminUserListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
     model = User
     template_name = "core/users_list.html"
     context_object_name = "users"
-    paginate_by = 25
+    paginate_by = 20
 
-    _per_choices = (25, 50, 100, 200)
+    _per_choices = (20, 50, 100)
 
     def get_paginate_by(self, queryset):
         try:

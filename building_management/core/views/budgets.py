@@ -252,7 +252,7 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
             filter_data["technician"] = str(user.pk)
 
         filter_form = BudgetFilterForm(filter_data, user=self.request.user)
-        per_value = 25
+        per_value = 20
         active_filter_chips: list[dict[str, str]] = []
 
         def _chip_remove_url(*keys: str) -> str:
@@ -293,7 +293,7 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                 budget_qs = budget_qs.filter(created_at__date__gte=from_date)
             if to_date:
                 budget_qs = budget_qs.filter(created_at__date__lte=to_date)
-            per_value = data.get("per") or 25
+            per_value = data.get("per") or 20
 
             if data.get("q"):
                 active_filter_chips.append(
@@ -330,7 +330,7 @@ class BudgetListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateVie
                         "remove_url": _chip_remove_url("date_from", "date_to"),
                     }
                 )
-            if per_value != 25:
+            if per_value != 20:
                 active_filter_chips.append(
                     {
                         "label": _("Page size: %(value)s") % {"value": per_value},
@@ -1160,8 +1160,8 @@ class BudgetArchiveView(LoginRequiredMixin, BudgetFeatureRequiredMixin, View):
 
 class BudgetArchivedListView(LoginRequiredMixin, BudgetFeatureRequiredMixin, TemplateView):
     template_name = "core/budgets_archived.html"
-    PER_CHOICES = (25, 50, 100, 200)
-    PER_DEFAULT = 25
+    PER_CHOICES = (20, 50, 100)
+    PER_DEFAULT = 20
     SORT_CHOICES = [
         ("archived_desc", _("Archived (Newest first)")),
         ("archived_asc", _("Archived (Oldest first)")),
