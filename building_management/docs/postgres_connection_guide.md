@@ -137,6 +137,22 @@ python manage.py shell -c "from django.db import connection; c=connection.cursor
 python manage.py verify_pg_schema --show-counts
 ```
 
+4. Exact `psql` check for the `core_unit` case-insensitive uniqueness index:
+```bash
+python manage.py dbshell
+```
+```sql
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename='core_unit'
+  AND indexname='unique_unit_number_ci_per_building';
+```
+
+Explanation:
+1. If this query returns one row, the required uniqueness rule exists.
+2. In PostgreSQL, expression-based uniqueness (like `lower(number), building_id`) is commonly stored as a unique index.
+3. Older versions of `verify_pg_schema` might only check `pg_constraint`, which can report a false failure even though the unique index is present and correct.
+
 ## 7. Run the app with PostgreSQL
 
 Development server:

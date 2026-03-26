@@ -47,8 +47,14 @@ class Command(BaseCommand):
                 JOIN pg_namespace n ON n.oid = c.connamespace
                 WHERE c.conname = %s
                   AND n.nspname = ANY (current_schemas(FALSE))
+                UNION ALL
+                SELECT 1
+                FROM pg_indexes i
+                WHERE i.indexname = %s
+                  AND i.schemaname = ANY (current_schemas(FALSE))
+                LIMIT 1
                 """,
-                ("unique_unit_number_ci_per_building",),
+                ("unique_unit_number_ci_per_building", "unique_unit_number_ci_per_building"),
             ),
             (
                 "core_unit (building_id, number) index",
