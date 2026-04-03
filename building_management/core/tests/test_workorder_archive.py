@@ -151,3 +151,47 @@ class ArchivedWorkOrderPurgeViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         order.refresh_from_db()
         self.assertIsNotNone(order.archived_at)
+
+
+class WorkOrderDeleteViewTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        self.owner = self.User.objects.create_user(username="owner-delete", password="pass1234")
+        self.building = Building.objects.create(
+            owner=self.owner,
+            name="Delete Tower",
+            address="3 Main",
+        )
+        self.lawyer = self.User.objects.create_user(username="lawyer-delete", password="pass1234")
+        BuildingMembership.objects.create(
+            user=self.lawyer,
+            building=self.building,
+            role=MembershipRole.LAWYER,
+        )
+
+    def _create_order(self, *, lawyer_only: bool):
+        return WorkOrder.objects.create(
+            building=self.building,
+            title="Delete candidate",
+            deadline=timezone.localdate(),
+            lawyer_only=lawyer_only,
+        )
+
+    def test_lawyer_can_delete_lawyer_only_order(self):
+        order = self._create_order(lawyer_only=True)
+        self.client.force_login(self.lawyer)
+
+        confirm_response = self.client.get(reverse("core:work_order_delete", args=[order.pk]))
+        self.assertEqual(confirm_response.status_code, 200)
+
+        delete_response = self.client.post(reverse("core:work_order_delete", args=[order.pk]))
+        self.assertEqual(delete_response.status_code, 302)
+        self.assertFalse(WorkOrder.objects.filter(pk=order.pk).exists())
+
+    def test_lawyer_cannot_delete_non_lawyer_only_order(self):
+        order = self._create_order(lawyer_only=False)
+        self.client.force_login(self.lawyer)
+
+        response = self.client.get(reverse("core:work_order_delete", args=[order.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(WorkOrder.objects.filter(pk=order.pk).exists())

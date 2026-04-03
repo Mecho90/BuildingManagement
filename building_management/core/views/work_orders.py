@@ -1729,6 +1729,8 @@ class WorkOrderDeleteView(LoginRequiredMixin, UserPassesTestMixin, CachedObjectM
         wo = self.get_object()
         if _technician_readonly_for_forwarded_office_order(self.request.user, wo):
             return False
+        if wo.lawyer_only and user_is_lawyer(self.request.user, building_id=wo.building_id):
+            return True
         return _user_has_building_capability(
             self.request.user,
             wo.building,

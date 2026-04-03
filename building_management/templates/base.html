@@ -85,6 +85,7 @@
                       <div class="header-meta__pill header-meta__pill--accent">
                         <time datetime="{% now 'c' %}" class="body-sm font-semibold">{% now 'D, M j, Y' %}</time>
                         {% if user.is_authenticated %}
+                          <span class="body-sm hidden sm:inline-flex font-semibold" aria-hidden="true">|</span>
                           <span class="body-sm hidden sm:inline-flex font-semibold">{% blocktrans with name=user.get_full_name|default:user.username %}Welcome, {{ name }}{% endblocktrans %}</span>
                         {% endif %}
                       </div>

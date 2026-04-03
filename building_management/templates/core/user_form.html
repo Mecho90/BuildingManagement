@@ -22,30 +22,6 @@
 
   <form method="post" id="admin-user-form" class="space-y-6" novalidate>
     {% csrf_token %}
-    {% if invalid_field_count or form.non_field_errors %}
-      <section class="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900 dark:border-rose-500/70 dark:bg-rose-950/30 dark:text-rose-100" aria-live="assertive">
-        {% if invalid_field_count %}
-          <p class="text-sm font-semibold">
-            {% blocktrans count total=invalid_field_count %}Please fix {{ total }} field.{% plural %}Please fix {{ total }} fields.{% endblocktrans %}
-          </p>
-          <ul class="mt-2 list-disc space-y-1 pl-5 text-sm">
-            {% for item in invalid_field_items %}
-              <li>
-                <a href="#{{ item.id }}" class="underline decoration-rose-400 hover:decoration-rose-600 dark:decoration-rose-300 dark:hover:decoration-rose-200">{{ item.label }}</a>
-              </li>
-            {% endfor %}
-          </ul>
-        {% endif %}
-        {% if form.non_field_errors %}
-          <ul class="{% if invalid_field_count %}mt-3{% endif %} list-disc space-y-1 pl-5 text-sm">
-            {% for error in form.non_field_errors %}
-              <li>{{ error }}</li>
-            {% endfor %}
-          </ul>
-        {% endif %}
-      </section>
-    {% endif %}
-
     <div>
       <div class="space-y-6">
         <section class="space-y-4 rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">

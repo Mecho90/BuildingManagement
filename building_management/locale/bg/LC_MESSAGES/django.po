@@ -168,6 +168,10 @@ msgstr "Приоритет"
 msgid "Deadline"
 msgstr "Краен срок"
 
+#: core/forms.py:598
+msgid "Employees"
+msgstr "Служители"
+
 #: core/forms.py:608
 #, fuzzy
 #| msgid "Awaiting approval. Only backoffice users can change this status."
@@ -606,6 +610,10 @@ msgstr "Адрес"
 #: core/models.py:286
 msgid "Marks the singleton Office building that remains unit-less."
 msgstr ""
+
+#: templates/core/building_detail.html:99
+msgid "Office workspace"
+msgstr "Офис пространство"
 
 #: core/models.py:294 templates/base.html:48
 #: templates/core/building_detail.html:4 templates/core/buildings_list.html:4

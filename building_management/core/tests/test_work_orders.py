@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.translation import override
 
 from core.forms import WorkOrderForm
 from core.models import Building, BuildingMembership, MembershipRole, Unit, WorkOrder, WorkOrderAuditLog
@@ -72,9 +73,21 @@ class WorkOrderFormForwardingTests(TestCase):
     def setUp(self):
         User = get_user_model()
         self.admin = User.objects.create_user(username="admin", password="pass", is_superuser=True)
+        self.backoffice = User.objects.create_user(username="backoffice", password="pass")
+        BuildingMembership.objects.create(
+            user=self.backoffice,
+            building=None,
+            role=MembershipRole.BACKOFFICE,
+        )
+        self.technician = User.objects.create_user(username="tech", password="pass")
         self.office = Building.objects.create(owner=self.admin, name="Office", is_system_default=True)
         self.destination_owner = User.objects.create_user(username="dest-owner", password="pass")
         self.destination = Building.objects.create(owner=self.destination_owner, name="Destination")
+        BuildingMembership.objects.create(
+            user=self.technician,
+            building=self.destination,
+            role=MembershipRole.TECHNICIAN,
+        )
 
     def _base_form_data(self, **overrides):
         data = {
@@ -84,6 +97,7 @@ class WorkOrderFormForwardingTests(TestCase):
             "deadline": timezone.localdate().isoformat(),
             "description": "",
             "replacement_request_note": "",
+            "office_employee": str(self.backoffice.pk),
             "forward_note": overrides.get("forward_note", "Please dispatch"),
             "forwarded_to_building": overrides.get("forwarded_to_building"),
         }
@@ -129,11 +143,80 @@ class WorkOrderFormForwardingTests(TestCase):
             self.destination_owner.get_full_name() or self.destination_owner.username,
         )
 
-    def test_building_dropdown_excludes_office(self):
+    def test_building_dropdown_includes_office_for_admin(self):
         form = WorkOrderForm(user=self.admin)
+        building_ids = set(form.fields["building"].queryset.values_list("id", flat=True))
+        self.assertIn(self.office.pk, building_ids)
+        self.assertIn(self.destination.pk, building_ids)
+        self.assertIsNone(form.fields["building"].empty_label)
+
+    def test_building_dropdown_includes_office_for_backoffice(self):
+        form = WorkOrderForm(user=self.backoffice)
+        building_ids = set(form.fields["building"].queryset.values_list("id", flat=True))
+        self.assertIn(self.office.pk, building_ids)
+        self.assertIn(self.destination.pk, building_ids)
+
+    def test_building_dropdown_translates_office_label_in_bulgarian(self):
+        with override("bg"):
+            form = WorkOrderForm(user=self.admin)
+            office_label = form.fields["building"].label_from_instance(self.office)
+        self.assertEqual(office_label, "Офис")
+
+    def test_building_dropdown_excludes_office_for_technician(self):
+        form = WorkOrderForm(user=self.technician)
         building_ids = set(form.fields["building"].queryset.values_list("id", flat=True))
         self.assertNotIn(self.office.pk, building_ids)
         self.assertIn(self.destination.pk, building_ids)
+
+    def test_office_employee_field_lists_only_backoffice_users(self):
+        non_backoffice = get_user_model().objects.create_user(username="no-backoffice", password="pass")
+        form = WorkOrderForm(user=self.admin, building=self.office)
+        employee_ids = set(form.fields["office_employee"].queryset.values_list("pk", flat=True))
+        self.assertIn(self.backoffice.pk, employee_ids)
+        self.assertNotIn(non_backoffice.pk, employee_ids)
+        self.assertTrue(form.show_office_employee)
+
+    def test_office_employee_required_for_office_building(self):
+        form = WorkOrderForm(
+            data=self._base_form_data(
+                office_employee="",
+                forwarded_to_building=str(self.destination.pk),
+            ),
+            user=self.admin,
+            building=self.office,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("office_employee", form.errors)
+
+    def test_lawyer_only_create_requires_unit_field(self):
+        form = WorkOrderForm(
+            user=self.admin,
+            force_lawyer_only=True,
+        )
+        self.assertTrue(form.fields["unit"].required)
+
+    def test_lawyer_only_create_without_unit_is_invalid(self):
+        form = WorkOrderForm(
+            data=self._base_form_data(),
+            user=self.admin,
+            building=self.destination,
+            force_lawyer_only=True,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("unit", form.errors)
+
+    def test_lawyer_only_create_with_unit_is_valid(self):
+        destination_unit = Unit.objects.create(building=self.destination, number="A-101")
+        form = WorkOrderForm(
+            data=self._base_form_data(unit=str(destination_unit.pk)),
+            user=self.admin,
+            building=self.destination,
+            force_lawyer_only=True,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        order = form.save()
+        self.assertEqual(order.unit_id, destination_unit.pk)
+        self.assertTrue(order.lawyer_only)
 
     def test_existing_forward_target_cannot_be_cleared(self):
         order = WorkOrder.objects.create(

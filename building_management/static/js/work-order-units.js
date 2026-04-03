@@ -12,6 +12,38 @@
 
     const buildingField = document.getElementById("id_building");
     const loadingText = unitField.dataset.loadingText || "Loading…";
+    const unitWrapper = document.querySelector(".js-work-order-unit-field");
+    const employeeWrapper = document.querySelector(".js-work-order-employee-field");
+    const employeeField = document.getElementById("id_office_employee");
+    const officeBuildingId = buildingField ? buildingField.dataset.officeBuildingId || "" : "";
+
+    const isOfficeBuilding = function (buildingId) {
+      if (!officeBuildingId || !buildingId) {
+        return false;
+      }
+      return String(officeBuildingId) === String(buildingId);
+    };
+
+    const toggleOfficeFields = function (buildingId) {
+      const officeSelected = isOfficeBuilding(buildingId);
+      if (unitWrapper) {
+        unitWrapper.classList.toggle("hidden", officeSelected);
+      }
+      if (employeeWrapper) {
+        employeeWrapper.classList.toggle("hidden", !officeSelected);
+      }
+      if (employeeField) {
+        employeeField.disabled = !officeSelected;
+        employeeField.setAttribute("aria-disabled", String(!officeSelected));
+        if (!officeSelected) {
+          employeeField.value = "";
+        }
+      }
+      if (officeSelected) {
+        setDisabledState(true, unitField.getAttribute("data-empty-label") || "---------");
+      }
+      return officeSelected;
+    };
 
     const setDisabledState = function (disabled, message) {
       unitField.innerHTML = "";
@@ -71,7 +103,8 @@
       unitField.dataset.initialBuilding || (buildingField ? buildingField.value : "");
     const selectedUnit = unitField.dataset.selectedUnit || unitField.value;
 
-    if (initialBuilding) {
+    const initialIsOffice = toggleOfficeFields(initialBuilding);
+    if (initialBuilding && !initialIsOffice) {
       populateUnits(initialBuilding, selectedUnit);
     } else {
       setDisabledState(true, unitField.getAttribute("data-empty-label") || "---------");
@@ -79,7 +112,12 @@
 
     if (buildingField && buildingField.tagName !== "INPUT") {
       buildingField.addEventListener("change", function (event) {
-        populateUnits(event.target.value, "");
+        const selectedBuilding = event.target.value;
+        const officeSelected = toggleOfficeFields(selectedBuilding);
+        if (officeSelected) {
+          return;
+        }
+        populateUnits(selectedBuilding, "");
       });
     }
   };

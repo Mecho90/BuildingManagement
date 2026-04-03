@@ -11,7 +11,7 @@ from django.utils import formats, timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.text import capfirst
 from django.template.defaultfilters import filesizeformat
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import get_language, gettext_lazy as _
 from django.db import transaction
 from django.db.models import F, Q
 from django.db.models.functions import Lower
@@ -32,7 +32,7 @@ from .models import (
     WorkOrderAttachment,
     UserSecurityProfile,
 )
-from .utils.roles import user_can_approve_work_orders, user_is_lawyer
+from .utils.roles import user_can_approve_work_orders, user_is_admin_or_backoffice, user_is_lawyer
 
 ROLE_DESCRIPTIONS = {
     MembershipRole.TECHNICIAN: _("Technician – access to assigned buildings."),
@@ -178,6 +178,7 @@ class BuildingForm(forms.ModelForm):
             self.fields["owner"].widget.attrs["data-technician-users"] = ",".join(
                 str(pk) for pk in sorted(technician_ids)
             )
+            self.fields["owner"].empty_label = None
             self.fields["owner"].label_from_instance = lambda obj: obj.get_full_name() or obj.get_username()
             self.fields["owner"].label = _("Owner")
         else:
@@ -197,17 +198,11 @@ class BuildingForm(forms.ModelForm):
                 ).exists()
         is_editing_existing = bool(getattr(self.instance, "pk", None))
         role_field = self.fields["role"]
-        if not is_editing_existing:
-            role_field.widget = forms.HiddenInput()
-            role_field.required = False
-            role_field.initial = Building.Role.TECH_SUPPORT
-            role_field.help_text = ""
-        elif is_editing_existing and not self._is_admin:
+        if is_editing_existing and not self._is_admin:
             role_field.disabled = True
             role_field.help_text = _("Only administrators can change the building role once it has been set.")
         elif not owner_is_technician:
             role_field.disabled = True
-            role_field.help_text = _("Role is editable only when the assigned user has the Technician role.")
 
     def save(self, commit: bool = True):
         obj: Building = super().save(commit=False)
@@ -516,7 +511,9 @@ class WorkOrderForm(forms.ModelForm):
         self._building = building
         self._force_lawyer_only = bool(force_lawyer_only)
         self._locked_building_obj = self._coerce_building(building)
+        self._requires_unit_for_lawyer_order = False
         self._effective_building = None
+        self.show_office_employee = False
         self._existing_attachments = []
         self._attachment_lookup: dict[str, WorkOrderAttachment] = {}
         self._resolver = CapabilityResolver(user) if user and user.is_authenticated else None
@@ -528,6 +525,7 @@ class WorkOrderForm(forms.ModelForm):
         self._budget_charge_budget: BudgetRequest | None = None
         self._budget_charge_amount_value: Decimal | None = None
         super().__init__(*args, **kwargs)
+        self._requires_unit_for_lawyer_order = self._is_lawyer_order_create()
 
         # 1) Building choices / lock + hide if provided
         if self._building is not None:
@@ -538,7 +536,9 @@ class WorkOrderForm(forms.ModelForm):
             self.fields["building"].required = False
         else:
             if user:
-                bqs = Building.objects.visible_to(user).exclude(is_system_default=True)
+                bqs = Building.objects.visible_to(user)
+                if self._force_lawyer_only or not user_is_admin_or_backoffice(user):
+                    bqs = bqs.exclude(is_system_default=True)
             else:
                 bqs = Building.objects.none()
             self.fields["building"].queryset = bqs
@@ -548,6 +548,20 @@ class WorkOrderForm(forms.ModelForm):
             self.fields["building"].queryset = field_qs.order_by("name", "id")
 
         self.fields["building"].label = _("Building")
+        if not isinstance(self.fields["building"].widget, forms.HiddenInput):
+            self.fields["building"].empty_label = None
+        def _building_label(obj: Building) -> str:
+            if not getattr(obj, "is_system_default", False):
+                return obj.name
+            language_code = (get_language() or "").lower()
+            if language_code.startswith("bg"):
+                return "Офис"
+            return _("Office")
+
+        self.fields["building"].label_from_instance = _building_label
+        office_building_id = Building.system_default_id()
+        if office_building_id:
+            self.fields["building"].widget.attrs["data-office-building-id"] = str(office_building_id)
 
         # 2) Units: filter by effective building (kwarg > POST > initial > instance)
         effective_b = (
@@ -560,6 +574,9 @@ class WorkOrderForm(forms.ModelForm):
         effective_building_obj = self._coerce_building(effective_b)
         b_id = effective_building_obj.pk if effective_building_obj else self._resolve_building_id(effective_b)
         self._effective_building = effective_building_obj
+        self.show_office_employee = bool(
+            effective_building_obj and getattr(effective_building_obj, "is_system_default", False)
+        )
         self.fields["unit"].queryset = (
             Unit.objects.filter(building_id=b_id).order_by("number") if b_id else Unit.objects.none()
         )
@@ -574,6 +591,28 @@ class WorkOrderForm(forms.ModelForm):
             unit_field.widget = forms.HiddenInput()
             unit_field.required = False
             unit_field.initial = None
+        if self._requires_unit_for_lawyer_order:
+            self.fields["unit"].required = True
+
+        office_employee_queryset = (
+            User.objects.filter(
+                memberships__role=MembershipRole.BACKOFFICE,
+                is_active=True,
+            )
+            .distinct()
+            .order_by(Lower("username"))
+        )
+        office_employee_field = forms.ModelChoiceField(
+            queryset=office_employee_queryset,
+            required=False,
+            label=_("Employees"),
+            widget=forms.Select(attrs={"class": "input"}),
+        )
+        office_employee_field.empty_label = None
+        office_employee_field.label_from_instance = lambda obj: obj.get_full_name() or obj.username
+        if not self.show_office_employee:
+            office_employee_field.widget.attrs["disabled"] = "disabled"
+        self.fields["office_employee"] = office_employee_field
 
         self.fields["unit"].label = _("Unit")
         self.fields["priority"].label = _("Priority")
@@ -719,10 +758,15 @@ class WorkOrderForm(forms.ModelForm):
         building_id = getattr(building, "pk", None)
 
         unit = cleaned.get("unit")
+        office_employee = cleaned.get("office_employee")
 
         # Unit must belong to building
         if building and unit and unit.building_id != building.id:
             self.add_error("unit", _("Selected unit does not belong to the chosen building."))
+        if not (building and getattr(building, "is_system_default", False)):
+            cleaned["office_employee"] = None
+        elif not office_employee:
+            self.add_error("office_employee", _("Select an employee."))
 
         # Non-staff must own the building
         if self._user and building:
@@ -967,6 +1011,11 @@ class WorkOrderForm(forms.ModelForm):
         can_view_confidential = self._resolver.has(Capability.VIEW_CONFIDENTIAL_WORK_ORDERS)
         can_manage_buildings = self._resolver.has(Capability.MANAGE_BUILDINGS)
         return can_view_confidential and not can_manage_buildings
+
+    def _is_lawyer_order_create(self) -> bool:
+        if getattr(self.instance, "pk", None):
+            return False
+        return bool(self._force_lawyer_only or self._user_is_lawyer())
 
     def apply_budget_charge(self, *, work_order: WorkOrder, actor):
         budget = getattr(self, "_budget_charge_budget", None)
