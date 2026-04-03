@@ -7,6 +7,18 @@ from django import template
 register = template.Library()
 
 
+def _path_matches_pattern(path: str, pattern: str) -> bool:
+    if not pattern:
+        return False
+    exact = pattern.endswith("$")
+    candidate = pattern[:-1] if exact else pattern
+    if candidate == "/":
+        return path == "/"
+    if exact:
+        return path == candidate
+    return path.startswith(candidate)
+
+
 @register.simple_tag(takes_context=True)
 def active_nav(
     context,
@@ -23,20 +35,21 @@ def active_nav(
     if not request:
         return ""
     path = request.path or ""
+    positive_patterns: list[str] = []
+    negative_patterns: list[str] = []
     for pattern in patterns:
         if not pattern:
             continue
-        matches = False
-        exact = pattern.endswith("$")
-        candidate = pattern[:-1] if exact else pattern
-        if candidate == "/":
-            matches = path == "/"
-        elif exact:
-            matches = path == candidate
-        else:
-            matches = path.startswith(candidate)
-        if matches:
-            return css_class
+        if pattern.startswith("!"):
+            negated = pattern[1:]
+            if negated:
+                negative_patterns.append(negated)
+            continue
+        positive_patterns.append(pattern)
+    if any(_path_matches_pattern(path, pattern) for pattern in negative_patterns):
+        return ""
+    if any(_path_matches_pattern(path, pattern) for pattern in positive_patterns):
+        return css_class
     return ""
 
 

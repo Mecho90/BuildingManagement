@@ -44,21 +44,21 @@
                         {% trans "To-Dos" %}
                       </a>
                     {% endif %}
-                    <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/' css_class='nav-link--active' %} {% active_nav_next_prefix '/buildings/' css_class='nav-link--active' %}">
+                    <a href="{% url 'core:buildings_list' %}" class="nav-link {% active_nav '/buildings/' '/manage/mass-delete/buildings/$' css_class='nav-link--active' %} {% active_nav_next_prefix '/buildings/' css_class='nav-link--active' %}">
                       {% trans "Buildings" %}
                     </a>
                     {% if work_orders_enabled and work_orders_url %}
-                      <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url|add:'$' css_class='nav-link--active' %}">
+                      <a href="{{ work_orders_url }}" class="nav-link {% active_nav work_orders_url '!/work-orders/archive/' '!/work-orders/lawyer/' '/manage/mass-archive/work-orders/$' '/manage/mass-delete/work-orders/$' css_class='nav-link--active' %} {% active_nav_next_prefix '/work-orders/' css_class='nav-link--active' %}">
                         {% trans "Work Orders" %}
                       </a>
                     {% endif %}
                     {% if lawyer_orders_enabled and lawyer_orders_url %}
-                      <a href="{{ lawyer_orders_url }}" class="nav-link {% active_nav lawyer_orders_url css_class='nav-link--active' %}">
+                      <a href="{{ lawyer_orders_url }}" class="nav-link {% active_nav lawyer_orders_url '/manage/mass-delete/lawyer-work-orders/$' css_class='nav-link--active' %}">
                         {% trans "Lawyer Orders" %}
                       </a>
                     {% endif %}
                     {% if budgets_enabled and budgets_url %}
-                      <a href="{{ budgets_url }}" class="nav-link {% active_nav budgets_url|add:'$' css_class='nav-link--active' %}">
+                      <a href="{{ budgets_url }}" class="nav-link {% active_nav '/budgets/' css_class='nav-link--active' %}">
                         {% trans "Budgets" %}
                       </a>
                     {% endif %}
@@ -68,7 +68,7 @@
                       </a>
                     {% endif %}
                     {% if can_view_user_management and user_management_url %}
-                      <a href="{{ user_management_url }}" class="nav-link {% active_nav '/manage/users/' css_class='nav-link--active' %}">
+                      <a href="{{ user_management_url }}" class="nav-link {% active_nav '/manage/users/' '/manage/mass-delete/users/$' css_class='nav-link--active' %}">
                         {% trans "User Management" %}
                       </a>
                     {% elif user.is_staff %}
